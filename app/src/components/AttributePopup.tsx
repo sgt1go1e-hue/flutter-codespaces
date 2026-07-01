@@ -5,27 +5,49 @@ import {
   pipeTypes,
   sizesForPipeType,
   getSizeInfo,
+  getPipeType,
+  connectionMethods,
 } from '../data/masters'
 
 interface Props {
   segment: Segment
+  /** 親から継承される管種（自分未設定時のデフォルト） */
+  inheritedPipeType?: string
+  /** 親から継承されるサイズ（自分未設定時のデフォルト） */
+  inheritedSize?: string
   onChange: (patch: Partial<Segment>) => void
   onClose: () => void
 }
 
 /**
  * 「寸法・属性を入力」で開くポップアップ（ボトムシート）。
- * 管種 / サイズ(呼び径) / 継手(始点側・終点側) をマスタから選択する。
+ * 管種 / サイズ / 継手 / 接続方法 をマスタから選択する。
+ * 未設定の管種・サイズは上流から継承した値を既定として扱い、
+ * 明示的に選ぶとその値が下流にも引き継がれる。
  */
-export function AttributePopup({ segment, onChange, onClose }: Props) {
+export function AttributePopup({
+  segment,
+  inheritedPipeType,
+  inheritedSize,
+  onChange,
+  onClose,
+}: Props) {
   const length = Math.round(distance(segment.start, segment.end))
-  const sizes = sizesForPipeType(segment.pipeType)
-  const od = getSizeInfo(segment.size)?.od
+  // サイズ候補は「実効管種（自分 or 継承）」に合わせる
+  const effPipe = segment.pipeType ?? inheritedPipeType
+  const sizes = sizesForPipeType(effPipe)
+  const od = getSizeInfo(segment.size ?? inheritedSize)?.od
 
-  // 管種を変えたとき、そのサイズが新しい管種に無ければサイズをリセット
+  const pipeEmptyLabel = inheritedPipeType
+    ? `継承（${getPipeType(inheritedPipeType)?.short ?? inheritedPipeType}）`
+    : '— 未設定 —'
+  const sizeEmptyLabel = inheritedSize ? `継承（${inheritedSize}）` : '— 未設定 —'
+
   function onPipeTypeChange(pipeType: string) {
-    const available = sizesForPipeType(pipeType).map((s) => s.code)
-    const patch: Partial<Segment> = { pipeType }
+    const available = sizesForPipeType(pipeType || inheritedPipeType).map(
+      (s) => s.code,
+    )
+    const patch: Partial<Segment> = { pipeType: pipeType || undefined }
     if (segment.size && !available.includes(segment.size)) {
       patch.size = undefined
     }
@@ -51,12 +73,15 @@ export function AttributePopup({ segment, onChange, onClose }: Props) {
           </div>
 
           <label className="field">
-            <span className="field-label">管種</span>
+            <span className="field-label">
+              管種
+              <span className="field-note">未設定なら上流から継承</span>
+            </span>
             <select
               value={segment.pipeType ?? ''}
               onChange={(e) => onPipeTypeChange(e.target.value)}
             >
-              <option value="">— 未選択 —</option>
+              <option value="">{pipeEmptyLabel}</option>
               {pipeTypes.map((p) => (
                 <option key={p.id} value={p.id}>
                   {p.name}
@@ -74,10 +99,27 @@ export function AttributePopup({ segment, onChange, onClose }: Props) {
               value={segment.size ?? ''}
               onChange={(e) => onChange({ size: e.target.value || undefined })}
             >
-              <option value="">— 未選択 —</option>
+              <option value="">{sizeEmptyLabel}</option>
               {sizes.map((s) => (
                 <option key={s.code} value={s.code}>
                   {s.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <label className="field">
+            <span className="field-label">接続方法</span>
+            <select
+              value={segment.connection ?? ''}
+              onChange={(e) =>
+                onChange({ connection: e.target.value || undefined })
+              }
+            >
+              <option value="">— 未設定 —</option>
+              {connectionMethods.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
                 </option>
               ))}
             </select>
@@ -118,7 +160,8 @@ export function AttributePopup({ segment, onChange, onClose }: Props) {
           </label>
 
           <p className="sheet-note">
-            切断寸法の自動計算はフェーズ3、継手の集計・CSV出力はフェーズ4で対応します。
+            サイズ・管種を変更すると、下流のセグメントにも引き継がれます（別途変更されるまで）。
+            切断寸法の自動計算はフェーズ3、集計・CSV出力はフェーズ4で対応します。
           </p>
         </div>
       </div>

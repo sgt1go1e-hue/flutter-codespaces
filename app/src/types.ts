@@ -23,6 +23,15 @@ export interface Segment {
   startFitting?: string
   /** 終点側の継手（fittings.json の id） */
   endFitting?: string
+  /** 接続方法（connections の id）。例: フランジ接合 'flange' */
+  connection?: string
+
+  /**
+   * 直接の親（上流）セグメントの id。属性継承に使う。
+   * pipeType / size が未設定のときは親をたどって値を継承する。
+   * 描画時に、始点が接続している既存セグメントを自動で親に設定する。
+   */
+  parentId?: string
 }
 
 // 図面全体の状態

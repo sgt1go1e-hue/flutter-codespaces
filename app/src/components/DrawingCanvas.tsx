@@ -4,9 +4,10 @@ import {
   distance,
   distanceToSegment,
   isometricGrid,
-  snapToEndpoints,
-  snapToIsometric,
+  snapSegmentToGrid,
 } from '../lib/isometric'
+import { breakLine } from '../lib/crossover'
+import type { Effective } from '../lib/inheritance'
 
 interface Props {
   segments: Segment[]
@@ -14,31 +15,38 @@ interface Props {
   onAddSegment: (seg: Omit<Segment, 'id'>) => void
   /** ロングタップでセグメントを選択したとき（メニュー表示位置を画面座標で渡す） */
   onLongPressSegment: (id: string, clientX: number, clientY: number) => void
+  /** 各セグメントの実効属性（継承後） */
+  effectiveById: Record<string, Effective>
+  /** またぎ表示で線を途切れさせる位置（セグメント上パラメータ 0〜1） */
+  crossoverGaps: Record<string, number[]>
+  /** パーツドラッグ中など、キャンバス入力を一時無効化する */
+  inputDisabled: boolean
 }
 
 // 指を動かして「描画」と判定するまでの移動量(px)。これ未満なら静止扱い。
 const MOVE_THRESHOLD = 8
 // ロングタップ（長押し）と判定するまでの時間(ms)
 const LONG_PRESS_MS = 500
-// 端点どうしを連結するための吸着距離(px)
-const ENDPOINT_SNAP = 24
 // ロングタップ位置からセグメントを拾うヒット距離(px)
 const HIT_DIST = 18
-// アイソメグリッドの間隔(px)
+// アイソメグリッドの間隔(px)＝格子スナップの基準
 const GRID_GAP = 40
+// またぎ表示の途切れ幅(px)
+const CROSS_GAP = 9
 
 export function DrawingCanvas({
   segments,
   selectedId,
   onAddSegment,
   onLongPressSegment,
+  effectiveById,
+  crossoverGaps,
+  inputDisabled,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
-  // 描画中のプレビュー線（スナップ後）
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
     null,
   )
-  // キャンバスの実サイズ（グリッド生成用）
   const [size, setSize] = useState({ w: 0, h: 0 })
 
   // ジェスチャ状態
@@ -48,7 +56,6 @@ export function DrawingCanvas({
   const longFiredRef = useRef(false)
   const longTimerRef = useRef<number | null>(null)
 
-  // キャンバスサイズを監視してグリッドに反映
   useEffect(() => {
     const el = svgRef.current
     if (!el) return
@@ -72,13 +79,6 @@ export function DrawingCanvas({
     return { x: clientX - rect.left, y: clientY - rect.top }
   }
 
-  function allEndpoints(): Point[] {
-    const pts: Point[] = []
-    for (const s of segments) pts.push(s.start, s.end)
-    return pts
-  }
-
-  // 指定点の近くにあるセグメントを1つ返す（無ければ null）
   function hitSegment(p: Point): Segment | null {
     let best: Segment | null = null
     let bestDist = HIT_DIST
@@ -100,6 +100,7 @@ export function DrawingCanvas({
   }
 
   function handlePointerDown(e: React.PointerEvent) {
+    if (inputDisabled) return
     svgRef.current?.setPointerCapture(e.pointerId)
     const local = toLocal(e.clientX, e.clientY)
     startLocalRef.current = local
@@ -108,7 +109,6 @@ export function DrawingCanvas({
     longFiredRef.current = false
     setPreview(null)
 
-    // 指を止めたまま LONG_PRESS_MS 経過したら選択（描画開始していなければ）
     clearLongTimer()
     longTimerRef.current = window.setTimeout(() => {
       if (movedRef.current) return
@@ -125,14 +125,13 @@ export function DrawingCanvas({
     if (!start || longFiredRef.current) return
     const p = toLocal(e.clientX, e.clientY)
     if (!movedRef.current && distance(start, p) > MOVE_THRESHOLD) {
-      // 動いた → 描画モードに確定（ロングタップはキャンセル）
       movedRef.current = true
       clearLongTimer()
     }
     if (movedRef.current) {
-      const snappedStart = snapToEndpoints(start, allEndpoints(), ENDPOINT_SNAP)
-      const { end } = snapToIsometric(snappedStart, p)
-      setPreview({ start: snappedStart, end })
+      // グリッド交点間・アイソメ角に拘束したプレビュー
+      const { start: s, end } = snapSegmentToGrid(start, p, GRID_GAP)
+      setPreview({ start: s, end })
     }
   }
 
@@ -143,19 +142,43 @@ export function DrawingCanvas({
     startClientRef.current = null
 
     if (longFiredRef.current) {
-      // ロングタップ選択済み → 描画はしない
       setPreview(null)
       return
     }
     if (start && movedRef.current) {
       const p = toLocal(e.clientX, e.clientY)
-      const snappedStart = snapToEndpoints(start, allEndpoints(), ENDPOINT_SNAP)
-      const { end, angle } = snapToIsometric(snappedStart, p)
-      const snappedEnd = snapToEndpoints(end, allEndpoints(), ENDPOINT_SNAP)
-      onAddSegment({ start: snappedStart, end: snappedEnd, angle })
+      const { start: s, end, angle } = snapSegmentToGrid(start, p, GRID_GAP)
+      onAddSegment({ start: s, end, angle })
     }
-    // 静止したままの短いタップは何もしない（描画の妨げにしない）
     setPreview(null)
+  }
+
+  // フランジ記号（配管に直交する短い2本線）
+  function flangeMarker(s: Segment) {
+    const mx = (s.start.x + s.end.x) / 2
+    const my = (s.start.y + s.end.y) / 2
+    const len = distance(s.start, s.end) || 1
+    const ux = (s.end.x - s.start.x) / len
+    const uy = (s.end.y - s.start.y) / len
+    const nx = -uy
+    const ny = ux
+    const half = 8
+    const off = 3
+    const bar = (cx: number, cy: number) => (
+      <line
+        x1={cx - nx * half}
+        y1={cy - ny * half}
+        x2={cx + nx * half}
+        y2={cy + ny * half}
+        className="flange-mark"
+      />
+    )
+    return (
+      <>
+        {bar(mx - ux * off, my - uy * off)}
+        {bar(mx + ux * off, my + uy * off)}
+      </>
+    )
   }
 
   return (
@@ -167,37 +190,54 @@ export function DrawingCanvas({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
     >
-      {/* アイソメ（等角投影）グリッド：30°/150° の菱形パターン */}
+      {/* アイソメ格子：30°/150° の菱形パターン（描画はこの交点間に拘束される） */}
       <g className="iso-grid" pointerEvents="none">
         {gridLines.map((l, i) => (
           <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} />
         ))}
       </g>
 
-      {/* 確定済みセグメント（タップ判定は JS 側のヒットテストで行うため pointerEvents は無効） */}
+      {/* 確定済みセグメント */}
       {segments.map((s) => {
         const selected = s.id === selectedId
+        const eff = effectiveById[s.id]
+        const resolved = eff?.resolved ?? false
+        // 色: 選択=橙 / 属性確定=水色 / 未確定=グレー
+        const stroke = selected ? '#f59e0b' : resolved ? '#38bdf8' : '#64748b'
+        const dashed = !resolved && !selected
+        const pieces = breakLine(
+          s.start,
+          s.end,
+          crossoverGaps[s.id] ?? [],
+          CROSS_GAP,
+        )
         return (
           <g key={s.id} pointerEvents="none">
-            <line
-              x1={s.start.x}
-              y1={s.start.y}
-              x2={s.end.x}
-              y2={s.end.y}
-              stroke={selected ? '#f59e0b' : '#38bdf8'}
-              strokeWidth={selected ? 5 : 3}
-              strokeLinecap="round"
-            />
+            {pieces.map((pc, i) => (
+              <line
+                key={i}
+                x1={pc.a.x}
+                y1={pc.a.y}
+                x2={pc.b.x}
+                y2={pc.b.y}
+                stroke={stroke}
+                strokeWidth={selected ? 5 : 3}
+                strokeLinecap="round"
+                strokeDasharray={dashed ? '6 5' : undefined}
+              />
+            ))}
             <circle cx={s.start.x} cy={s.start.y} r={4} fill="#94a3b8" />
             <circle cx={s.end.x} cy={s.end.y} r={4} fill="#94a3b8" />
-            {s.size && (
+            {s.connection === 'flange' && flangeMarker(s)}
+            {eff?.size && (
               <text
-                className="seg-label"
+                className={`seg-label${eff.sizeOwn ? '' : ' inherited'}`}
                 x={(s.start.x + s.end.x) / 2}
-                y={(s.start.y + s.end.y) / 2 - 8}
+                y={(s.start.y + s.end.y) / 2 - 10}
                 textAnchor="middle"
               >
-                {s.size}
+                {eff.size}
+                {!eff.sizeOwn && '*'}
               </text>
             )}
           </g>

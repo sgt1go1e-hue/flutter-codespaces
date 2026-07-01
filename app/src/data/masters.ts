@@ -28,6 +28,23 @@ export const pipeTypes = pipesJson.pipeTypes as PipeType[]
 export const sizeList = pipesJson.sizeList as SizeInfo[]
 export const fittings = fittingsJson.fittings as Fitting[]
 
+// --- 接続方法（接合方法）マスタ ---
+export interface ConnectionMethod {
+  id: string
+  name: string
+}
+
+export const connectionMethods: ConnectionMethod[] = [
+  { id: 'weld', name: '溶接' },
+  { id: 'thread', name: 'ねじ込み' },
+  { id: 'socket', name: '差込（ソケット）' },
+  { id: 'flange', name: 'フランジ接合' },
+]
+
+export function getConnectionMethod(id?: string): ConnectionMethod | undefined {
+  return connectionMethods.find((c) => c.id === id)
+}
+
 // --- 参照ヘルパー ---
 export function getPipeType(id?: string): PipeType | undefined {
   return pipeTypes.find((p) => p.id === id)

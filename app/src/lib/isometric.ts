@@ -69,9 +69,15 @@ export interface GridLine {
   y2: number
 }
 
+// 菱形グリッドを構成する2方向（30° / 150°）の単位法線ベクトル。
+// 原点(0,0)を基準に、各線は p·n = k*gap（k は整数）上に並ぶ。
+// このため格子（交点）も原点基準で定義でき、キャンバスサイズに依らず安定する。
+const N_A = { x: -Math.sin(30 * DEG), y: Math.cos(30 * DEG) } // 30°線の法線
+const N_B = { x: -Math.sin(150 * DEG), y: Math.cos(150 * DEG) } // 150°線の法線
+
 /**
- * 指定角度(度)の平行線群を、w×h の領域を覆うように生成する。
- * 中心から前後に、direction 方向へ長く伸ばした線を perpendicular 方向に gap 間隔で並べる。
+ * 指定角度(度)の平行線群を、原点(0,0)基準で w×h の領域を覆うように生成する。
+ * 各線は p·n = k*gap 上に並ぶので、格子スナップ(snapToLattice)と必ず一致する。
  */
 function parallelLines(
   w: number,
@@ -83,22 +89,29 @@ function parallelLines(
   const rad = angleDeg * DEG
   const ux = Math.cos(rad)
   const uy = Math.sin(rad)
-  // 線に垂直な方向（この方向へ gap 間隔でずらす）
-  const nx = -uy
+  const nx = -uy // 線に垂直な方向（単位ベクトル）
   const ny = ux
-  const cx = w / 2
-  const cy = h / 2
+  // ビューポート四隅での p·n の範囲から、必要な k の範囲を求める
+  const corners = [
+    0,
+    w * nx,
+    h * ny,
+    w * nx + h * ny,
+  ]
+  const cmin = Math.min(...corners)
+  const cmax = Math.max(...corners)
   const diag = Math.hypot(w, h)
-  const count = Math.ceil(diag / gap)
   const lines: GridLine[] = []
-  for (let k = -count; k <= count; k++) {
-    const ox = cx + nx * k * gap
-    const oy = cy + ny * k * gap
+  for (let k = Math.floor(cmin / gap); k <= Math.ceil(cmax / gap); k++) {
+    const c = k * gap
+    // 線 p·n = c 上の基準点（法線方向に c だけ進んだ点）
+    const px = nx * c
+    const py = ny * c
     lines.push({
-      x1: ox - ux * diag,
-      y1: oy - uy * diag,
-      x2: ox + ux * diag,
-      y2: oy + uy * diag,
+      x1: px - ux * diag,
+      y1: py - uy * diag,
+      x2: px + ux * diag,
+      y2: py + uy * diag,
     })
   }
   return lines
@@ -107,13 +120,80 @@ function parallelLines(
 /**
  * アイソメ（等角投影）グリッドの線を生成する。
  * 30° と 150° の2方向の平行線群を重ねることで菱形（ひし形）パターンになる。
- * これらは配管のアイソメ角(30/150/210/330°)と一致し、描画時のガイドになる。
  */
 export function isometricGrid(w: number, h: number, gap: number): GridLine[] {
   return [
     ...parallelLines(w, h, gap, 30),
     ...parallelLines(w, h, gap, 150),
   ]
+}
+
+/**
+ * 任意の点を、最寄りのアイソメ格子交点（グリッド線の交点）へスナップする。
+ * 30°線群と150°線群の交点で構成される格子の格子点を返す。
+ */
+export function snapToLattice(p: Point, gap: number): Point {
+  const i = Math.round((p.x * N_A.x + p.y * N_A.y) / gap)
+  const j = Math.round((p.x * N_B.x + p.y * N_B.y) / gap)
+  const A = i * gap
+  const B = j * gap
+  // 連立 p·N_A = A, p·N_B = B を解いた閉形式（N_A,N_B は上記の単位法線）
+  return { x: -(A + B), y: (A - B) / Math.sqrt(3) }
+}
+
+/**
+ * 指定アイソメ角度に沿って隣り合う格子点どうしの距離(px)。
+ * 0°/180°(水平)は 2*gap、それ以外(30/90/150…)は 2*gap/√3。
+ */
+export function latticeStep(angleDeg: number, gap: number): number {
+  const a = ((angleDeg % 180) + 180) % 180
+  return a === 0 ? 2 * gap : (2 * gap) / Math.sqrt(3)
+}
+
+/**
+ * フリーハンドの始点・終点を、
+ *  1) 始点を最寄り格子点へスナップ
+ *  2) 向きを最寄りのアイソメ角へスナップ
+ *  3) その方向で最寄り格子点に乗る長さ（格子ステップの整数倍）に終点をスナップ
+ * することで、必ず「交点から交点へ・アイソメ角に沿った」セグメントに整える。
+ */
+export function snapSegmentToGrid(
+  rawStart: Point,
+  rawEnd: Point,
+  gap: number,
+): { start: Point; end: Point; angle: number } {
+  const start = snapToLattice(rawStart, gap)
+  const dx = rawEnd.x - start.x
+  const dy = rawEnd.y - start.y
+  const rawAngle = angleOf(dx, dy)
+
+  // 最寄りのアイソメ角
+  let angle = SNAP_CANDIDATES[0]
+  let bestDiff = Infinity
+  for (const cand of SNAP_CANDIDATES) {
+    const diff = angleDiff(rawAngle, cand)
+    if (diff < bestDiff) {
+      bestDiff = diff
+      angle = cand
+    }
+  }
+
+  const rad = angle * DEG
+  const ux = Math.cos(rad)
+  const uy = Math.sin(rad)
+  const projLen = dx * ux + dy * uy // その方向への射影長
+  const step = latticeStep(angle, gap)
+  const k = Math.max(1, Math.round(projLen / step)) // 最低1ステップ
+  const end: Point = {
+    x: start.x + ux * step * k,
+    y: start.y + uy * step * k,
+  }
+  return { start, end, angle }
+}
+
+/** 2点がほぼ同一か（格子スナップ済みなので誤差は極小） */
+export function samePoint(a: Point, b: Point, eps = 1): boolean {
+  return Math.abs(a.x - b.x) <= eps && Math.abs(a.y - b.y) <= eps
 }
 
 /** 点 p から線分 a-b までの最短距離 */

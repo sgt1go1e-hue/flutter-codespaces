@@ -276,3 +276,93 @@ body {
   stroke: #0f172a;
   stroke-width: 3px;
 }
+
+/* 継承（仮適用）中のサイズラベルは控えめに表示 */
+.seg-label.inherited {
+  fill: #64748b;
+  font-weight: 500;
+}
+
+/* フランジ記号（配管に直交する2本線） */
+.flange-mark {
+  stroke: #e2e8f0;
+  stroke-width: 2.5;
+  stroke-linecap: round;
+}
+
+/* --- パーツパレット（画面下部） --- */
+.palette {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: #111c30;
+  border-top: 1px solid #1f2b3d;
+}
+
+.palette-title {
+  color: var(--hint);
+  font-size: 12px;
+  white-space: nowrap;
+}
+
+.palette-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+}
+
+.palette-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #1e293b;
+  color: var(--text);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-height: 44px;
+  font-size: 14px;
+  touch-action: none;
+  white-space: nowrap;
+}
+
+.palette-chip.dragging {
+  opacity: 0.4;
+}
+
+.chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #0ea5e9;
+  color: #04222e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.palette-hint {
+  color: #64748b;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ドラッグ中に指へ追従する ghost */
+.part-ghost {
+  position: fixed;
+  z-index: 30;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #0ea5e9;
+  color: #04222e;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
