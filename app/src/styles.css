@@ -1,0 +1,114 @@
+:root {
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --text: #e2e8f0;
+  --hint: #94a3b8;
+  --accent: #38bdf8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family:
+    system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+    sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  /* タッチ操作でのスクロール／ズームを無効化（描画優先） */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  padding-top: max(10px, env(safe-area-inset-top));
+  background: var(--panel);
+  gap: 12px;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 16px;
+}
+
+.tools {
+  display: flex;
+  gap: 8px;
+}
+
+.tools button {
+  background: #334155;
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  min-height: 44px;
+}
+
+.tools button:disabled {
+  opacity: 0.4;
+}
+
+.tools button:active:not(:disabled) {
+  background: var(--accent);
+  color: #04222e;
+}
+
+.stage {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background:
+    radial-gradient(circle, #1e293b 1px, transparent 1px);
+  background-size: 28px 28px;
+  touch-action: none;
+}
+
+.statusbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 14px;
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  background: var(--panel);
+  font-size: 13px;
+}
+
+.hint {
+  color: var(--hint);
+  margin-left: 6px;
+}
+
+.count {
+  color: var(--hint);
+  white-space: nowrap;
+}
