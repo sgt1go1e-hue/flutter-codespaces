@@ -190,6 +190,16 @@ export function DrawingCanvas({
             />
             <circle cx={s.start.x} cy={s.start.y} r={4} fill="#94a3b8" />
             <circle cx={s.end.x} cy={s.end.y} r={4} fill="#94a3b8" />
+            {s.size && (
+              <text
+                className="seg-label"
+                x={(s.start.x + s.end.x) / 2}
+                y={(s.start.y + s.end.y) / 2 - 8}
+                textAnchor="middle"
+              >
+                {s.size}
+              </text>
+            )}
           </g>
         )
       })}

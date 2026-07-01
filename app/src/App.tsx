@@ -28,6 +28,14 @@ export default function App() {
     setSegments((prev) => [...prev, { ...seg, id: makeId() }])
   }
 
+  // 選択中セグメントの属性を更新（管種/サイズ/継手など）
+  function updateSelected(patch: Partial<Segment>) {
+    if (!selectedId) return
+    setSegments((prev) =>
+      prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s)),
+    )
+  }
+
   // ロングタップでセグメント選択 → アクションメニューを表示
   function handleLongPress(id: string, clientX: number, clientY: number) {
     setSelectedId(id)
@@ -100,7 +108,11 @@ export default function App() {
 
         {/* 「寸法・属性を入力」で開くポップアップ */}
         {attrOpen && selected && (
-          <AttributePopup segment={selected} onClose={closeSelection} />
+          <AttributePopup
+            segment={selected}
+            onChange={updateSelected}
+            onClose={closeSelection}
+          />
         )}
       </main>
 

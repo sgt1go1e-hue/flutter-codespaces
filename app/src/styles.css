@@ -226,3 +226,53 @@ body {
   border-top: 1px solid #334155;
   margin: 4px 0;
 }
+
+/* 属性入力フォーム */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 4px;
+}
+
+.field-label {
+  color: var(--hint);
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.field-note {
+  color: #64748b;
+  font-size: 12px;
+}
+
+.field select {
+  appearance: none;
+  background: #0b1220;
+  color: var(--text);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
+  min-height: 48px;
+  width: 100%;
+}
+
+.sheet-note {
+  color: #64748b;
+  font-size: 12px;
+  margin: 12px 4px 0;
+  line-height: 1.6;
+}
+
+/* セグメント上のサイズ表示ラベル */
+.seg-label {
+  fill: #cbd5e1;
+  font-size: 12px;
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: #0f172a;
+  stroke-width: 3px;
+}

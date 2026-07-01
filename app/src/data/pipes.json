@@ -1,0 +1,44 @@
+{
+  "_comment": "管種・サイズ(呼び径)のマスタ。後から自由に追加・編集できます。sizes は pipeType ごとに使える呼び径コードの一覧、sizeList は呼び径ごとの表示名と外径(mm)です。",
+  "pipeTypes": [
+    {
+      "id": "sgp",
+      "name": "SGP 配管用炭素鋼鋼管",
+      "short": "SGP",
+      "sizes": ["15A", "20A", "25A", "32A", "40A", "50A", "65A", "80A", "100A"]
+    },
+    {
+      "id": "sus",
+      "name": "ステンレス鋼管 (SUS304)",
+      "short": "SUS",
+      "sizes": ["15A", "20A", "25A", "32A", "40A", "50A", "65A", "80A", "100A"]
+    },
+    {
+      "id": "vp",
+      "name": "硬質塩化ビニル管 VP",
+      "short": "VP",
+      "sizes": ["VP13", "VP16", "VP20", "VP25", "VP30", "VP40", "VP50", "VP65", "VP75", "VP100"]
+    }
+  ],
+  "sizeList": [
+    { "code": "15A", "label": "15A", "od": 21.7 },
+    { "code": "20A", "label": "20A", "od": 27.2 },
+    { "code": "25A", "label": "25A", "od": 34.0 },
+    { "code": "32A", "label": "32A", "od": 42.7 },
+    { "code": "40A", "label": "40A", "od": 48.6 },
+    { "code": "50A", "label": "50A", "od": 60.5 },
+    { "code": "65A", "label": "65A", "od": 76.3 },
+    { "code": "80A", "label": "80A", "od": 89.1 },
+    { "code": "100A", "label": "100A", "od": 114.3 },
+    { "code": "VP13", "label": "VP13", "od": 18.0 },
+    { "code": "VP16", "label": "VP16", "od": 22.0 },
+    { "code": "VP20", "label": "VP20", "od": 26.0 },
+    { "code": "VP25", "label": "VP25", "od": 32.0 },
+    { "code": "VP30", "label": "VP30", "od": 38.0 },
+    { "code": "VP40", "label": "VP40", "od": 48.0 },
+    { "code": "VP50", "label": "VP50", "od": 60.0 },
+    { "code": "VP65", "label": "VP65", "od": 76.0 },
+    { "code": "VP75", "label": "VP75", "od": 89.0 },
+    { "code": "VP100", "label": "VP100", "od": 114.0 }
+  ]
+}
