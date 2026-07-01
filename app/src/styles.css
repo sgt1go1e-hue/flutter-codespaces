@@ -86,10 +86,14 @@ body {
   width: 100%;
   height: 100%;
   display: block;
-  background:
-    radial-gradient(circle, #1e293b 1px, transparent 1px);
-  background-size: 28px 28px;
+  background: var(--bg);
   touch-action: none;
+}
+
+/* アイソメグリッド線（薄いグレーで常時表示のガイド） */
+.iso-grid line {
+  stroke: rgba(148, 163, 184, 0.14);
+  stroke-width: 1;
 }
 
 .statusbar {
@@ -111,4 +115,114 @@ body {
 .count {
   color: var(--hint);
   white-space: nowrap;
+}
+
+/* --- ロングタップのアクションメニュー --- */
+.menu-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 10;
+}
+
+.action-menu {
+  position: fixed;
+  z-index: 11;
+  transform: translate(-50%, 8px);
+  display: flex;
+  flex-direction: column;
+  min-width: 180px;
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 12px;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.menu-item {
+  background: transparent;
+  color: var(--text);
+  border: none;
+  border-bottom: 1px solid #1f2b3d;
+  padding: 14px 16px;
+  font-size: 15px;
+  text-align: left;
+  min-height: 48px;
+}
+
+.menu-item:last-child {
+  border-bottom: none;
+}
+
+.menu-item:active {
+  background: #1e293b;
+}
+
+.menu-item.danger {
+  color: #f87171;
+}
+
+/* --- 属性入力ポップアップ（ボトムシート） --- */
+.sheet-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 20;
+  background: rgba(0, 0, 0, 0.4);
+}
+
+.attr-sheet {
+  position: fixed;
+  z-index: 21;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--panel);
+  border-radius: 16px 16px 0 0;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.sheet-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  font-weight: 700;
+  border-bottom: 1px solid #334155;
+}
+
+.sheet-close {
+  background: #334155;
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  padding: 8px 14px;
+  min-height: 40px;
+  font-size: 14px;
+}
+
+.sheet-body {
+  padding: 8px 16px 16px;
+}
+
+.attr-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 4px;
+  font-size: 15px;
+}
+
+.attr-label {
+  color: var(--hint);
+}
+
+.attr-row.placeholder .attr-value {
+  color: #64748b;
+  font-size: 13px;
+}
+
+.sheet-body hr {
+  border: none;
+  border-top: 1px solid #334155;
+  margin: 4px 0;
 }

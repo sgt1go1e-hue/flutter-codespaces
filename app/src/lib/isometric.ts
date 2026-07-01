@@ -62,6 +62,73 @@ export function snapToIsometric(
   return { end, angle: best }
 }
 
+export interface GridLine {
+  x1: number
+  y1: number
+  x2: number
+  y2: number
+}
+
+/**
+ * 指定角度(度)の平行線群を、w×h の領域を覆うように生成する。
+ * 中心から前後に、direction 方向へ長く伸ばした線を perpendicular 方向に gap 間隔で並べる。
+ */
+function parallelLines(
+  w: number,
+  h: number,
+  gap: number,
+  angleDeg: number,
+): GridLine[] {
+  if (w <= 0 || h <= 0 || gap <= 0) return []
+  const rad = angleDeg * DEG
+  const ux = Math.cos(rad)
+  const uy = Math.sin(rad)
+  // 線に垂直な方向（この方向へ gap 間隔でずらす）
+  const nx = -uy
+  const ny = ux
+  const cx = w / 2
+  const cy = h / 2
+  const diag = Math.hypot(w, h)
+  const count = Math.ceil(diag / gap)
+  const lines: GridLine[] = []
+  for (let k = -count; k <= count; k++) {
+    const ox = cx + nx * k * gap
+    const oy = cy + ny * k * gap
+    lines.push({
+      x1: ox - ux * diag,
+      y1: oy - uy * diag,
+      x2: ox + ux * diag,
+      y2: oy + uy * diag,
+    })
+  }
+  return lines
+}
+
+/**
+ * アイソメ（等角投影）グリッドの線を生成する。
+ * 30° と 150° の2方向の平行線群を重ねることで菱形（ひし形）パターンになる。
+ * これらは配管のアイソメ角(30/150/210/330°)と一致し、描画時のガイドになる。
+ */
+export function isometricGrid(w: number, h: number, gap: number): GridLine[] {
+  return [
+    ...parallelLines(w, h, gap, 30),
+    ...parallelLines(w, h, gap, 150),
+  ]
+}
+
+/** 点 p から線分 a-b までの最短距離 */
+export function distanceToSegment(p: Point, a: Point, b: Point): number {
+  const abx = b.x - a.x
+  const aby = b.y - a.y
+  const lenSq = abx * abx + aby * aby
+  if (lenSq === 0) return distance(p, a)
+  // p を線分上に射影したパラメータ t を 0〜1 にクランプ
+  let t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / lenSq
+  t = Math.max(0, Math.min(1, t))
+  const proj: Point = { x: a.x + t * abx, y: a.y + t * aby }
+  return distance(p, proj)
+}
+
 /**
  * 既存の端点（各セグメントの始点・終点）のうち、p に近いものへ吸着する。
  * threshold(px) 以内に候補が無ければ p をそのまま返す。
