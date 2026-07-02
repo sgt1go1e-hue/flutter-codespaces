@@ -8,6 +8,7 @@ import {
   getPipeType,
   connectionMethods,
 } from '../data/masters'
+import type { CutResult } from '../lib/cutlength'
 
 interface Props {
   segment: Segment
@@ -15,6 +16,8 @@ interface Props {
   inheritedPipeType?: string
   /** 親から継承されるサイズ（自分未設定時のデフォルト） */
   inheritedSize?: string
+  /** 切断寸法の計算結果 */
+  cut: CutResult
   onChange: (patch: Partial<Segment>) => void
   onClose: () => void
 }
@@ -29,6 +32,7 @@ export function AttributePopup({
   segment,
   inheritedPipeType,
   inheritedSize,
+  cut,
   onChange,
   onClose,
 }: Props) {
@@ -66,11 +70,32 @@ export function AttributePopup({
         </div>
         <div className="sheet-body">
           <div className="attr-row">
-            <span className="attr-label">角度 / 長さ</span>
+            <span className="attr-label">角度 / 図面長</span>
             <span className="attr-value">
               {segment.angle}° / {length} px
             </span>
           </div>
+
+          <label className="field">
+            <span className="field-label">
+              芯々寸法（mm）
+              <span className="field-note">中心〜中心の実寸を入力</span>
+            </span>
+            <input
+              className="num-input"
+              type="number"
+              inputMode="numeric"
+              min={0}
+              placeholder="例: 1200"
+              value={segment.centerLength ?? ''}
+              onChange={(e) =>
+                onChange({
+                  centerLength:
+                    e.target.value === '' ? undefined : Number(e.target.value),
+                })
+              }
+            />
+          </label>
 
           <label className="field">
             <span className="field-label">
@@ -200,9 +225,41 @@ export function AttributePopup({
             </select>
           </label>
 
+          {/* 切断（加工）寸法の内訳 */}
+          <div className="cut-summary">
+            <div className="cut-title">切断（加工）寸法</div>
+            {segment.centerLength == null ? (
+              <div className="cut-hint">芯々寸法を入力すると自動計算します。</div>
+            ) : (
+              <>
+                <div className="cut-row">
+                  <span>芯々寸法</span>
+                  <span>{cut.center} mm</span>
+                </div>
+                <div className="cut-row">
+                  <span>− 始点側 継手・フランジ</span>
+                  <span>{cut.startAllow} mm</span>
+                </div>
+                <div className="cut-row">
+                  <span>− 終点側 継手・フランジ</span>
+                  <span>{cut.endAllow} mm</span>
+                </div>
+                <div className="cut-row total">
+                  <span>切断長さ</span>
+                  <span>{cut.cut} mm</span>
+                </div>
+                {!cut.sizeKnown && (
+                  <div className="cut-hint">
+                    ※サイズ未設定のため継手寸法は差し引かれていません。
+                  </div>
+                )}
+              </>
+            )}
+          </div>
+
           <p className="sheet-note">
-            サイズ・管種を変更すると、下流のセグメントにも引き継がれます（別途変更されるまで）。
-            切断寸法の自動計算はフェーズ3、集計・CSV出力はフェーズ4で対応します。
+            サイズ・管種を変更すると下流のセグメントにも引き継がれます（別途変更されるまで）。
+            継手の集計・CSV出力はフェーズ4で対応します。
           </p>
         </div>
       </div>

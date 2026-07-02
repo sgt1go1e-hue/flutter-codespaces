@@ -175,13 +175,16 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
+  max-height: 90vh;
+  display: flex;
+  flex-direction: column;
   background: var(--panel);
   border-radius: 16px 16px 0 0;
-  padding-bottom: max(16px, env(safe-area-inset-bottom));
   box-shadow: 0 -10px 30px rgba(0, 0, 0, 0.5);
 }
 
 .sheet-header {
+  flex-shrink: 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -201,7 +204,11 @@ body {
 }
 
 .sheet-body {
+  flex: 1;
+  overflow-y: auto;
   padding: 8px 16px 16px;
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+  -webkit-overflow-scrolling: touch;
 }
 
 .attr-row {
@@ -267,6 +274,56 @@ body {
   line-height: 1.6;
 }
 
+.num-input {
+  background: #0b1220;
+  color: var(--text);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
+  min-height: 48px;
+  width: 100%;
+}
+
+/* 切断寸法の内訳 */
+.cut-summary {
+  margin-top: 12px;
+  padding: 12px 14px;
+  background: #0b1220;
+  border: 1px solid #1f3b34;
+  border-radius: 12px;
+}
+
+.cut-title {
+  font-size: 13px;
+  color: #34d399;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.cut-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 14px;
+  padding: 4px 0;
+  color: var(--text);
+}
+
+.cut-row.total {
+  border-top: 1px solid #334155;
+  margin-top: 4px;
+  padding-top: 8px;
+  font-weight: 700;
+  color: #34d399;
+  font-size: 16px;
+}
+
+.cut-hint {
+  color: #64748b;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
 /* セグメント上のサイズ表示ラベル */
 .seg-label {
   fill: #cbd5e1;
@@ -281,6 +338,16 @@ body {
 .seg-label.inherited {
   fill: #64748b;
   font-weight: 500;
+}
+
+/* 切断寸法ラベル（セグメント下側） */
+.cut-label {
+  fill: #34d399;
+  font-size: 11px;
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: #0f172a;
+  stroke-width: 3px;
 }
 
 /* フランジ記号（配管に直交する2本線） */

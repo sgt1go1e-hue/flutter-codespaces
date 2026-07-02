@@ -19,6 +19,11 @@ export interface Segment {
   pipeType?: string
   /** 呼び径（サイズコード） */
   size?: string
+  /**
+   * 芯々寸法（この直線区間の中心〜中心の実寸, mm）。ユーザーが手入力する。
+   * アイソメ図は非スケールのため、線のピクセル長ではなくこの値を寸法計算に使う。
+   */
+  centerLength?: number
   /** 始点側の継手（fittings.json の id） */
   startFitting?: string
   /** 終点側の継手（fittings.json の id） */

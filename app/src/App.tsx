@@ -11,6 +11,7 @@ import {
 } from './lib/isometric'
 import type { Point } from './types'
 import { computeCrossoverGaps } from './lib/crossover'
+import { computeAllCut } from './lib/cutlength'
 import {
   buildSegmentMap,
   computeEffective,
@@ -128,6 +129,11 @@ export default function App() {
   const effectiveById = useMemo(() => computeEffective(segments), [segments])
   const crossoverGaps = useMemo(() => computeCrossoverGaps(segments), [segments])
   const byId = useMemo(() => buildSegmentMap(segments), [segments])
+  // 各区間の切断（加工）寸法
+  const cutById = useMemo(
+    () => computeAllCut(segments, effectiveById),
+    [segments, effectiveById],
+  )
 
   // 新規セグメントの親（上流）を、始点が接続している既存セグメントから決定する
   function findParentId(start: Segment['start']): string | undefined {
@@ -260,6 +266,7 @@ export default function App() {
           onLongPressSegment={handleLongPress}
           effectiveById={effectiveById}
           crossoverGaps={crossoverGaps}
+          cutById={cutById}
           inputDisabled={partDrag !== null}
         />
 
@@ -281,6 +288,7 @@ export default function App() {
             segment={selected}
             inheritedPipeType={inheritedPipeType(selected, byId)}
             inheritedSize={inheritedSize(selected, byId)}
+            cut={cutById[selected.id]}
             onChange={updateSelected}
             onClose={closeSelection}
           />

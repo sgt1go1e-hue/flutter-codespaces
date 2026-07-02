@@ -8,6 +8,7 @@ import {
 } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
 import type { Effective } from '../lib/inheritance'
+import type { CutResult } from '../lib/cutlength'
 
 interface Props {
   segments: Segment[]
@@ -19,6 +20,8 @@ interface Props {
   effectiveById: Record<string, Effective>
   /** またぎ表示で線を途切れさせる位置（セグメント上パラメータ 0〜1） */
   crossoverGaps: Record<string, number[]>
+  /** 各区間の切断（加工）寸法 */
+  cutById: Record<string, CutResult>
   /** パーツドラッグ中など、キャンバス入力を一時無効化する */
   inputDisabled: boolean
 }
@@ -45,6 +48,7 @@ export function DrawingCanvas({
   onLongPressSegment,
   effectiveById,
   crossoverGaps,
+  cutById,
   inputDisabled,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
@@ -272,6 +276,17 @@ export function DrawingCanvas({
                 textAnchor="middle"
               >
                 {eff.size}
+              </text>
+            )}
+            {/* 切断（加工）寸法。芯々寸法が入力された区間に表示 */}
+            {cutById[s.id]?.cut != null && (
+              <text
+                className="cut-label"
+                x={(s.start.x + s.end.x) / 2}
+                y={(s.start.y + s.end.y) / 2 + 16}
+                textAnchor="middle"
+              >
+                ✂ {cutById[s.id].cut}
               </text>
             )}
           </g>
