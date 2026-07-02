@@ -153,19 +153,25 @@ export function DrawingCanvas({
     setPreview(null)
   }
 
-  // フランジ記号（配管に直交する短い2本線）
-  function flangeMarker(s: Segment) {
-    const mx = (s.start.x + s.end.x) / 2
-    const my = (s.start.y + s.end.y) / 2
-    const len = distance(s.start, s.end) || 1
-    const ux = (s.end.x - s.start.x) / len
-    const uy = (s.end.y - s.start.y) / len
+  // フランジ記号を端点に描く。
+  // 'double'(両) = 配管に直交する短い2本線、'single'(片) = 1本線（終端エンド）。
+  function flangeMarker(
+    s: Segment,
+    at: 'start' | 'end',
+    type: 'double' | 'single',
+  ) {
+    const pt = at === 'start' ? s.start : s.end
+    // 端点での配管方向（端点から内側へ向かう向き）
+    const other = at === 'start' ? s.end : s.start
+    const len = distance(pt, other) || 1
+    const ux = (other.x - pt.x) / len
+    const uy = (other.y - pt.y) / len
     const nx = -uy
     const ny = ux
     const half = 8
-    const off = 3
-    const bar = (cx: number, cy: number) => (
+    const bar = (cx: number, cy: number, key: number) => (
       <line
+        key={key}
         x1={cx - nx * half}
         y1={cy - ny * half}
         x2={cx + nx * half}
@@ -173,10 +179,17 @@ export function DrawingCanvas({
         className="flange-mark"
       />
     )
+    if (type === 'single') {
+      // 端点に1本
+      return <>{bar(pt.x, pt.y, 0)}</>
+    }
+    // 両フランジ: 内側へ少しずらした2本
+    const o1 = 2
+    const o2 = 7
     return (
       <>
-        {bar(mx - ux * off, my - uy * off)}
-        {bar(mx + ux * off, my + uy * off)}
+        {bar(pt.x + ux * o1, pt.y + uy * o1, 0)}
+        {bar(pt.x + ux * o2, pt.y + uy * o2, 1)}
       </>
     )
   }
@@ -228,16 +241,17 @@ export function DrawingCanvas({
             ))}
             <circle cx={s.start.x} cy={s.start.y} r={4} fill="#94a3b8" />
             <circle cx={s.end.x} cy={s.end.y} r={4} fill="#94a3b8" />
-            {s.connection === 'flange' && flangeMarker(s)}
-            {eff?.size && (
+            {s.startFlange && flangeMarker(s, 'start', s.startFlange)}
+            {s.endFlange && flangeMarker(s, 'end', s.endFlange)}
+            {/* サイズは「切り替わった地点」だけに1箇所表示（データは全保持） */}
+            {eff?.showSizeLabel && eff.size && (
               <text
-                className={`seg-label${eff.sizeOwn ? '' : ' inherited'}`}
+                className="seg-label"
                 x={(s.start.x + s.end.x) / 2}
                 y={(s.start.y + s.end.y) / 2 - 10}
                 textAnchor="middle"
               >
                 {eff.size}
-                {!eff.sizeOwn && '*'}
               </text>
             )}
           </g>

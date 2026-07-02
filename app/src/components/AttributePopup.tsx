@@ -126,6 +126,47 @@ export function AttributePopup({
           </label>
 
           <label className="field">
+            <span className="field-label">
+              フランジ（始点側）
+              <span className="field-note">両=途中接続 / 片=終端エンド</span>
+            </span>
+            <select
+              value={segment.startFlange ?? ''}
+              onChange={(e) =>
+                onChange({
+                  startFlange: (e.target.value || undefined) as
+                    | 'double'
+                    | 'single'
+                    | undefined,
+                })
+              }
+            >
+              <option value="">なし</option>
+              <option value="double">両フランジ</option>
+              <option value="single">片フランジ（終端）</option>
+            </select>
+          </label>
+
+          <label className="field">
+            <span className="field-label">フランジ（終点側）</span>
+            <select
+              value={segment.endFlange ?? ''}
+              onChange={(e) =>
+                onChange({
+                  endFlange: (e.target.value || undefined) as
+                    | 'double'
+                    | 'single'
+                    | undefined,
+                })
+              }
+            >
+              <option value="">なし</option>
+              <option value="double">両フランジ</option>
+              <option value="single">片フランジ（終端）</option>
+            </select>
+          </label>
+
+          <label className="field">
             <span className="field-label">継手（始点側）</span>
             <select
               value={segment.startFitting ?? ''}

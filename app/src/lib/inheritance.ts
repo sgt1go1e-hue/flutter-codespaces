@@ -52,6 +52,12 @@ export interface Effective {
   sizeOwn: boolean
   /** 実効サイズが（自分 or 継承で）決まっているか */
   resolved: boolean
+  /**
+   * サイズラベルを表示すべきか。
+   * 「サイズが切り替わった地点」＝実効サイズが親（上流）の実効サイズと異なる場合のみ true。
+   * 同一サイズが継承され続ける後続では false（表示を間引く）。データ自体は全保持。
+   */
+  showSizeLabel: boolean
 }
 
 /** 全セグメントの実効属性をまとめて計算する */
@@ -60,11 +66,14 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
   const out: Record<string, Effective> = {}
   for (const s of segments) {
     const size = effectiveSize(s, byId)
+    const parent = s.parentId ? byId[s.parentId] : undefined
+    const parentSize = parent ? effectiveSize(parent, byId) : undefined
     out[s.id] = {
       pipeType: effectivePipeType(s, byId),
       size,
       sizeOwn: s.size != null && s.size !== '',
       resolved: size != null && size !== '',
+      showSizeLabel: size != null && size !== '' && size !== parentSize,
     }
   }
   return out

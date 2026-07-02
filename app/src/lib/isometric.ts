@@ -196,17 +196,25 @@ export function samePoint(a: Point, b: Point, eps = 1): boolean {
   return Math.abs(a.x - b.x) <= eps && Math.abs(a.y - b.y) <= eps
 }
 
-/** 点 p から線分 a-b までの最短距離 */
-export function distanceToSegment(p: Point, a: Point, b: Point): number {
+/** 点 p を線分 a-b 上へ射影した点とパラメータ t（0〜1にクランプ） */
+export function projectOnSegment(
+  p: Point,
+  a: Point,
+  b: Point,
+): { point: Point; t: number } {
   const abx = b.x - a.x
   const aby = b.y - a.y
   const lenSq = abx * abx + aby * aby
-  if (lenSq === 0) return distance(p, a)
-  // p を線分上に射影したパラメータ t を 0〜1 にクランプ
+  if (lenSq === 0) return { point: { ...a }, t: 0 }
   let t = ((p.x - a.x) * abx + (p.y - a.y) * aby) / lenSq
   t = Math.max(0, Math.min(1, t))
-  const proj: Point = { x: a.x + t * abx, y: a.y + t * aby }
-  return distance(p, proj)
+  return { point: { x: a.x + t * abx, y: a.y + t * aby }, t }
+}
+
+/** 点 p から線分 a-b までの最短距離 */
+export function distanceToSegment(p: Point, a: Point, b: Point): number {
+  const { point } = projectOnSegment(p, a, b)
+  return distance(p, point)
 }
 
 /**

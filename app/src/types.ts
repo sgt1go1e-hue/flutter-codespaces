@@ -25,6 +25,13 @@ export interface Segment {
   endFitting?: string
   /** 接続方法（connections の id）。例: フランジ接合 'flange' */
   connection?: string
+  /**
+   * 始点側 / 終点側のフランジ。
+   * 'double'（両フランジ・途中挿入の接続面）/ 'single'（片フランジ・ルート終端のエンド用）。
+   * 両フランジは配置時に前後セグメントへ分割され、その接合ノードの両側に付く。
+   */
+  startFlange?: 'double' | 'single'
+  endFlange?: 'double' | 'single'
 
   /**
    * 直接の親（上流）セグメントの id。属性継承に使う。

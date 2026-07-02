@@ -4,7 +4,12 @@ import { SegmentActionMenu } from './components/SegmentActionMenu'
 import { AttributePopup } from './components/AttributePopup'
 import { PartsPalette } from './components/PartsPalette'
 import { useLocalStorage } from './hooks/useLocalStorage'
-import { distanceToSegment, samePoint } from './lib/isometric'
+import {
+  distanceToSegment,
+  projectOnSegment,
+  samePoint,
+} from './lib/isometric'
+import type { Point } from './types'
 import { computeCrossoverGaps } from './lib/crossover'
 import {
   buildSegmentMap,
@@ -21,6 +26,83 @@ const DROP_HIT = 28
 
 function makeId(): string {
   return `seg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+}
+
+// 両フランジ: 対象セグメントを投影点で前後2本に分割する。
+// A(上流) は元の属性を保持、B(下流) は A を親にして継承。接合ノードの両側にフランジを付ける。
+function splitForDoubleFlange(
+  segments: Segment[],
+  targetId: string,
+  dropPoint: Point,
+): Segment[] {
+  const target = segments.find((s) => s.id === targetId)
+  if (!target) return segments
+  const { point: P, t } = projectOnSegment(dropPoint, target.start, target.end)
+
+  // 端点に極端に近い場合は分割せず、その端にフランジを付けるだけ
+  if (t < 0.02) {
+    return segments.map((s) =>
+      s.id === targetId ? { ...s, startFlange: 'double' } : s,
+    )
+  }
+  if (t > 0.98) {
+    return segments.map((s) =>
+      s.id === targetId ? { ...s, endFlange: 'double' } : s,
+    )
+  }
+
+  const bId = makeId()
+  const A: Segment = { ...target, end: P, endFlange: 'double' }
+  const B: Segment = {
+    id: bId,
+    start: P,
+    end: target.end,
+    angle: target.angle,
+    parentId: target.id,
+    startFlange: 'double',
+    connection: 'flange',
+    endFitting: target.endFitting,
+    // pipeType/size は持たせない → A から継承
+  }
+  // A は終点側の継手を B へ譲る（終点はもう B の終点）
+  A.endFitting = undefined
+  A.connection = target.connection ?? 'flange'
+
+  const result: Segment[] = []
+  for (const s of segments) {
+    if (s.id === targetId) {
+      result.push(A)
+      continue
+    }
+    // 元セグメントの子のうち、下流(B)側に接続しているものは B を親に付け替える
+    if (s.parentId === targetId) {
+      const dA = distanceToSegment(s.start, A.start, A.end)
+      const dB = distanceToSegment(s.start, B.start, B.end)
+      result.push(dB < dA ? { ...s, parentId: bId } : s)
+      continue
+    }
+    result.push(s)
+  }
+  const idx = result.findIndex((s) => s.id === targetId)
+  result.splice(idx + 1, 0, B)
+  return result
+}
+
+// 片フランジ: 分割せず、ドロップ位置に近い端を終端フランジとしてマークする。
+function markSingleFlange(
+  segments: Segment[],
+  targetId: string,
+  dropPoint: Point,
+): Segment[] {
+  const target = segments.find((s) => s.id === targetId)
+  if (!target) return segments
+  const { t } = projectOnSegment(dropPoint, target.start, target.end)
+  const at = t < 0.5 ? 'startFlange' : 'endFlange'
+  return segments.map((s) =>
+    s.id === targetId
+      ? { ...s, [at]: 'single', connection: s.connection ?? 'flange' }
+      : s,
+  )
 }
 
 export default function App() {
@@ -122,13 +204,16 @@ export default function App() {
     }
     if (!best) return
     const part = getPart(partId)
-    if (part?.action.type === 'setConnection') {
-      const value = part.action.value
-      const targetId = best.id
-      setSegments((prev) =>
-        prev.map((s) => (s.id === targetId ? { ...s, connection: value } : s)),
-      )
+    if (part?.action.type !== 'flange') return
+    const targetId = best.id
+    const dropPoint = p
+    if (part.action.flange === 'double') {
+      setSegments((prev) => splitForDoubleFlange(prev, targetId, dropPoint))
+    } else {
+      setSegments((prev) => markSingleFlange(prev, targetId, dropPoint))
     }
+    // 分割後は選択状態をリセット（前後が別データになるため）
+    setSelectedId(null)
   }
   // 最新の dropPart / segments を参照するための ref
   const dropRef = useRef(dropPart)
