@@ -240,6 +240,15 @@ body {
   color: var(--hint);
 }
 
+.sum-mode {
+  background: #0ea5e9;
+  color: #04222e;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
 .sum-none {
   color: var(--hint);
 }

@@ -18,6 +18,7 @@ import {
   inheritedSize,
 } from './lib/inheritance'
 import { getPart } from './data/parts'
+import { sizesForPipeType } from './data/masters'
 import type { Segment } from './types'
 
 const STORAGE_KEY = 'piping-iso:segments'
@@ -105,8 +106,14 @@ function markSingleFlange(
 export default function App() {
   const [segments, setSegments] = useLocalStorage<Segment[]>(STORAGE_KEY, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  // 常設パネルの開閉（選択時に自動で開く）
-  const [panelOpen, setPanelOpen] = useState(false)
+  // 常設パネルの開閉（初期は開いて「作図設定」を編集できるように）
+  const [panelOpen, setPanelOpen] = useState(true)
+  // これから描く線に適用する初期設定（線を選択せず通常画面で入力）
+  const [defaults, setDefaults] = useLocalStorage<{
+    pipeType?: string
+    size?: string
+    connection?: string
+  }>('piping-iso:defaults', {})
   // パーツパレットからのドラッグ状態（画面座標で ghost を追従表示）
   const [partDrag, setPartDrag] = useState<{
     partId: string
@@ -147,7 +154,27 @@ export default function App() {
 
   function addSegment(seg: Omit<Segment, 'id'>) {
     const parentId = findParentId(seg.start)
-    setSegments((prev) => [...prev, { ...seg, id: makeId(), parentId }])
+    const applied: Segment = { ...seg, id: makeId(), parentId }
+    // 接続方法は継承対象外なので、全ての新規線に初期設定を適用
+    if (defaults.connection) applied.connection = defaults.connection
+    // 管種・サイズはルート(接続元なし)にのみ付与。続きの線は上流から継承。
+    if (!parentId) {
+      if (defaults.pipeType) applied.pipeType = defaults.pipeType
+      if (defaults.size) applied.size = defaults.size
+    }
+    setSegments((prev) => [...prev, applied])
+  }
+
+  // 作図設定（defaults）の更新。管種変更時はサイズ整合をとる。
+  function updateDefaults(patch: Partial<typeof defaults>) {
+    setDefaults((d) => {
+      const next = { ...d, ...patch }
+      if ('pipeType' in patch) {
+        const avail = sizesForPipeType(next.pipeType).map((s) => s.code)
+        if (next.size && !avail.includes(next.size)) next.size = undefined
+      }
+      return next
+    })
   }
 
   function updateSelected(patch: Partial<Segment>) {
@@ -283,6 +310,8 @@ export default function App() {
         inheritedPipeType={selected ? inheritedPipeType(selected, byId) : undefined}
         inheritedSize={selected ? inheritedSize(selected, byId) : undefined}
         cut={selected ? cutById[selected.id] : undefined}
+        defaults={defaults}
+        onDefaultsChange={updateDefaults}
         open={panelOpen}
         onToggle={() => setPanelOpen((v) => !v)}
         onChange={updateSelected}
