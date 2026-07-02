@@ -24,9 +24,13 @@ interface Props {
 }
 
 // 指を動かして「描画」と判定するまでの移動量(px)。これ未満なら静止扱い。
-const MOVE_THRESHOLD = 8
-// ロングタップ（長押し）と判定するまでの時間(ms)
-const LONG_PRESS_MS = 500
+const MOVE_THRESHOLD = 7
+// 引き始めの猶予(ms)。タッチ直後この時間は長押し判定を開始しない
+//（この間に動けば素直に描画になり、選択の誤爆を防ぐ）。
+const ARM_DELAY = 180
+// 猶予後、静止し続けたときに選択（長押し）と確定するまでの保持時間(ms)。
+// 選択までの合計は ARM_DELAY + LONG_PRESS_HOLD ≈ 530ms（従来と同等の感触）。
+const LONG_PRESS_HOLD = 350
 // ロングタップ位置からセグメントを拾うヒット距離(px)
 const HIT_DIST = 18
 // アイソメグリッドの間隔(px)＝格子スナップの基準
@@ -54,7 +58,9 @@ export function DrawingCanvas({
   const startClientRef = useRef<{ x: number; y: number } | null>(null)
   const movedRef = useRef(false)
   const longFiredRef = useRef(false)
-  const longTimerRef = useRef<number | null>(null)
+  // 引き始めの猶予タイマーと、その後の長押し保持タイマー
+  const armTimerRef = useRef<number | null>(null)
+  const holdTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const el = svgRef.current
@@ -92,10 +98,14 @@ export function DrawingCanvas({
     return best
   }
 
-  function clearLongTimer() {
-    if (longTimerRef.current !== null) {
-      clearTimeout(longTimerRef.current)
-      longTimerRef.current = null
+  function clearTimers() {
+    if (armTimerRef.current !== null) {
+      clearTimeout(armTimerRef.current)
+      armTimerRef.current = null
+    }
+    if (holdTimerRef.current !== null) {
+      clearTimeout(holdTimerRef.current)
+      holdTimerRef.current = null
     }
   }
 
@@ -109,15 +119,24 @@ export function DrawingCanvas({
     longFiredRef.current = false
     setPreview(null)
 
-    clearLongTimer()
-    longTimerRef.current = window.setTimeout(() => {
+    clearTimers()
+    // 第1段階: 引き始めの猶予。この間に動けば描画になり、長押しは開始しない。
+    armTimerRef.current = window.setTimeout(() => {
       if (movedRef.current) return
-      const seg = hitSegment(local)
-      if (seg && startClientRef.current) {
-        longFiredRef.current = true
-        onLongPressSegment(seg.id, startClientRef.current.x, startClientRef.current.y)
-      }
-    }, LONG_PRESS_MS)
+      // 猶予後も静止 → 第2段階: 長押し保持タイマーを開始。
+      holdTimerRef.current = window.setTimeout(() => {
+        if (movedRef.current) return
+        const seg = hitSegment(local)
+        if (seg && startClientRef.current) {
+          longFiredRef.current = true
+          onLongPressSegment(
+            seg.id,
+            startClientRef.current.x,
+            startClientRef.current.y,
+          )
+        }
+      }, LONG_PRESS_HOLD)
+    }, ARM_DELAY)
   }
 
   function handlePointerMove(e: React.PointerEvent) {
@@ -126,7 +145,7 @@ export function DrawingCanvas({
     const p = toLocal(e.clientX, e.clientY)
     if (!movedRef.current && distance(start, p) > MOVE_THRESHOLD) {
       movedRef.current = true
-      clearLongTimer()
+      clearTimers()
     }
     if (movedRef.current) {
       // グリッド交点間・アイソメ角に拘束したプレビュー
@@ -136,7 +155,7 @@ export function DrawingCanvas({
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    clearLongTimer()
+    clearTimers()
     const start = startLocalRef.current
     startLocalRef.current = null
     startClientRef.current = null
@@ -180,16 +199,17 @@ export function DrawingCanvas({
       />
     )
     if (type === 'single') {
-      // 端点に1本
+      // 片フランジ（終端）: 端点に1本のみ
       return <>{bar(pt.x, pt.y, 0)}</>
     }
-    // 両フランジ: 内側へ少しずらした2本
-    const o1 = 2
-    const o2 = 7
+    // 両フランジ: 接続点を挟んで前後に1本ずつ（合計2本のペア表現）。
+    // 分割した A.endFlange と B.startFlange は同じ2位置を描くため、重なって
+    // ちょうど2本に見える（ペアのボルト締結を表す一般的な記号）。
+    const off = 4
     return (
       <>
-        {bar(pt.x + ux * o1, pt.y + uy * o1, 0)}
-        {bar(pt.x + ux * o2, pt.y + uy * o2, 1)}
+        {bar(pt.x - ux * off, pt.y - uy * off, 0)}
+        {bar(pt.x + ux * off, pt.y + uy * off, 1)}
       </>
     )
   }
