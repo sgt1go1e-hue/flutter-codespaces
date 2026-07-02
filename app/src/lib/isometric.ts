@@ -163,11 +163,22 @@ export function snapSegmentToGrid(
   gap: number,
 ): { start: Point; end: Point; angle: number } {
   const start = snapToLattice(rawStart, gap)
+  return { start, ...snapEndFromStart(start, rawEnd, gap) }
+}
+
+/**
+ * 始点（すでに格子点）を固定し、終点だけをアイソメ角＋格子点にスナップする。
+ * 分岐など、始点を別ロジックで決めたい場合に使う。
+ */
+export function snapEndFromStart(
+  start: Point,
+  rawEnd: Point,
+  gap: number,
+): { end: Point; angle: number } {
   const dx = rawEnd.x - start.x
   const dy = rawEnd.y - start.y
   const rawAngle = angleOf(dx, dy)
 
-  // 最寄りのアイソメ角
   let angle = SNAP_CANDIDATES[0]
   let bestDiff = Infinity
   for (const cand of SNAP_CANDIDATES) {
@@ -181,14 +192,11 @@ export function snapSegmentToGrid(
   const rad = angle * DEG
   const ux = Math.cos(rad)
   const uy = Math.sin(rad)
-  const projLen = dx * ux + dy * uy // その方向への射影長
+  const projLen = dx * ux + dy * uy
   const step = latticeStep(angle, gap)
-  const k = Math.max(1, Math.round(projLen / step)) // 最低1ステップ
-  const end: Point = {
-    x: start.x + ux * step * k,
-    y: start.y + uy * step * k,
-  }
-  return { start, end, angle }
+  const k = Math.max(1, Math.round(projLen / step))
+  const end: Point = { x: start.x + ux * step * k, y: start.y + uy * step * k }
+  return { end, angle }
 }
 
 /** 2点がほぼ同一か（格子スナップ済みなので誤差は極小） */

@@ -4,7 +4,10 @@ import {
   distance,
   distanceToSegment,
   isometricGrid,
-  snapSegmentToGrid,
+  latticeStep,
+  projectOnSegment,
+  snapEndFromStart,
+  snapToLattice,
 } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
 import type { Effective } from '../lib/inheritance'
@@ -14,8 +17,10 @@ interface Props {
   segments: Segment[]
   selectedId: string | null
   onAddSegment: (seg: Omit<Segment, 'id'>) => void
-  /** ロングタップでセグメントを選択したとき（メニュー表示位置を画面座標で渡す） */
-  onLongPressSegment: (id: string, clientX: number, clientY: number) => void
+  /** ロングタップでセグメントを選択したとき */
+  onLongPressSegment: (id: string) => void
+  /** 何もない場所を短くタップしたとき（選択解除用） */
+  onBackgroundTap: () => void
   /** 各セグメントの実効属性（継承後） */
   effectiveById: Record<string, Effective>
   /** またぎ表示で線を途切れさせる位置（セグメント上パラメータ 0〜1） */
@@ -40,12 +45,15 @@ const HIT_DIST = 18
 const GRID_GAP = 40
 // またぎ表示の途切れ幅(px)
 const CROSS_GAP = 9
+// 描画開始点を既存線上の格子点へ吸着する距離(px)。分岐の接続を確実にする。
+const START_SNAP = 18
 
 export function DrawingCanvas({
   segments,
   selectedId,
   onAddSegment,
   onLongPressSegment,
+  onBackgroundTap,
   effectiveById,
   crossoverGaps,
   cutById,
@@ -102,6 +110,34 @@ export function DrawingCanvas({
     return best
   }
 
+  // 描画開始点のスナップ。既存線の近くなら、その線上の格子点へ吸着して
+  // 分岐（チーズ）が確実に接続するようにする。それ以外は通常の格子スナップ。
+  function snapStart(raw: Point): Point {
+    const global = snapToLattice(raw, GRID_GAP)
+    // すでにいずれかの線上に乗っていればそのまま
+    for (const s of segments) {
+      if (distanceToSegment(global, s.start, s.end) < 1.5) return global
+    }
+    // 近くの線を探し、その線上の最寄り格子点へ
+    let best: Segment | null = null
+    let bestDist = START_SNAP
+    for (const s of segments) {
+      const d = distanceToSegment(raw, s.start, s.end)
+      if (d < bestDist) {
+        bestDist = d
+        best = s
+      }
+    }
+    if (!best) return global
+    const len = distance(best.start, best.end) || 1
+    const dir = { x: (best.end.x - best.start.x) / len, y: (best.end.y - best.start.y) / len }
+    const { t } = projectOnSegment(raw, best.start, best.end)
+    const step = latticeStep(best.angle, GRID_GAP)
+    const maxK = Math.round(len / step)
+    const k = Math.max(0, Math.min(maxK, Math.round((t * len) / step)))
+    return { x: best.start.x + dir.x * step * k, y: best.start.y + dir.y * step * k }
+  }
+
   function clearTimers() {
     if (armTimerRef.current !== null) {
       clearTimeout(armTimerRef.current)
@@ -131,13 +167,9 @@ export function DrawingCanvas({
       holdTimerRef.current = window.setTimeout(() => {
         if (movedRef.current) return
         const seg = hitSegment(local)
-        if (seg && startClientRef.current) {
+        if (seg) {
           longFiredRef.current = true
-          onLongPressSegment(
-            seg.id,
-            startClientRef.current.x,
-            startClientRef.current.y,
-          )
+          onLongPressSegment(seg.id)
         }
       }, LONG_PRESS_HOLD)
     }, ARM_DELAY)
@@ -153,7 +185,8 @@ export function DrawingCanvas({
     }
     if (movedRef.current) {
       // グリッド交点間・アイソメ角に拘束したプレビュー
-      const { start: s, end } = snapSegmentToGrid(start, p, GRID_GAP)
+      const s = snapStart(start)
+      const { end } = snapEndFromStart(s, p, GRID_GAP)
       setPreview({ start: s, end })
     }
   }
@@ -170,8 +203,12 @@ export function DrawingCanvas({
     }
     if (start && movedRef.current) {
       const p = toLocal(e.clientX, e.clientY)
-      const { start: s, end, angle } = snapSegmentToGrid(start, p, GRID_GAP)
+      const s = snapStart(start)
+      const { end, angle } = snapEndFromStart(s, p, GRID_GAP)
       onAddSegment({ start: s, end, angle })
+    } else if (start && !movedRef.current) {
+      // 短いタップ: 線の上でなければ選択解除
+      if (!hitSegment(start)) onBackgroundTap()
     }
     setPreview(null)
   }

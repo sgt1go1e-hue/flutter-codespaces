@@ -17,16 +17,22 @@ export interface CutResult {
 
 /**
  * 1区間の切断（加工）寸法を計算する。
- *   切断長 = 芯々寸法 −（始点側の継手＋フランジ 中心〜端面寸法）−（終点側の同）
- * 継手・フランジの中心〜端面寸法は実効サイズ(effSize)で fittings.json から引く。
+ *   切断長 = 芯々寸法 −（始点側の控え）−（終点側の控え）
+ * 継手は区間で1種類（両端に同じ継手が付く前提）。フランジは始点・終点で個別。
+ * 中心〜端面寸法は実効サイズ(effSize)で fittings.json から引く。
  */
-export function computeCutLength(seg: Segment, effSize?: string): CutResult {
-  const fitAllow = (fid?: string) => centerToFace(fid, effSize) ?? 0
+export function computeCutLength(
+  seg: Segment,
+  effSize?: string,
+  effFitting?: string,
+): CutResult {
+  const fit = centerToFace(effFitting, effSize) ?? 0
   const flangeAllow = (f?: 'double' | 'single') =>
     f ? (centerToFace('flange', effSize) ?? 0) : 0
 
-  const startAllow = fitAllow(seg.startFitting) + flangeAllow(seg.startFlange)
-  const endAllow = fitAllow(seg.endFitting) + flangeAllow(seg.endFlange)
+  // 同じ継手が両端に付く。フランジがある端はフランジ控えも加算。
+  const startAllow = fit + flangeAllow(seg.startFlange)
+  const endAllow = fit + flangeAllow(seg.endFlange)
 
   const center = seg.centerLength
   const cut =
@@ -50,7 +56,8 @@ export function computeAllCut(
 ): Record<string, CutResult> {
   const out: Record<string, CutResult> = {}
   for (const s of segments) {
-    out[s.id] = computeCutLength(s, effectiveById[s.id]?.size)
+    const eff = effectiveById[s.id]
+    out[s.id] = computeCutLength(s, eff?.size, eff?.fitting)
   }
   return out
 }

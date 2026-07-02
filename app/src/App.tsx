@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DrawingCanvas } from './components/DrawingCanvas'
-import { SegmentActionMenu } from './components/SegmentActionMenu'
-import { AttributePopup } from './components/AttributePopup'
+import { AttributePanel } from './components/AttributePanel'
 import { PartsPalette } from './components/PartsPalette'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
@@ -62,11 +61,8 @@ function splitForDoubleFlange(
     parentId: target.id,
     startFlange: 'double',
     connection: 'flange',
-    endFitting: target.endFitting,
-    // pipeType/size は持たせない → A から継承
+    // pipeType/size/fitting は持たせない → A から継承・自動
   }
-  // A は終点側の継手を B へ譲る（終点はもう B の終点）
-  A.endFitting = undefined
   A.connection = target.connection ?? 'flange'
 
   const result: Segment[] = []
@@ -109,8 +105,8 @@ function markSingleFlange(
 export default function App() {
   const [segments, setSegments] = useLocalStorage<Segment[]>(STORAGE_KEY, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
-  const [attrOpen, setAttrOpen] = useState(false)
+  // 常設パネルの開閉（選択時に自動で開く）
+  const [panelOpen, setPanelOpen] = useState(false)
   // パーツパレットからのドラッグ状態（画面座標で ghost を追従表示）
   const [partDrag, setPartDrag] = useState<{
     partId: string
@@ -161,16 +157,14 @@ export default function App() {
     )
   }
 
-  function handleLongPress(id: string, clientX: number, clientY: number) {
+  // 長押し=選択のみ（メニューは廃止）。選択したらパネルを開く。
+  function handleLongPress(id: string) {
     setSelectedId(id)
-    setMenu({ x: clientX, y: clientY })
-    setAttrOpen(false)
+    setPanelOpen(true)
   }
 
   function closeSelection() {
     setSelectedId(null)
-    setMenu(null)
-    setAttrOpen(false)
   }
 
   function deleteSelected() {
@@ -264,35 +258,12 @@ export default function App() {
           selectedId={selectedId}
           onAddSegment={addSegment}
           onLongPressSegment={handleLongPress}
+          onBackgroundTap={closeSelection}
           effectiveById={effectiveById}
           crossoverGaps={crossoverGaps}
           cutById={cutById}
           inputDisabled={partDrag !== null}
         />
-
-        {menu && selected && !attrOpen && (
-          <SegmentActionMenu
-            x={menu.x}
-            y={menu.y}
-            onEditAttributes={() => {
-              setMenu(null)
-              setAttrOpen(true)
-            }}
-            onDelete={deleteSelected}
-            onClose={closeSelection}
-          />
-        )}
-
-        {attrOpen && selected && (
-          <AttributePopup
-            segment={selected}
-            inheritedPipeType={inheritedPipeType(selected, byId)}
-            inheritedSize={inheritedSize(selected, byId)}
-            cut={cutById[selected.id]}
-            onChange={updateSelected}
-            onClose={closeSelection}
-          />
-        )}
 
         {/* ドラッグ中のパーツ ghost */}
         {partDrag && (
@@ -305,6 +276,19 @@ export default function App() {
         )}
       </main>
 
+      {/* 常設の属性パネル（ポップアップの置き換え） */}
+      <AttributePanel
+        segment={selected}
+        effective={selected ? effectiveById[selected.id] : undefined}
+        inheritedPipeType={selected ? inheritedPipeType(selected, byId) : undefined}
+        inheritedSize={selected ? inheritedSize(selected, byId) : undefined}
+        cut={selected ? cutById[selected.id] : undefined}
+        open={panelOpen}
+        onToggle={() => setPanelOpen((v) => !v)}
+        onChange={updateSelected}
+        onDelete={deleteSelected}
+      />
+
       <PartsPalette
         onDragStart={(partId, x, y) => setPartDrag({ partId, x, y })}
         draggingId={partDrag?.partId ?? null}
@@ -312,7 +296,7 @@ export default function App() {
 
       <footer className="statusbar">
         <span className="hint">
-          ドラッグで描画（グリッド交点間・アイソメ角に自動スナップ）／線を長押しで選択
+          ドラッグで描画／線を長押しで選択（下のパネルで属性）
         </span>
         <span className="count">セグメント数: {segments.length}</span>
       </footer>

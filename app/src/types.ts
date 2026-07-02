@@ -24,10 +24,11 @@ export interface Segment {
    * アイソメ図は非スケールのため、線のピクセル長ではなくこの値を寸法計算に使う。
    */
   centerLength?: number
-  /** 始点側の継手（fittings.json の id） */
-  startFitting?: string
-  /** 終点側の継手（fittings.json の id） */
-  endFitting?: string
+  /**
+   * この区間の継手種類（fittings.json の id）。始点・終点で別々には持たず1つに統合。
+   * 未設定なら継承ロジックと同様、分岐箇所は 'tee'・それ以外は 'elbow' を実効値とする。
+   */
+  fitting?: string
   /** 接続方法（connections の id）。例: フランジ接合 'flange' */
   connection?: string
   /**
