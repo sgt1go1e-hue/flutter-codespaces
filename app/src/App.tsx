@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DrawingCanvas } from './components/DrawingCanvas'
 import { SegmentPanel, DrawSettingsPanel } from './components/AttributePanel'
 import { PartsPalette } from './components/PartsPalette'
+import { DisclaimerModal } from './components/DisclaimerModal'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
   distanceToSegment,
@@ -24,6 +25,8 @@ import type { Segment } from './types'
 const STORAGE_KEY = 'piping-iso:segments'
 // パーツをドロップしたとき、対象セグメントを拾うヒット距離(px)
 const DROP_HIT = 28
+// 免責事項の版。文面を更新して再同意を求めたい場合はこの数値を上げる。
+const CONSENT_VERSION = 1
 
 function makeId(): string {
   return `seg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
@@ -108,6 +111,14 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 「作図設定」バーの開閉（寸法入力とは独立。既定は畳んだ状態で割り込まない）
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // 免責事項への同意記録（版＋同意日時を端末に保存）
+  const [consent, setConsent] = useLocalStorage<{
+    version?: number
+    agreedAt?: string
+  }>('piping-iso:consent', {})
+  // 免責事項の再確認モーダル（設定からいつでも表示）
+  const [reviewDisclaimer, setReviewDisclaimer] = useState(false)
+  const needConsent = consent.version !== CONSENT_VERSION
   // これから描く線に適用する初期設定（線を選択せず通常画面で入力）
   const [defaults, setDefaults] = useLocalStorage<{
     pipeType?: string
@@ -214,6 +225,10 @@ export default function App() {
     }
   }
 
+  function agreeDisclaimer() {
+    setConsent({ version: CONSENT_VERSION, agreedAt: new Date().toISOString() })
+  }
+
   // --- パーツ ドラッグ&ドロップ ---
   function dropPart(partId: string, clientX: number, clientY: number) {
     const rect = stageRef.current?.getBoundingClientRect()
@@ -275,6 +290,7 @@ export default function App() {
           <button onClick={clearAll} disabled={segments.length === 0}>
             全消去
           </button>
+          <button onClick={() => setReviewDisclaimer(true)}>免責</button>
         </div>
       </header>
 
@@ -334,6 +350,20 @@ export default function App() {
         </span>
         <span className="count">セグメント数: {segments.length}</span>
       </footer>
+
+      {/* 初回同意（同意するまで他操作をブロック） */}
+      {needConsent && (
+        <DisclaimerModal mode="consent" onAgree={agreeDisclaimer} />
+      )}
+      {/* 設定からの再確認（同意済みのときのみ） */}
+      {!needConsent && reviewDisclaimer && (
+        <DisclaimerModal
+          mode="review"
+          agreedAt={consent.agreedAt}
+          onAgree={() => setReviewDisclaimer(false)}
+          onClose={() => setReviewDisclaimer(false)}
+        />
+      )}
     </div>
   )
 }
