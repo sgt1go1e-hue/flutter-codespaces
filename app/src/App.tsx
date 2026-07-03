@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DrawingCanvas } from './components/DrawingCanvas'
-import { AttributePanel } from './components/AttributePanel'
+import { SegmentPanel, DrawSettingsPanel } from './components/AttributePanel'
 import { PartsPalette } from './components/PartsPalette'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
@@ -106,8 +106,8 @@ function markSingleFlange(
 export default function App() {
   const [segments, setSegments] = useLocalStorage<Segment[]>(STORAGE_KEY, [])
   const [selectedId, setSelectedId] = useState<string | null>(null)
-  // 常設パネルの開閉（初期は開いて「作図設定」を編集できるように）
-  const [panelOpen, setPanelOpen] = useState(true)
+  // 「作図設定」バーの開閉（寸法入力とは独立。既定は畳んだ状態で割り込まない）
+  const [settingsOpen, setSettingsOpen] = useState(false)
   // これから描く線に適用する初期設定（線を選択せず通常画面で入力）
   const [defaults, setDefaults] = useLocalStorage<{
     pipeType?: string
@@ -184,10 +184,9 @@ export default function App() {
     )
   }
 
-  // 長押し=選択のみ（メニューは廃止）。選択したらパネルを開く。
-  function handleLongPress(id: string) {
+  // タップで選択（寸法パネルが自動で出る。作図設定は開かない）。
+  function handleSelect(id: string) {
     setSelectedId(id)
-    setPanelOpen(true)
   }
 
   function closeSelection() {
@@ -284,7 +283,7 @@ export default function App() {
           segments={segments}
           selectedId={selectedId}
           onAddSegment={addSegment}
-          onLongPressSegment={handleLongPress}
+          onSelectSegment={handleSelect}
           onBackgroundTap={closeSelection}
           effectiveById={effectiveById}
           crossoverGaps={crossoverGaps}
@@ -303,19 +302,25 @@ export default function App() {
         )}
       </main>
 
-      {/* 常設の属性パネル（ポップアップの置き換え） */}
-      <AttributePanel
-        segment={selected}
-        effective={selected ? effectiveById[selected.id] : undefined}
-        inheritedPipeType={selected ? inheritedPipeType(selected, byId) : undefined}
-        inheritedSize={selected ? inheritedSize(selected, byId) : undefined}
-        cut={selected ? cutById[selected.id] : undefined}
+      {/* 寸法・属性の編集パネル（線を選択したときだけ表示。作図設定とは独立） */}
+      {selected && (
+        <SegmentPanel
+          segment={selected}
+          effective={effectiveById[selected.id]}
+          inheritedPipeType={inheritedPipeType(selected, byId)}
+          inheritedSize={inheritedSize(selected, byId)}
+          cut={cutById[selected.id]}
+          onChange={updateSelected}
+          onDelete={deleteSelected}
+        />
+      )}
+
+      {/* 作図設定バー（独立して開閉。選択・寸法入力では自動で開かない） */}
+      <DrawSettingsPanel
         defaults={defaults}
-        onDefaultsChange={updateDefaults}
-        open={panelOpen}
-        onToggle={() => setPanelOpen((v) => !v)}
-        onChange={updateSelected}
-        onDelete={deleteSelected}
+        onChange={updateDefaults}
+        open={settingsOpen}
+        onToggle={() => setSettingsOpen((v) => !v)}
       />
 
       <PartsPalette
@@ -325,7 +330,7 @@ export default function App() {
 
       <footer className="statusbar">
         <span className="hint">
-          ドラッグで描画／線を長押しで選択（下のパネルで属性）
+          ドラッグで描画／線をタップで選択（寸法・属性を編集）
         </span>
         <span className="count">セグメント数: {segments.length}</span>
       </footer>

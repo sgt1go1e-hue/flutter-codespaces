@@ -17,9 +17,9 @@ interface Props {
   segments: Segment[]
   selectedId: string | null
   onAddSegment: (seg: Omit<Segment, 'id'>) => void
-  /** ロングタップでセグメントを選択したとき */
-  onLongPressSegment: (id: string) => void
-  /** 何もない場所を短くタップしたとき（選択解除用） */
+  /** 線をタップして選択したとき */
+  onSelectSegment: (id: string) => void
+  /** 何もない場所をタップしたとき（選択解除用） */
   onBackgroundTap: () => void
   /** 各セグメントの実効属性（継承後） */
   effectiveById: Record<string, Effective>
@@ -31,15 +31,10 @@ interface Props {
   inputDisabled: boolean
 }
 
-// 指を動かして「描画」と判定するまでの移動量(px)。これ未満なら静止扱い。
+// 指を動かして「描画」と判定するまでの移動量(px)。これ未満はタップ扱い。
+// タップ（動かさず離す）=選択、ドラッグ（動かす）=描画、と明確に分ける。
 const MOVE_THRESHOLD = 7
-// 引き始めの猶予(ms)。タッチ直後この時間は長押し判定を開始しない
-//（この間に動けば素直に描画になり、選択の誤爆を防ぐ）。
-const ARM_DELAY = 180
-// 猶予後、静止し続けたときに選択（長押し）と確定するまでの保持時間(ms)。
-// 選択までの合計は ARM_DELAY + LONG_PRESS_HOLD ≈ 530ms（従来と同等の感触）。
-const LONG_PRESS_HOLD = 350
-// ロングタップ位置からセグメントを拾うヒット距離(px)
+// タップ位置からセグメントを拾うヒット距離(px)
 const HIT_DIST = 18
 // アイソメグリッドの間隔(px)＝格子スナップの基準
 const GRID_GAP = 40
@@ -52,7 +47,7 @@ export function DrawingCanvas({
   segments,
   selectedId,
   onAddSegment,
-  onLongPressSegment,
+  onSelectSegment,
   onBackgroundTap,
   effectiveById,
   crossoverGaps,
@@ -67,12 +62,7 @@ export function DrawingCanvas({
 
   // ジェスチャ状態
   const startLocalRef = useRef<Point | null>(null)
-  const startClientRef = useRef<{ x: number; y: number } | null>(null)
   const movedRef = useRef(false)
-  const longFiredRef = useRef(false)
-  // 引き始めの猶予タイマーと、その後の長押し保持タイマー
-  const armTimerRef = useRef<number | null>(null)
-  const holdTimerRef = useRef<number | null>(null)
 
   useEffect(() => {
     const el = svgRef.current
@@ -138,50 +128,20 @@ export function DrawingCanvas({
     return { x: best.start.x + dir.x * step * k, y: best.start.y + dir.y * step * k }
   }
 
-  function clearTimers() {
-    if (armTimerRef.current !== null) {
-      clearTimeout(armTimerRef.current)
-      armTimerRef.current = null
-    }
-    if (holdTimerRef.current !== null) {
-      clearTimeout(holdTimerRef.current)
-      holdTimerRef.current = null
-    }
-  }
-
   function handlePointerDown(e: React.PointerEvent) {
     if (inputDisabled) return
     svgRef.current?.setPointerCapture(e.pointerId)
-    const local = toLocal(e.clientX, e.clientY)
-    startLocalRef.current = local
-    startClientRef.current = { x: e.clientX, y: e.clientY }
+    startLocalRef.current = toLocal(e.clientX, e.clientY)
     movedRef.current = false
-    longFiredRef.current = false
     setPreview(null)
-
-    clearTimers()
-    // 第1段階: 引き始めの猶予。この間に動けば描画になり、長押しは開始しない。
-    armTimerRef.current = window.setTimeout(() => {
-      if (movedRef.current) return
-      // 猶予後も静止 → 第2段階: 長押し保持タイマーを開始。
-      holdTimerRef.current = window.setTimeout(() => {
-        if (movedRef.current) return
-        const seg = hitSegment(local)
-        if (seg) {
-          longFiredRef.current = true
-          onLongPressSegment(seg.id)
-        }
-      }, LONG_PRESS_HOLD)
-    }, ARM_DELAY)
   }
 
   function handlePointerMove(e: React.PointerEvent) {
     const start = startLocalRef.current
-    if (!start || longFiredRef.current) return
+    if (!start) return
     const p = toLocal(e.clientX, e.clientY)
     if (!movedRef.current && distance(start, p) > MOVE_THRESHOLD) {
       movedRef.current = true
-      clearTimers()
     }
     if (movedRef.current) {
       // グリッド交点間・アイソメ角に拘束したプレビュー
@@ -192,23 +152,20 @@ export function DrawingCanvas({
   }
 
   function handlePointerUp(e: React.PointerEvent) {
-    clearTimers()
     const start = startLocalRef.current
     startLocalRef.current = null
-    startClientRef.current = null
 
-    if (longFiredRef.current) {
-      setPreview(null)
-      return
-    }
     if (start && movedRef.current) {
+      // ドラッグ = 描画
       const p = toLocal(e.clientX, e.clientY)
       const s = snapStart(start)
       const { end, angle } = snapEndFromStart(s, p, GRID_GAP)
       onAddSegment({ start: s, end, angle })
-    } else if (start && !movedRef.current) {
-      // 短いタップ: 線の上でなければ選択解除
-      if (!hitSegment(start)) onBackgroundTap()
+    } else if (start) {
+      // タップ（動かさず離す）= 線上なら選択、そうでなければ選択解除
+      const seg = hitSegment(start)
+      if (seg) onSelectSegment(seg.id)
+      else onBackgroundTap()
     }
     setPreview(null)
   }

@@ -213,9 +213,18 @@ body {
   text-align: left;
 }
 
+.panel-header.static {
+  cursor: default;
+}
+
 .panel-caret {
   color: var(--hint);
   font-size: 11px;
+}
+
+/* 芯々寸法欄は連続入力の主役なので少し強調 */
+.dim-field .num-input {
+  border-color: #0ea5e9;
 }
 
 .panel-summary {
