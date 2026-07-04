@@ -19,7 +19,7 @@ import {
   inheritedSize,
 } from './lib/inheritance'
 import { getPart } from './data/parts'
-import { sizesForPipeType } from './data/masters'
+import { sizesForPipeType, nextSmallerSize } from './data/masters'
 import type { Segment } from './types'
 
 const STORAGE_KEY = 'piping-iso:segments'
@@ -76,6 +76,52 @@ function splitForDoubleFlange(
       continue
     }
     // 元セグメントの子のうち、下流(B)側に接続しているものは B を親に付け替える
+    if (s.parentId === targetId) {
+      const dA = distanceToSegment(s.start, A.start, A.end)
+      const dB = distanceToSegment(s.start, B.start, B.end)
+      result.push(dB < dA ? { ...s, parentId: bId } : s)
+      continue
+    }
+    result.push(s)
+  }
+  const idx = result.findIndex((s) => s.id === targetId)
+  result.splice(idx + 1, 0, B)
+  return result
+}
+
+// レジューサー: ドロップ位置でセグメントを前後に分割し、下流(B)を1段小さいサイズにする。
+// A(上流)は元サイズを保持、B(下流)は小径＋レジューサー継手＋相手径=A径。交点以外にも挿入可。
+function splitForReducer(
+  segments: Segment[],
+  targetId: string,
+  dropPoint: Point,
+  kind: 'concentric' | 'eccentric',
+  largeSize: string | undefined,
+  smallSize: string | undefined,
+): Segment[] {
+  const target = segments.find((s) => s.id === targetId)
+  if (!target) return segments
+  const { point: P, t } = projectOnSegment(dropPoint, target.start, target.end)
+  if (t < 0.02 || t > 0.98) return segments // 端に寄りすぎは無視
+
+  const bId = makeId()
+  const A: Segment = { ...target, end: P }
+  const B: Segment = {
+    id: bId,
+    start: P,
+    end: target.end,
+    angle: target.angle,
+    parentId: target.id,
+    size: smallSize,
+    fitting: `reducer_${kind}`,
+    reducerSize: largeSize,
+  }
+  const result: Segment[] = []
+  for (const s of segments) {
+    if (s.id === targetId) {
+      result.push(A)
+      continue
+    }
     if (s.parentId === targetId) {
       const dA = distanceToSegment(s.start, A.start, A.end)
       const dB = distanceToSegment(s.start, B.start, B.end)
@@ -245,13 +291,22 @@ export default function App() {
     }
     if (!best) return
     const part = getPart(partId)
-    if (part?.action.type !== 'flange') return
+    if (!part) return
     const targetId = best.id
     const dropPoint = p
-    if (part.action.flange === 'double') {
-      setSegments((prev) => splitForDoubleFlange(prev, targetId, dropPoint))
-    } else {
-      setSegments((prev) => markSingleFlange(prev, targetId, dropPoint))
+    if (part.action.type === 'flange') {
+      if (part.action.flange === 'double') {
+        setSegments((prev) => splitForDoubleFlange(prev, targetId, dropPoint))
+      } else {
+        setSegments((prev) => markSingleFlange(prev, targetId, dropPoint))
+      }
+    } else if (part.action.type === 'reducer') {
+      const kind = part.action.reducer
+      const large = effectiveById[targetId]?.size
+      const small = nextSmallerSize(large)
+      setSegments((prev) =>
+        splitForReducer(prev, targetId, dropPoint, kind, large, small),
+      )
     }
     // 分割後は選択状態をリセット（前後が別データになるため）
     setSelectedId(null)

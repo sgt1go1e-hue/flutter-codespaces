@@ -31,19 +31,57 @@ export function inheritedPipeType(seg: Segment, byId: SegmentMap) {
   return walkUp(seg.parentId, byId, (s) => s.pipeType)
 }
 
-/** 親（上流）から継承されるサイズ（自分自身は見ない） */
-export function inheritedSize(seg: Segment, byId: SegmentMap) {
-  return walkUp(seg.parentId, byId, (s) => s.size)
-}
-
 /** 実効管種 = 自分の値 or 継承値 */
 export function effectivePipeType(seg: Segment, byId: SegmentMap) {
   return seg.pipeType ?? inheritedPipeType(seg, byId)
 }
 
-/** 実効サイズ = 自分の値 or 継承値 */
+const isReducerId = (id?: string) =>
+  id === 'reducer_concentric' || id === 'reducer_eccentric'
+
+/**
+ * そのセグメントが下流(子)へ渡すサイズ。
+ * レジューサー継手を持つ場合、下流は小径側（自分のサイズと相手径のうち小さい方）になる。
+ * これにより「レジューサーでサイズを落とすと下流も縮小したサイズを継承する」。
+ */
+function outputSize(
+  seg: Segment,
+  byId: SegmentMap,
+  seen: Set<string>,
+): string | undefined {
+  const base = effectiveSizeInner(seg, byId, seen)
+  if (base && isReducerId(seg.fitting) && seg.reducerSize) {
+    const a = nomA(base)
+    const b = nomA(seg.reducerSize)
+    if (a != null && b != null) return a <= b ? base : seg.reducerSize
+  }
+  return base
+}
+
+function effectiveSizeInner(
+  seg: Segment,
+  byId: SegmentMap,
+  seen: Set<string>,
+): string | undefined {
+  if (seg.size) return seg.size
+  if (!seg.parentId || seen.has(seg.id)) return undefined
+  seen.add(seg.id)
+  const parent = byId[seg.parentId]
+  if (!parent) return undefined
+  return outputSize(parent, byId, seen)
+}
+
+/** 実効サイズ = 自分の値 or 親の「下流へ渡すサイズ」（レジューサーで縮小反映） */
 export function effectiveSize(seg: Segment, byId: SegmentMap) {
-  return seg.size ?? inheritedSize(seg, byId)
+  return effectiveSizeInner(seg, byId, new Set())
+}
+
+/** 親（上流）から継承されるサイズ（自分自身は見ない） */
+export function inheritedSize(seg: Segment, byId: SegmentMap) {
+  if (!seg.parentId) return undefined
+  const parent = byId[seg.parentId]
+  if (!parent) return undefined
+  return outputSize(parent, byId, new Set())
 }
 
 export interface Effective {

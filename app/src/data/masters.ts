@@ -89,6 +89,15 @@ export function sizesForPipeType(pipeTypeId?: string): SizeInfo[] {
     .filter((s): s is SizeInfo => !!s)
 }
 
+/** 鋼管サイズ列で1段小さい呼び径コードを返す（無ければ元のまま） */
+export function nextSmallerSize(code?: string): string | undefined {
+  if (!code) return undefined
+  const steel = getPipeType('sgp')?.sizes ?? []
+  const i = steel.indexOf(code)
+  if (i > 0) return steel[i - 1]
+  return code
+}
+
 /** レジューサーの大径_小径キー（2つの呼び径コードから、大→小の順で組む） */
 export function reducerKey(sizeCodeA?: string, sizeCodeB?: string): string | undefined {
   const a = nominalOf(sizeCodeA)

@@ -17,7 +17,9 @@ export interface PartDef {
    *   'single'（片フランジ）は分割せず終端としてマークする。
    * （将来: 独立配置部材の 'placeInline' などを追加予定）
    */
-  action: { type: 'flange'; flange: FlangeType }
+  action:
+    | { type: 'flange'; flange: FlangeType }
+    | { type: 'reducer'; reducer: 'concentric' | 'eccentric' }
 }
 
 export const partsPalette: PartDef[] = [
@@ -33,9 +35,20 @@ export const partsPalette: PartDef[] = [
     icon: 'FLG',
     action: { type: 'flange', flange: 'single' },
   },
+  {
+    id: 'reducer-concentric',
+    name: '同心レジューサー',
+    icon: 'RED',
+    action: { type: 'reducer', reducer: 'concentric' },
+  },
+  {
+    id: 'reducer-eccentric',
+    name: '偏心レジューサー',
+    icon: 'RED',
+    action: { type: 'reducer', reducer: 'eccentric' },
+  },
   // 例: 今後こう増やせる（未実装のプレースホルダは追加しない）
   // { id: 'valve', name: 'バルブ', icon: 'VLV', action: { type: 'placeInline', ... } },
-  // { id: 'strainer', name: 'ストレーナー', icon: 'STR', action: { ... } },
 ]
 
 export function getPart(id: string): PartDef | undefined {

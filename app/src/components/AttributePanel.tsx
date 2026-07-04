@@ -18,6 +18,25 @@ export interface DrawDefaults {
   connection?: string
 }
 
+function roleLabel(role: string): string {
+  switch (role) {
+    case 'free':
+      return 'フリー端'
+    case 'straight':
+      return '直管'
+    case 'elbow':
+      return 'エルボ'
+    case 'reducer':
+      return 'レジューサー'
+    case 'tee-run':
+      return 'チーズ・ラン'
+    case 'tee-branch':
+      return 'チーズ・枝'
+    default:
+      return role
+  }
+}
+
 // ============================================================
 // 寸法・属性パネル（線を選択したときに表示）
 // ============================================================
@@ -230,23 +249,23 @@ export function SegmentPanel({
         {cut && !cut.needsCounterpart && (
           <div className="end-breakdown">
             <div className="end-row">
-              <span>始点側</span>
+              <span>始点側（{roleLabel(cut.startRole)}）</span>
               <span>
                 {cut.startAllow > 0
                   ? `− ${cut.startAllow} mm`
                   : cut.startConnected
                     ? '差引なし'
-                    : 'フリー端（芯出し基準）'}
+                    : '芯出し基準'}
               </span>
             </div>
             <div className="end-row">
-              <span>終点側</span>
+              <span>終点側（{roleLabel(cut.endRole)}）</span>
               <span>
                 {cut.endAllow > 0
                   ? `− ${cut.endAllow} mm`
                   : cut.endConnected
                     ? '差引なし'
-                    : 'フリー端（芯出し基準）'}
+                    : '芯出し基準'}
               </span>
             </div>
           </div>

@@ -1,0 +1,201 @@
+import type { Point, Segment } from '../types'
+import { samePoint, distanceToSegment, distance } from './isometric'
+import {
+  getFitting,
+  nominalOf,
+  reducerKey,
+  type ReducerDim,
+  type TeeDim,
+} from '../data/masters'
+import type { Effective } from './inheritance'
+
+// ノード同一判定の許容誤差(px)
+const NODE_EPS = 1
+
+export type EndRole =
+  | 'free' // 接続なし（芯出し基準）
+  | 'straight' // 直管接続（同径・一直線）
+  | 'elbow'
+  | 'reducer'
+  | 'tee-run'
+  | 'tee-branch'
+
+export interface EndResult {
+  role: EndRole
+  /** 差し引く取り出し寸法(mm) */
+  mm: number
+  /** 参照した継手 id（表示用） */
+  fittingId?: string
+}
+
+interface Inc {
+  seg: Segment
+  end: 'start' | 'end'
+  /** セグメント本体→ノードへ向かう単位ベクトル */
+  into: Point
+  size?: string
+}
+interface GNode {
+  p: Point
+  incs: Inc[]
+  through: Segment[] // このノードを内部通過する線（中間分岐の本管）
+}
+
+const dot = (a: Point, b: Point) => a.x * b.x + a.y * b.y
+const isElbowId = (id?: string) =>
+  id === 'elbow90_short' || id === 'elbow90_long' || id === 'elbow45_long'
+const isTeeId = (id?: string) => id === 'tee_equal' || id === 'tee_reducing'
+const isReducerId = (id?: string) =>
+  id === 'reducer_concentric' || id === 'reducer_eccentric'
+
+function buildGraph(
+  segments: Segment[],
+  effById: Record<string, Effective>,
+): GNode[] {
+  const nodes: GNode[] = []
+  const findOrAdd = (p: Point) => {
+    let n = nodes.find((n) => samePoint(n.p, p, NODE_EPS))
+    if (!n) {
+      n = { p: { ...p }, incs: [], through: [] }
+      nodes.push(n)
+    }
+    return n
+  }
+  for (const s of segments) {
+    for (const end of ['start', 'end'] as const) {
+      const p = end === 'start' ? s.start : s.end
+      const other = end === 'start' ? s.end : s.start
+      const len = distance(p, other) || 1
+      const into = { x: (p.x - other.x) / len, y: (p.y - other.y) / len }
+      findOrAdd(p).incs.push({ seg: s, end, into, size: effById[s.id]?.size })
+    }
+  }
+  for (const n of nodes) {
+    for (const s of segments) {
+      if (samePoint(n.p, s.start, NODE_EPS) || samePoint(n.p, s.end, NODE_EPS)) continue
+      if (distanceToSegment(n.p, s.start, s.end) < 1.5) n.through.push(s)
+    }
+  }
+  return nodes
+}
+
+// エルボの取り出し寸法（自セグメントのサイズで）
+function elbowTakeout(inc: Inc, nb?: Inc): number {
+  const nomKey = String(nominalOf(inc.size) ?? '')
+  const id = isElbowId(inc.seg.fitting)
+    ? (inc.seg.fitting as string)
+    : isElbowId(nb?.seg.fitting)
+      ? (nb!.seg.fitting as string)
+      : 'elbow90_short'
+  const raw = getFitting(id)?.dims[nomKey]
+  return typeof raw === 'number' ? raw : 0
+}
+
+// レジューサーの取り出し寸法（大径側=0/小径側=全長H。face 基準）
+function reducerTakeout(inc: Inc, nb: Inc): { mm: number; id: string } {
+  const a = nominalOf(inc.size)
+  const b = nominalOf(nb.size)
+  const id = isReducerId(inc.seg.fitting)
+    ? (inc.seg.fitting as string)
+    : isReducerId(nb.seg.fitting)
+      ? (nb.seg.fitting as string)
+      : 'reducer_concentric'
+  if (a == null || b == null) return { mm: 0, id }
+  const key = reducerKey(inc.size, nb.size)
+  const dim = key ? (getFitting(id)?.dims[key] as ReducerDim | undefined) : undefined
+  const H = dim?.H ?? 0
+  const isLarge = a >= b
+  return { mm: isLarge ? 0 : H, id }
+}
+
+// チーズの取り出し寸法（ラン/枝で C・M を出し分け）
+function teeTakeout(
+  runSize: string | undefined,
+  branchSize: string | undefined,
+  isRun: boolean,
+): { mm: number; id: string } {
+  const runN = nominalOf(runSize)
+  const brN = nominalOf(branchSize)
+  const reducing = runN != null && brN != null && runN !== brN
+  const id = reducing ? 'tee_reducing' : 'tee_equal'
+  let dim: TeeDim | undefined
+  if (reducing) {
+    dim = getFitting('tee_reducing')?.dims[`${runN}_${brN}`] as TeeDim | undefined
+  } else {
+    dim = getFitting('tee_equal')?.dims[String(runN ?? '')] as TeeDim | undefined
+  }
+  if (!dim) return { mm: 0, id }
+  return { mm: isRun ? dim.run : dim.branch, id }
+}
+
+function resolveEnd(inc: Inc, node: GNode): EndResult {
+  const others = node.incs.filter((i) => i.seg.id !== inc.seg.id)
+  const throughs = node.through.filter((t) => t.id !== inc.seg.id)
+  const degree = node.incs.length + 2 * throughs.length
+
+  if (others.length === 0 && throughs.length === 0) {
+    return { role: 'free', mm: 0 }
+  }
+
+  // 分岐（3方向以上、または本管の途中に接続＝中間分岐）
+  if (degree >= 3) {
+    // このセグメントが本管(run)方向か？（反対向きの端点隣接、または本管通過に平行）
+    const opposite = others.find((o) => dot(inc.into, o.into) < -0.9)
+    let throughParallel = false
+    if (throughs.length > 0) {
+      const t = throughs[0]
+      const tlen = distance(t.start, t.end) || 1
+      const tdir = { x: (t.end.x - t.start.x) / tlen, y: (t.end.y - t.start.y) / tlen }
+      throughParallel = Math.abs(dot(inc.into, tdir)) > 0.9
+    }
+    const isRun = Boolean(opposite) || throughParallel
+    const branchInc = others.find((o) => dot(inc.into, o.into) >= -0.9)
+    const runSize = isRun ? inc.size : (opposite?.size ?? inc.size)
+    const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
+    const t = teeTakeout(runSize, branchSize, isRun)
+    return { role: isRun ? 'tee-run' : 'tee-branch', mm: t.mm, fittingId: t.id }
+  }
+
+  // 次数2：端点隣接1本
+  const nb = others[0]
+  if (!nb) return { role: 'free', mm: 0 }
+  const straight = dot(inc.into, nb.into) < -0.9
+  if (straight) {
+    const a = nominalOf(inc.size)
+    const b = nominalOf(nb.size)
+    if (a != null && b != null && a !== b) {
+      const r = reducerTakeout(inc, nb)
+      return { role: 'reducer', mm: r.mm, fittingId: r.id }
+    }
+    return { role: 'straight', mm: 0 }
+  }
+  return { role: 'elbow', mm: elbowTakeout(inc, nb), fittingId: isElbowId(inc.seg.fitting) ? inc.seg.fitting : 'elbow90_short' }
+}
+
+export interface SegEnds {
+  start: EndResult
+  end: EndResult
+}
+
+/** 全セグメントの端ごとの取り出し寸法を計算 */
+export function computeEnds(
+  segments: Segment[],
+  effById: Record<string, Effective>,
+): Record<string, SegEnds> {
+  const nodes = buildGraph(segments, effById)
+  const nodeAt = (p: Point) => nodes.find((n) => samePoint(n.p, p, NODE_EPS))!
+  const out: Record<string, SegEnds> = {}
+  for (const s of segments) {
+    const startNode = nodeAt(s.start)
+    const endNode = nodeAt(s.end)
+    const startInc = startNode.incs.find((i) => i.seg.id === s.id && i.end === 'start')!
+    const endInc = endNode.incs.find((i) => i.seg.id === s.id && i.end === 'end')!
+    out[s.id] = {
+      start: resolveEnd(startInc, startNode),
+      end: resolveEnd(endInc, endNode),
+    }
+  }
+  return out
+}
+
+export { isTeeId }
