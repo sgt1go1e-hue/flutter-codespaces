@@ -51,6 +51,11 @@ export function SegmentPanel({
   const effPipe = segment.pipeType ?? inheritedPipeType
   const sizes = sizesForPipeType(effPipe)
   const od = getSizeInfo(segment.size ?? inheritedSize)?.od
+  const effFittingId = effective?.fitting
+  const isReducer =
+    effFittingId === 'reducer_concentric' || effFittingId === 'reducer_eccentric'
+  const needsCounterpart =
+    isReducer || effFittingId === 'tee_reducing'
 
   const pipeShort = effPipe ? (getPipeType(effPipe)?.short ?? effPipe) : '—'
   const sizeText = segment.size ?? inheritedSize ?? '—'
@@ -107,7 +112,13 @@ export function SegmentPanel({
 
           <div className="field cut-field">
             <span className="field-label">切断長さ</span>
-            <div className="cut-value">{cut?.cut != null ? `${cut.cut} mm` : '—'}</div>
+            <div className="cut-value">
+              {cut?.needsCounterpart
+                ? '要相手径'
+                : cut?.cut != null
+                  ? `${cut.cut} mm`
+                  : '—'}
+            </div>
           </div>
 
           <label className="field">
@@ -169,6 +180,72 @@ export function SegmentPanel({
             </select>
           </label>
         </div>
+
+        {/* レジューサー / 径違いチーズ: 相手径・合わせ面 */}
+        {needsCounterpart && (
+          <div className="panel-grid reducer-grid">
+            <label className="field">
+              <span className="field-label">相手径</span>
+              <select
+                value={segment.reducerSize ?? ''}
+                onChange={(e) => onChange({ reducerSize: e.target.value || undefined })}
+              >
+                <option value="">— 選択 —</option>
+                {sizes.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {effFittingId === 'reducer_eccentric' && (
+              <label className="field">
+                <span className="field-label">合わせ面（必須）</span>
+                <select
+                  value={segment.reducerAlign ?? ''}
+                  onChange={(e) =>
+                    onChange({
+                      reducerAlign: (e.target.value || undefined) as
+                        | 'top'
+                        | 'bottom'
+                        | undefined,
+                    })
+                  }
+                >
+                  <option value="">— 選択 —</option>
+                  <option value="top">上面合わせ（TOP）</option>
+                  <option value="bottom">下面合わせ（BOTTOM）</option>
+                </select>
+              </label>
+            )}
+          </div>
+        )}
+
+        {cut?.needsCounterpart && (
+          <p className="cut-warn">相手径を選択すると加工寸法を計算します。</p>
+        )}
+
+        {/* 偏心レジューサーの芯ズレ表示 */}
+        {cut?.eccentric && !cut.needsCounterpart && (
+          <div className="ecc-box">
+            {cut.eccentric.alignNeeded ? (
+              <p className="cut-warn">合わせ面（上面／下面）を選択してください。</p>
+            ) : cut.eccentric.offset != null ? (
+              <>
+                <div className="ecc-line">
+                  芯ズレ: <b>{cut.eccentric.offset} mm</b>（
+                  {cut.eccentric.align === 'top' ? '上面合わせ' : '下面合わせ'}）
+                </div>
+                <p className="ecc-note">
+                  レジューサー基準面から {cut.eccentric.offset}mm{' '}
+                  {cut.eccentric.align === 'top' ? '下' : '上'}に芯がズレています（
+                  {cut.eccentric.large}→{cut.eccentric.small}）。下流の立上り／立下り
+                  高さ確認の参考にしてください（図の見た目は変わりません）。
+                </p>
+              </>
+            ) : null}
+          </div>
+        )}
 
         <details className="panel-more">
           <summary>フランジ（始点 / 終点）</summary>

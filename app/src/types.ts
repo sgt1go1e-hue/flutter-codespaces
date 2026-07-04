@@ -26,9 +26,16 @@ export interface Segment {
   centerLength?: number
   /**
    * この区間の継手種類（fittings.json の id）。始点・終点で別々には持たず1つに統合。
-   * 未設定なら継承ロジックと同様、分岐箇所は 'tee'・それ以外は 'elbow' を実効値とする。
+   * 未設定なら継承ロジックと同様、分岐箇所は 'tee_equal'・それ以外は 'elbow90_short' を実効値とする。
    */
   fitting?: string
+  /**
+   * レジューサー/径違いチーズの「相手径」呼び径コード。
+   * 自分の size と合わせて大径_小径を決め、全長や芯ズレ計算に使う。
+   */
+  reducerSize?: string
+  /** 偏心レジューサーの合わせ面。'top'=上面合わせ / 'bottom'=下面合わせ。必須選択。 */
+  reducerAlign?: 'top' | 'bottom'
   /** 接続方法（connections の id）。例: フランジ接合 'flange' */
   connection?: string
   /**

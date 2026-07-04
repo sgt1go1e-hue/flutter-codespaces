@@ -115,7 +115,11 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
       (degrees.get(nodeKey(s.start)) ?? 0) >= 3 ||
       (degrees.get(nodeKey(s.end)) ?? 0) >= 3
     const fittingOwn = s.fitting != null && s.fitting !== ''
-    const fitting = fittingOwn ? (s.fitting as string) : isBranch ? 'tee' : 'elbow90'
+    const fitting = fittingOwn
+      ? (s.fitting as string)
+      : isBranch
+        ? 'tee_equal'
+        : 'elbow90_short'
     out[s.id] = {
       pipeType: effectivePipeType(s, byId),
       size,

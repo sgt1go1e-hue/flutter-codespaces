@@ -15,18 +15,40 @@ export interface SizeInfo {
   od: number
 }
 
+// 継手の計算方式
+export type FittingCalc = 'centerMinus' | 'overall' | 'endDepth' | 'none'
+// dims の値: エルボ/キャップ=数値, チーズ={run,branch}, レジューサー={H,od1,od2}
+export type TeeDim = { run: number; branch: number }
+export type ReducerDim = { H: number; od1: number | null; od2: number | null }
+export type DimValue = number | TeeDim | ReducerDim
+
 export interface Fitting {
   id: string
   name: string
   short: string
-  /** 呼び径コード -> 中心〜端面寸法(mm)。センターマイナス寸法。 */
-  centerToFace: Record<string, number>
+  calc: FittingCalc
+  source: string | null
+  drawingNo: string | null
+  /** キー: 単一=呼び径A(例"25") / 径違いチーズ="ラン_枝" / レジューサー="大径_小径" */
+  dims: Record<string, DimValue>
 }
 
 // --- マスタデータ ---
 export const pipeTypes = pipesJson.pipeTypes as PipeType[]
 export const sizeList = pipesJson.sizeList as SizeInfo[]
 export const fittings = fittingsJson.fittings as Fitting[]
+
+/** 呼び径コード("25A")→ A呼称の数値(25)。VP等でAが無ければ null */
+export function nominalOf(sizeCode?: string): number | null {
+  if (!sizeCode) return null
+  const m = /^(\d+)A$/.exec(sizeCode)
+  return m ? Number(m[1]) : null
+}
+
+/** 外径(OD, mm)を呼び径コードから取得 */
+export function odOf(sizeCode?: string): number | undefined {
+  return getSizeInfo(sizeCode)?.od
+}
 
 // --- 接続方法（接合方法）マスタ ---
 export interface ConnectionMethod {
@@ -67,10 +89,12 @@ export function sizesForPipeType(pipeTypeId?: string): SizeInfo[] {
     .filter((s): s is SizeInfo => !!s)
 }
 
-/** 継手の中心〜端面寸法(mm)を取得（未登録サイズは undefined） */
-export function centerToFace(fittingId?: string, sizeCode?: string): number | undefined {
-  if (!fittingId || !sizeCode) return undefined
-  const f = getFitting(fittingId)
-  if (!f) return undefined
-  return f.centerToFace[sizeCode]
+/** レジューサーの大径_小径キー（2つの呼び径コードから、大→小の順で組む） */
+export function reducerKey(sizeCodeA?: string, sizeCodeB?: string): string | undefined {
+  const a = nominalOf(sizeCodeA)
+  const b = nominalOf(sizeCodeB)
+  if (a == null || b == null) return undefined
+  const large = Math.max(a, b)
+  const small = Math.min(a, b)
+  return `${large}_${small}`
 }
