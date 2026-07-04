@@ -1,6 +1,10 @@
 import type { Segment } from '../types'
 import type { Effective } from './inheritance'
-import { reducerCounterpart, endConnections } from './inheritance'
+import {
+  reducerCounterpart,
+  endConnections,
+  reducerLargeAtStart,
+} from './inheritance'
 import {
   getFitting,
   nominalOf,
@@ -41,6 +45,8 @@ export interface CutResult {
   autoCounterpart?: string
   /** 偏心レジューサーのときの芯ズレ情報 */
   eccentric?: EccentricInfo
+  /** レジューサー描画用: 大径側が始点(start)側か（上流→下流の向き） */
+  reducerLargeAtStart?: boolean
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -154,7 +160,16 @@ export function computeAllCut(
     const eff = effectiveById[s.id]
     const auto = reducerCounterpart(s, segments, effectiveById)
     const conn = endConnections(s, segments)
-    out[s.id] = computeCutLength(s, eff?.size, eff?.fitting, auto, conn)
+    const res = computeCutLength(s, eff?.size, eff?.fitting, auto, conn)
+    if (res.calc === 'overall') {
+      res.reducerLargeAtStart = reducerLargeAtStart(
+        s,
+        segments,
+        effectiveById,
+        s.reducerSize ?? auto,
+      )
+    }
+    out[s.id] = res
   }
   return out
 }

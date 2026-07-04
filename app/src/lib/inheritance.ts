@@ -94,6 +94,49 @@ export function reducerCounterpart(
   return undefined
 }
 
+const nomA = (code?: string): number | null => {
+  const m = /^(\d+)A$/.exec(code ?? '')
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * レジューサーの「大径側が始点(start)側か」を判定する。
+ * 上流(大径)→下流(小径)の向きをシンボル描画に使う。
+ * 径の異なる隣接セグメントがどちらの端に接続しているかと、その径から決める。
+ */
+export function reducerLargeAtStart(
+  seg: Segment,
+  segments: Segment[],
+  effectiveById: Record<string, { size?: string }>,
+  counterpartSize?: string,
+): boolean {
+  const segN = nomA(effectiveById[seg.id]?.size)
+  let cpEnd: 'start' | 'end' | undefined
+  let cpN: number | null = null
+  for (const n of segments) {
+    if (n.id === seg.id) continue
+    const nn = nomA(effectiveById[n.id]?.size)
+    if (nn == null || nn === segN) continue
+    if (samePoint(n.start, seg.start) || samePoint(n.end, seg.start) ||
+        distanceToSegment(seg.start, n.start, n.end) < 1.5) {
+      cpEnd = 'start'; cpN = nn; break
+    }
+    if (samePoint(n.start, seg.end) || samePoint(n.end, seg.end) ||
+        distanceToSegment(seg.end, n.start, n.end) < 1.5) {
+      cpEnd = 'end'; cpN = nn; break
+    }
+  }
+  if (segN == null || cpN == null || !cpEnd) {
+    // 幾何が取れない場合は手動相手径から推定（不明なら大径を始点側に）
+    const mn = nomA(counterpartSize)
+    if (segN != null && mn != null) return mn < segN
+    return true
+  }
+  const other = cpEnd === 'start' ? 'end' : 'start'
+  const largeEnd = cpN > segN ? cpEnd : other
+  return largeEnd === 'start'
+}
+
 /**
  * セグメントの始点側・終点側それぞれが、他セグメントに接続しているかを判定する。
  * 接続あり＝他セグメントの端点が一致、またはその端点が他セグメント上（中間分岐）にある。

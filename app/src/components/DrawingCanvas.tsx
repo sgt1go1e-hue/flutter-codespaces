@@ -212,6 +212,47 @@ export function DrawingCanvas({
     )
   }
 
+  // レジューサーのシンボル。
+  // 同心=二等辺三角形（大径=底辺→小径=頂点）、偏心=直角三角形（斜辺の向きが Top/Bottom 連動）。
+  // 常に「上流(大径)側=底辺・下流(小径)側=頂点」。ルート向きが変わっても維持。
+  function reducerSymbol(
+    s: Segment,
+    kind: 'concentric' | 'eccentric',
+    align: 'top' | 'bottom' | undefined,
+    largeAtStart: boolean,
+  ) {
+    const mx = (s.start.x + s.end.x) / 2
+    const my = (s.start.y + s.end.y) / 2
+    const len = distance(s.start, s.end) || 1
+    const dx = (s.end.x - s.start.x) / len
+    const dy = (s.end.y - s.start.y) / len
+    // u = 大径→小径 の向き
+    const ux = largeAtStart ? dx : -dx
+    const uy = largeAtStart ? dy : -dy
+    const nx = -uy
+    const ny = ux
+    const L = 13 // 大径〜小径方向の半長
+    const W = 9 // 底辺の半幅
+    const largeCx = mx - ux * L
+    const largeCy = my - uy * L
+    const c1 = { x: largeCx + nx * W, y: largeCy + ny * W }
+    const c2 = { x: largeCx - nx * W, y: largeCy - ny * W }
+    let apex = { x: mx + ux * L, y: my + uy * L } // 小径側の中心（同心の頂点）
+    if (kind === 'eccentric' && align) {
+      // 画面上下で「面が揃う側」を決め、その角から頂点を配管方向へ伸ばす（斜辺=反対側）
+      const cTop = c1.y <= c2.y ? c1 : c2
+      const cBot = c1.y <= c2.y ? c2 : c1
+      const flush = align === 'bottom' ? cBot : cTop
+      apex = { x: flush.x + ux * 2 * L, y: flush.y + uy * 2 * L }
+    }
+    return (
+      <polygon
+        className="reducer-mark"
+        points={`${c1.x},${c1.y} ${c2.x},${c2.y} ${apex.x},${apex.y}`}
+      />
+    )
+  }
+
   return (
     <svg
       ref={svgRef}
@@ -261,6 +302,16 @@ export function DrawingCanvas({
             <circle cx={s.end.x} cy={s.end.y} r={4} fill="#94a3b8" />
             {s.startFlange && flangeMarker(s, 'start', s.startFlange)}
             {s.endFlange && flangeMarker(s, 'end', s.endFlange)}
+            {/* レジューサーのシンボル（同心=二等辺 / 偏心=直角三角形） */}
+            {eff?.fitting === 'reducer_concentric' &&
+              reducerSymbol(s, 'concentric', undefined, cutById[s.id]?.reducerLargeAtStart ?? true)}
+            {eff?.fitting === 'reducer_eccentric' &&
+              reducerSymbol(
+                s,
+                'eccentric',
+                cutById[s.id]?.eccentric?.align,
+                cutById[s.id]?.reducerLargeAtStart ?? true,
+              )}
             {/* サイズは「切り替わった地点」だけに1箇所表示（データは全保持） */}
             {eff?.showSizeLabel && eff.size && (
               <text

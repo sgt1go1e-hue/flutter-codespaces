@@ -187,6 +187,14 @@ body {
   stroke-width: 3px;
 }
 
+/* レジューサー記号（三角形） */
+.reducer-mark {
+  fill: rgba(56, 189, 248, 0.25);
+  stroke: #e2e8f0;
+  stroke-width: 2;
+  stroke-linejoin: round;
+}
+
 /* フランジ記号（配管に直交する2本線） */
 .flange-mark {
   stroke: #e2e8f0;
