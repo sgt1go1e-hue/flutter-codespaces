@@ -67,6 +67,33 @@ export interface Effective {
   isBranch: boolean
 }
 
+/**
+ * レジューサー/径違いチーズの「相手径」を、接続している隣接セグメントの
+ * 実効サイズから自動判定する。自分と径が異なる隣接管のサイズを採用。
+ * （手動指定 seg.reducerSize があればそちらを優先する想定で、ここは自動値のみ返す）
+ */
+export function reducerCounterpart(
+  seg: Segment,
+  segments: Segment[],
+  effectiveById: Record<string, { size?: string }>,
+): string | undefined {
+  const segSize = effectiveById[seg.id]?.size
+  const isNeighbor = (n: Segment) =>
+    n.id !== seg.id &&
+    (samePoint(n.start, seg.start) ||
+      samePoint(n.start, seg.end) ||
+      samePoint(n.end, seg.start) ||
+      samePoint(n.end, seg.end) ||
+      n.id === seg.parentId ||
+      n.parentId === seg.id)
+  for (const n of segments) {
+    if (!isNeighbor(n)) continue
+    const ns = effectiveById[n.id]?.size
+    if (ns && ns !== segSize) return ns
+  }
+  return undefined
+}
+
 const nodeKey = (p: Point) => `${Math.round(p.x)}_${Math.round(p.y)}`
 
 /**

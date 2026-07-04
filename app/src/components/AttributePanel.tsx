@@ -185,12 +185,17 @@ export function SegmentPanel({
         {needsCounterpart && (
           <div className="panel-grid reducer-grid">
             <label className="field">
-              <span className="field-label">相手径</span>
+              <span className="field-label">
+                相手径
+                <span className="field-note">隣接から自動判定</span>
+              </span>
               <select
                 value={segment.reducerSize ?? ''}
                 onChange={(e) => onChange({ reducerSize: e.target.value || undefined })}
               >
-                <option value="">— 選択 —</option>
+                <option value="">
+                  {cut?.autoCounterpart ? `自動（${cut.autoCounterpart}）` : '— 選択 —'}
+                </option>
                 {sizes.map((s) => (
                   <option key={s.code} value={s.code}>
                     {s.label}

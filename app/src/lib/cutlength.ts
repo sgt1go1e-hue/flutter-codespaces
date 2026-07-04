@@ -1,5 +1,6 @@
 import type { Segment } from '../types'
 import type { Effective } from './inheritance'
+import { reducerCounterpart } from './inheritance'
 import {
   getFitting,
   nominalOf,
@@ -30,6 +31,10 @@ export interface CutResult {
   calc: FittingCalc
   /** 相手径が未指定で計算できない（レジューサー/径違いチーズ） */
   needsCounterpart: boolean
+  /** 実際に使った相手径（手動指定 or 自動判定） */
+  counterpart?: string
+  /** 隣接から自動判定した相手径（表示用） */
+  autoCounterpart?: string
   /** 偏心レジューサーのときの芯ズレ情報 */
   eccentric?: EccentricInfo
 }
@@ -46,11 +51,14 @@ export function computeCutLength(
   seg: Segment,
   effSize?: string,
   effFitting?: string,
+  autoCounterpart?: string,
 ): CutResult {
   const fitting = getFitting(effFitting)
   const calc: FittingCalc = fitting?.calc ?? 'none'
   const nominal = nominalOf(effSize)
   const nominalKey = nominal != null ? String(nominal) : ''
+  // 相手径: 手動指定を優先し、無ければ隣接から自動判定した値を使う
+  const counterpart = seg.reducerSize ?? autoCounterpart
 
   let startAllow = 0
   let endAllow = 0
@@ -60,7 +68,7 @@ export function computeCutLength(
   if (fitting && calc === 'centerMinus') {
     if (fitting.id === 'tee_reducing') {
       // ラン_枝 のキー。相手径(枝径)が必要。
-      const key = reducerKey(effSize, seg.reducerSize)
+      const key = reducerKey(effSize, counterpart)
       const dim = key ? (fitting.dims[key] as TeeDim | undefined) : undefined
       if (dim) startAllow = endAllow = dim.run
       else needsCounterpart = true
@@ -71,7 +79,7 @@ export function computeCutLength(
     }
   } else if (fitting && calc === 'overall') {
     // レジューサー: 全長 H を片側で差し引く。相手径が必要。
-    const key = reducerKey(effSize, seg.reducerSize)
+    const key = reducerKey(effSize, counterpart)
     const dim = key ? (fitting.dims[key] as ReducerDim | undefined) : undefined
     if (dim) {
       startAllow = dim.H
@@ -81,7 +89,7 @@ export function computeCutLength(
             ? round1((dim.od1 - dim.od2) / 2)
             : undefined
         const a = nominalOf(effSize)
-        const b = nominalOf(seg.reducerSize)
+        const b = nominalOf(counterpart)
         const large = a != null && b != null ? `${Math.max(a, b)}A` : undefined
         const small = a != null && b != null ? `${Math.min(a, b)}A` : undefined
         eccentric = {
@@ -115,6 +123,8 @@ export function computeCutLength(
     sizeKnown: effSize != null && effSize !== '',
     calc,
     needsCounterpart,
+    counterpart,
+    autoCounterpart,
     eccentric,
   }
 }
@@ -127,7 +137,8 @@ export function computeAllCut(
   const out: Record<string, CutResult> = {}
   for (const s of segments) {
     const eff = effectiveById[s.id]
-    out[s.id] = computeCutLength(s, eff?.size, eff?.fitting)
+    const auto = reducerCounterpart(s, segments, effectiveById)
+    out[s.id] = computeCutLength(s, eff?.size, eff?.fitting, auto)
   }
   return out
 }
