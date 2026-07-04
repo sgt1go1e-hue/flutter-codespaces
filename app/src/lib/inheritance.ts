@@ -94,6 +94,26 @@ export function reducerCounterpart(
   return undefined
 }
 
+/**
+ * セグメントの始点側・終点側それぞれが、他セグメントに接続しているかを判定する。
+ * 接続あり＝他セグメントの端点が一致、またはその端点が他セグメント上（中間分岐）にある。
+ * 接続なし（フリー端）＝ルートの起点や、まだ何も繋がっていない末端。
+ */
+export function endConnections(
+  seg: Segment,
+  segments: Segment[],
+): { start: boolean; end: boolean } {
+  const touches = (pt: Point) =>
+    segments.some(
+      (n) =>
+        n.id !== seg.id &&
+        (samePoint(pt, n.start) ||
+          samePoint(pt, n.end) ||
+          distanceToSegment(pt, n.start, n.end) < 1.5),
+    )
+  return { start: touches(seg.start), end: touches(seg.end) }
+}
+
 const nodeKey = (p: Point) => `${Math.round(p.x)}_${Math.round(p.y)}`
 
 /**

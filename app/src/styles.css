@@ -309,6 +309,24 @@ body {
   color: #34d399;
 }
 
+.end-breakdown {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.end-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.end-row span:last-child {
+  color: var(--text);
+}
+
 .cut-warn {
   color: #fbbf24;
   font-size: 13px;

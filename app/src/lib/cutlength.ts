@@ -1,6 +1,6 @@
 import type { Segment } from '../types'
 import type { Effective } from './inheritance'
-import { reducerCounterpart } from './inheritance'
+import { reducerCounterpart, endConnections } from './inheritance'
 import {
   getFitting,
   nominalOf,
@@ -29,6 +29,10 @@ export interface CutResult {
   cut?: number
   sizeKnown: boolean
   calc: FittingCalc
+  /** 始点側が他セグメントに接続しているか（false=フリー端・差引なし） */
+  startConnected: boolean
+  /** 終点側が他セグメントに接続しているか */
+  endConnected: boolean
   /** 相手径が未指定で計算できない（レジューサー/径違いチーズ） */
   needsCounterpart: boolean
   /** 実際に使った相手径（手動指定 or 自動判定） */
@@ -52,6 +56,7 @@ export function computeCutLength(
   effSize?: string,
   effFitting?: string,
   autoCounterpart?: string,
+  conn: { start: boolean; end: boolean } = { start: true, end: true },
 ): CutResult {
   const fitting = getFitting(effFitting)
   const calc: FittingCalc = fitting?.calc ?? 'none'
@@ -66,16 +71,20 @@ export function computeCutLength(
   let eccentric: EccentricInfo | undefined
 
   if (fitting && calc === 'centerMinus') {
+    // エルボ/チーズ: 接続している端だけ差し引く（フリー端は芯先で引かない）
+    let t: number | undefined
     if (fitting.id === 'tee_reducing') {
-      // ラン_枝 のキー。相手径(枝径)が必要。
       const key = reducerKey(effSize, counterpart)
       const dim = key ? (fitting.dims[key] as TeeDim | undefined) : undefined
-      if (dim) startAllow = endAllow = dim.run
+      if (dim) t = dim.run
       else needsCounterpart = true
     } else {
       const raw = fitting.dims[nominalKey]
-      const t = typeof raw === 'number' ? raw : (raw as TeeDim | undefined)?.run
-      if (t != null) startAllow = endAllow = t
+      t = typeof raw === 'number' ? raw : (raw as TeeDim | undefined)?.run
+    }
+    if (t != null) {
+      if (conn.start) startAllow = t
+      if (conn.end) endAllow = t
     }
   } else if (fitting && calc === 'overall') {
     // レジューサー: 全長 H を片側で差し引く。相手径が必要。
@@ -104,9 +113,13 @@ export function computeCutLength(
       needsCounterpart = true
     }
   } else if (fitting && calc === 'endDepth') {
-    // キャップ: 終端で片側のみ差し引く
+    // キャップ: 終端（フリー端側）でキャップ深さを差し引く
     const raw = fitting.dims[nominalKey]
-    if (typeof raw === 'number') startAllow = raw
+    if (typeof raw === 'number') {
+      if (!conn.start) startAllow = raw
+      else if (!conn.end) endAllow = raw
+      else startAllow = raw // 両端接続の異常時は始点側
+    }
   }
 
   const center = seg.centerLength
@@ -122,6 +135,8 @@ export function computeCutLength(
     cut,
     sizeKnown: effSize != null && effSize !== '',
     calc,
+    startConnected: conn.start,
+    endConnected: conn.end,
     needsCounterpart,
     counterpart,
     autoCounterpart,
@@ -138,7 +153,8 @@ export function computeAllCut(
   for (const s of segments) {
     const eff = effectiveById[s.id]
     const auto = reducerCounterpart(s, segments, effectiveById)
-    out[s.id] = computeCutLength(s, eff?.size, eff?.fitting, auto)
+    const conn = endConnections(s, segments)
+    out[s.id] = computeCutLength(s, eff?.size, eff?.fitting, auto, conn)
   }
   return out
 }

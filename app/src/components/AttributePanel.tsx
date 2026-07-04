@@ -226,6 +226,32 @@ export function SegmentPanel({
           </div>
         )}
 
+        {/* 端ごとの差引/フリー端の内訳 */}
+        {cut && !cut.needsCounterpart && (
+          <div className="end-breakdown">
+            <div className="end-row">
+              <span>始点側</span>
+              <span>
+                {cut.startAllow > 0
+                  ? `− ${cut.startAllow} mm`
+                  : cut.startConnected
+                    ? '差引なし'
+                    : 'フリー端（芯出し基準）'}
+              </span>
+            </div>
+            <div className="end-row">
+              <span>終点側</span>
+              <span>
+                {cut.endAllow > 0
+                  ? `− ${cut.endAllow} mm`
+                  : cut.endConnected
+                    ? '差引なし'
+                    : 'フリー端（芯出し基準）'}
+              </span>
+            </div>
+          </div>
+        )}
+
         {cut?.needsCounterpart && (
           <p className="cut-warn">相手径を選択すると加工寸法を計算します。</p>
         )}
