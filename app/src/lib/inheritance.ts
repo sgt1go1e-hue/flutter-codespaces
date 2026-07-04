@@ -114,53 +114,59 @@ export function endConnections(
   return { start: touches(seg.start), end: touches(seg.end) }
 }
 
-const nodeKey = (p: Point) => `${Math.round(p.x)}_${Math.round(p.y)}`
+// ノード同一判定の許容誤差(px)。グリッドスナップの浮動小数点誤差を吸収する。
+const NODE_EPS = 1
+
+interface NodeCluster {
+  p: Point
+  endpoints: number
+  interior: number
+}
 
 /**
- * 各ノード（端点位置）の「次数」を求める。
- * 次数 = その点に集まる端点の数 + 2×その点を内部で通過する線の数。
- * 直線チェーンの中間ノードは 2、分岐（T字）は 3 以上になる。
+ * ノードの「次数」を許容誤差付きで求める。
+ * 端点は EPS 以内なら同一ノードとしてクラスタリングし、
+ * 次数 = そのノードに集まる端点の数 + 2×そのノードを内部で通過する線の数。
+ * 直線チェーンの中間ノードは 2、分岐（3方向以上）は 3 以上になる。
+ * 返り値は「点 → 次数」を許容誤差で引く関数。
  */
-function computeNodeDegrees(segments: Segment[]): Map<string, number> {
-  const deg = new Map<string, number>()
-  const nodes: Point[] = []
-  const seen = new Set<string>()
+function buildDegreeLookup(segments: Segment[]): (p: Point) => number {
+  const clusters: NodeCluster[] = []
+  const find = (p: Point) =>
+    clusters.find((c) => samePoint(c.p, p, NODE_EPS))
+
+  // 端点をクラスタリングして数える
   for (const s of segments) {
-    for (const p of [s.start, s.end]) {
-      const k = nodeKey(p)
-      deg.set(k, (deg.get(k) ?? 0) + 1)
-      if (!seen.has(k)) {
-        seen.add(k)
-        nodes.push(p)
-      }
+    for (const pt of [s.start, s.end]) {
+      const c = find(pt)
+      if (c) c.endpoints += 1
+      else clusters.push({ p: { ...pt }, endpoints: 1, interior: 0 })
     }
   }
-  // 内部通過（中間分岐 = 途中に他線の端点が乗る）を +2 でカウント
-  for (const node of nodes) {
+  // 中間通過（他線の途中にノードが乗る＝中間分岐）を +2 でカウント
+  for (const c of clusters) {
     for (const s of segments) {
-      if (samePoint(node, s.start) || samePoint(node, s.end)) continue
-      if (distanceToSegment(node, s.start, s.end) < 1.5) {
-        const k = nodeKey(node)
-        deg.set(k, (deg.get(k) ?? 0) + 2)
-      }
+      if (samePoint(c.p, s.start, NODE_EPS) || samePoint(c.p, s.end, NODE_EPS)) continue
+      if (distanceToSegment(c.p, s.start, s.end) < 1.5) c.interior += 1
     }
   }
-  return deg
+  return (p: Point) => {
+    const c = find(p)
+    return c ? c.endpoints + 2 * c.interior : 0
+  }
 }
 
 /** 全セグメントの実効属性をまとめて計算する */
 export function computeEffective(segments: Segment[]): Record<string, Effective> {
   const byId = buildSegmentMap(segments)
-  const degrees = computeNodeDegrees(segments)
+  const degreeAt = buildDegreeLookup(segments)
   const out: Record<string, Effective> = {}
   for (const s of segments) {
     const size = effectiveSize(s, byId)
     const parent = s.parentId ? byId[s.parentId] : undefined
     const parentSize = parent ? effectiveSize(parent, byId) : undefined
     // 分岐: いずれかの端点が次数3以上のノード
-    const isBranch =
-      (degrees.get(nodeKey(s.start)) ?? 0) >= 3 ||
-      (degrees.get(nodeKey(s.end)) ?? 0) >= 3
+    const isBranch = degreeAt(s.start) >= 3 || degreeAt(s.end) >= 3
     const fittingOwn = s.fitting != null && s.fitting !== ''
     const fitting = fittingOwn
       ? (s.fitting as string)
