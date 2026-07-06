@@ -3,6 +3,13 @@
     "dockerfile": "Dockerfile"
   },
   "forwardPorts": [3000],
+  "portsAttributes": {
+    "3000": {
+      "label": "piping-iso app",
+      "protocol": "http",
+      "onAutoForward": "notify"
+    }
+  },
   "name": "Flutter",
   "customizations": {
     "vscode": {
