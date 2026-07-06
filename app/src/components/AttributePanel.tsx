@@ -130,13 +130,23 @@ export function SegmentPanel({
           </label>
 
           <div className="field cut-field">
-            <span className="field-label">切断長さ</span>
-            <div className="cut-value">
+            <span className="field-label">
+              切り寸法{cut && cut.status !== 'none' && (
+                <span className="field-note">{cut.mode}</span>
+              )}
+            </span>
+            <div
+              className={`cut-value${cut?.status === 'over' ? ' over' : ''}${cut?.status === 'zero' ? ' zero' : ''}`}
+            >
               {cut?.needsCounterpart
                 ? '要相手径'
-                : cut?.cut != null
+                : cut?.status === 'ok'
                   ? `${cut.cut} mm`
-                  : '—'}
+                  : cut?.status === 'zero'
+                    ? 'パイプ0mm（継手直結）'
+                    : cut?.status === 'over'
+                      ? '継手が収まりません'
+                      : '—'}
             </div>
           </div>
 
@@ -269,6 +279,17 @@ export function SegmentPanel({
               </span>
             </div>
           </div>
+        )}
+
+        {cut?.status === 'over' && (
+          <p className="cut-warn danger">
+            継手が収まりません（芯々寸法が不足）。芯々寸法を大きくするか継手を見直してください。
+          </p>
+        )}
+        {cut?.status === 'zero' && (
+          <p className="cut-hint">
+            パイプ長さ0mm（継手同士が直結）。BOM のパイプ材にはカウントされません。
+          </p>
         )}
 
         {cut?.needsCounterpart && (

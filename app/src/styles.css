@@ -177,14 +177,36 @@ body {
   font-weight: 500;
 }
 
-/* 切断寸法ラベル（セグメント下側） */
-.cut-label {
-  fill: #34d399;
-  font-size: 11px;
-  font-weight: 700;
+/* 寸法2段表記（セグメント下側） */
+.dim-center {
+  fill: #94a3b8; /* 上段: 芯々寸法（控えめ） */
+  font-size: 10.5px;
+  font-weight: 600;
   paint-order: stroke;
   stroke: #0f172a;
   stroke-width: 3px;
+}
+
+.dim-cut {
+  fill: #34d399; /* 下段: 切り寸（強調・現場で使う数値） */
+  font-size: 12.5px;
+  font-weight: 800;
+  text-decoration: underline;
+  paint-order: stroke;
+  stroke: #0f172a;
+  stroke-width: 3.5px;
+}
+
+.dim-cut.zero {
+  fill: #fbbf24;
+  font-size: 10.5px;
+  text-decoration: none;
+}
+
+.dim-cut.over {
+  fill: #f87171;
+  font-size: 11px;
+  text-decoration: none;
 }
 
 /* レジューサー記号（三角形） */
@@ -315,6 +337,21 @@ body {
   font-size: 18px;
   font-weight: 700;
   color: #34d399;
+}
+
+.cut-field .cut-value.zero {
+  color: #fbbf24;
+  font-size: 14px;
+}
+
+.cut-field .cut-value.over {
+  color: #f87171;
+  font-size: 14px;
+}
+
+.cut-warn.danger {
+  color: #f87171;
+  font-weight: 700;
 }
 
 .end-breakdown {

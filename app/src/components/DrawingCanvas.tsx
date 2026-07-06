@@ -323,17 +323,35 @@ export function DrawingCanvas({
                 {eff.size}
               </text>
             )}
-            {/* 切断（加工）寸法。芯々寸法が入力された区間に表示 */}
-            {cutById[s.id]?.cut != null && (
-              <text
-                className="cut-label"
-                x={(s.start.x + s.end.x) / 2}
-                y={(s.start.y + s.end.y) / 2 + 16}
-                textAnchor="middle"
-              >
-                ✂ {cutById[s.id].cut}
-              </text>
-            )}
+            {/* 寸法2段表記: 上段=芯々(入力), 下段=切り寸(緑・下線)。芯々/芯先も表示 */}
+            {(() => {
+              const c = cutById[s.id]
+              if (!c || c.status === 'none') return null
+              const mx = (s.start.x + s.end.x) / 2
+              const my = (s.start.y + s.end.y) / 2
+              return (
+                <>
+                  <text className="dim-center" x={mx} y={my + 14} textAnchor="middle">
+                    {c.mode} {c.center}
+                  </text>
+                  {c.status === 'ok' && (
+                    <text className="dim-cut" x={mx} y={my + 30} textAnchor="middle">
+                      切 {c.cut}
+                    </text>
+                  )}
+                  {c.status === 'zero' && (
+                    <text className="dim-cut zero" x={mx} y={my + 30} textAnchor="middle">
+                      パイプ0（継手直結）
+                    </text>
+                  )}
+                  {c.status === 'over' && (
+                    <text className="dim-cut over" x={mx} y={my + 30} textAnchor="middle">
+                      継手不足
+                    </text>
+                  )}
+                </>
+              )
+            })()}
           </g>
         )
       })}

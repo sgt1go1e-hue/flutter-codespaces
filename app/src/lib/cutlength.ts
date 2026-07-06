@@ -18,7 +18,19 @@ export interface CutResult {
   endAllow: number
   startRole: EndRole
   endRole: EndRole
+  /** 表示用の切り寸法(mm)。0未満は0にクランプ済み */
   cut?: number
+  /** クランプ前の切り寸法（負値あり＝継手が収まらない判定用） */
+  rawCut?: number
+  /**
+   * 切り寸法の状態:
+   * 'none'=芯々未入力 / 'ok'=正の切り寸 / 'zero'=ほぼ0(継手直結) / 'over'=負(芯々不足)
+   */
+  status: 'none' | 'ok' | 'zero' | 'over'
+  /** BOM でパイプ材として計上できるか（切り寸 > 0） */
+  countable: boolean
+  /** 両端継手接続=芯々 / 片端フリー=芯先 */
+  mode: '芯々' | '芯先'
   sizeKnown: boolean
   startConnected: boolean
   endConnected: boolean
@@ -51,10 +63,21 @@ export function computeAllCut(
     const startAllow = round1(e.start.mm)
     const endAllow = round1(e.end.mm)
     const center = s.centerLength
-    const cut =
-      center != null && !Number.isNaN(center)
-        ? Math.max(0, round1(center - startAllow - endAllow))
-        : undefined
+    const hasCenter = center != null && !Number.isNaN(center)
+    const rawCut = hasCenter ? round1(center! - startAllow - endAllow) : undefined
+    const cut = rawCut != null ? Math.max(0, rawCut) : undefined
+    const status: CutResult['status'] =
+      rawCut == null
+        ? 'none'
+        : rawCut < -0.5
+          ? 'over'
+          : rawCut <= 0.5
+            ? 'zero'
+            : 'ok'
+    const startConnected = e.start.role !== 'free'
+    const endConnected = e.end.role !== 'free'
+    const mode: '芯々' | '芯先' =
+      startConnected && endConnected ? '芯々' : '芯先'
 
     // 偏心レジューサーの芯ズレ
     let eccentric: EccentricInfo | undefined
@@ -87,9 +110,13 @@ export function computeAllCut(
       startRole: e.start.role,
       endRole: e.end.role,
       cut,
+      rawCut,
+      status,
+      countable: status === 'ok',
+      mode,
       sizeKnown: eff?.size != null && eff?.size !== '',
-      startConnected: e.start.role !== 'free',
-      endConnected: e.end.role !== 'free',
+      startConnected,
+      endConnected,
       needsCounterpart,
       autoCounterpart,
       eccentric,
