@@ -5,6 +5,7 @@
   "type": "module",
   "description": "配管アイソメ図作成アプリ (PWA)",
   "scripts": {
+    "predev": "node scripts/free-vite.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "preview": "vite preview"
