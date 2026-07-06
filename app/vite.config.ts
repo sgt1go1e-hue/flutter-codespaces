@@ -2,7 +2,10 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // PWA化 (manifest / service worker) はフェーズ5で追加予定。
-export default defineConfig({
+export default defineConfig(({ command }) => ({
+  // GitHub Pages(プロジェクトページ)は /flutter-codespaces/ 配下に公開されるため、
+  // 本番ビルドだけ base を合わせる。開発サーバー(dev)は '/' のまま。
+  base: command === 'build' ? '/flutter-codespaces/' : '/',
   plugins: [react()],
   server: {
     host: true, // 0.0.0.0 で待受（Codespaces のポート転送から到達可能に）
@@ -14,4 +17,4 @@ export default defineConfig({
     // https(443) 経由のプレビューでも HMR(ホットリロード)が繋がるようにする。
     hmr: { clientPort: 443 },
   },
-})
+}))
