@@ -356,8 +356,12 @@ export default function App() {
           <button onClick={clearAll} disabled={segments.length === 0}>
             全消去
           </button>
-          <button onClick={() => setShowBom(true)} disabled={segments.length === 0}>
-            集計
+          <button
+            className="primary"
+            onClick={() => setShowBom(true)}
+            disabled={segments.length === 0}
+          >
+            集計・拾い出し
           </button>
           <button onClick={() => setReviewDisclaimer(true)}>免責</button>
         </div>

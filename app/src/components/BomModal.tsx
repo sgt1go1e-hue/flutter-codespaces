@@ -41,27 +41,26 @@ export function BomModal({ bom, onClose }: Props) {
 
           {bom.pipes.length > 0 && (
             <>
-              <h4 className="bom-section">パイプ（直管）</h4>
-              <table className="bom-table">
-                <thead>
-                  <tr>
-                    <th>管種</th>
-                    <th>呼び径</th>
-                    <th className="num">本数</th>
-                    <th className="num">合計(m)</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {bom.pipes.map((p, i) => (
-                    <tr key={i}>
-                      <td>{p.pipeShort}</td>
-                      <td>{p.size ?? '—'}</td>
-                      <td className="num">{p.count}</td>
-                      <td className="num">{round1(p.totalMm / 1000)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <h4 className="bom-section">パイプ 切り寸法（サイズ別）</h4>
+              {bom.pipes.map((p, i) => (
+                <div className="pipe-group" key={i}>
+                  <div className="pipe-group-head">
+                    <span className="pipe-size">
+                      {p.pipeShort} {p.size ?? '—'}
+                    </span>
+                    <span className="pipe-sub">
+                      {p.count}本 ・ 計 {round1(p.totalMm / 1000)}m
+                    </span>
+                  </div>
+                  <div className="pipe-cuts">
+                    {p.cuts.map((c, j) => (
+                      <span className="cut-chip" key={j}>
+                        {round1(c)}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+              ))}
             </>
           )}
 
@@ -118,7 +117,7 @@ export function BomModal({ bom, onClose }: Props) {
             CSVダウンロード
           </button>
           <button className="disclaimer-close" onClick={onClose}>
-            閉じる
+            完了
           </button>
         </div>
       </div>

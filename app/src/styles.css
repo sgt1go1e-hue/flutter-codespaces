@@ -76,6 +76,18 @@ body {
   color: #04222e;
 }
 
+/* 主要アクション（集計/BOM）は色分けして目立たせる */
+.tools button.primary {
+  background: #10b981;
+  color: #04231a;
+  font-weight: 800;
+  padding: 10px 18px;
+}
+
+.tools button.primary:active:not(:disabled) {
+  background: #059669;
+}
+
 .stage {
   flex: 1;
   position: relative;
@@ -608,6 +620,50 @@ body {
 
 .bom-section:first-child {
   margin-top: 4px;
+}
+
+/* パイプ切り寸法（サイズ別グループ） */
+.pipe-group {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  background: #0b1220;
+  border: 1px solid #334155;
+  border-radius: 10px;
+}
+
+.pipe-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pipe-size {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.pipe-sub {
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.pipe-cuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cut-chip {
+  background: #064e3b;
+  color: #6ee7b7;
+  border: 1px solid #10b981;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
 }
 
 .bom-table {
