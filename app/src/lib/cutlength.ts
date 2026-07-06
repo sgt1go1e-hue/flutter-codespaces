@@ -45,14 +45,22 @@ export interface CutResult {
 
 const round1 = (x: number) => Math.round(x * 10) / 10
 
+// 切り寸法の丸め方。継手の取り出し寸法(startAllow/endAllow)には適用せず、
+// 最終の切り寸法(cut)だけに適用する。
+export type RoundMode = 'round' | 'floor'
+const applyRound = (x: number, mode: RoundMode) =>
+  mode === 'floor' ? Math.floor(x) : Math.round(x)
+
 /**
  * 全セグメントの切断（加工）寸法を、端ごと（per-end）に計算する。
  * 各端の取り出し寸法は、その端のノードの役割（エルボ/チーズ/レジューサー/直管/フリー端）と
  * そのセグメント自身の実効サイズから、takeout.ts のノードグラフで求める。
+ * roundMode は切り寸法(cut)のみに適用（既定=四捨五入）。継手寸法は小数のまま。
  */
 export function computeAllCut(
   segments: Segment[],
   effectiveById: Record<string, Effective>,
+  roundMode: RoundMode = 'round',
 ): Record<string, CutResult> {
   const ends = computeEnds(segments, effectiveById)
   const out: Record<string, CutResult> = {}
@@ -65,7 +73,9 @@ export function computeAllCut(
     const center = s.centerLength
     const hasCenter = center != null && !Number.isNaN(center)
     const rawCut = hasCenter ? round1(center! - startAllow - endAllow) : undefined
-    const cut = rawCut != null ? Math.max(0, rawCut) : undefined
+    // 切り寸法だけ丸め（継手の取り出し寸法は小数のまま）。0未満は0にクランプ。
+    const cut =
+      rawCut != null ? applyRound(Math.max(0, rawCut), roundMode) : undefined
     const status: CutResult['status'] =
       rawCut == null
         ? 'none'

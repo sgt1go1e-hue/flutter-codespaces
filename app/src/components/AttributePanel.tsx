@@ -48,6 +48,9 @@ interface SegmentPanelProps {
   inheritedPipeType?: string
   inheritedSize?: string
   cut?: CutResult
+  /** 切り寸法の丸め方（全体設定・既定=四捨五入） */
+  roundMode: 'round' | 'floor'
+  onRoundModeChange: (mode: 'round' | 'floor') => void
   onChange: (patch: Partial<Segment>) => void
   onDelete: () => void
 }
@@ -58,6 +61,8 @@ export function SegmentPanel({
   inheritedPipeType,
   inheritedSize,
   cut,
+  roundMode,
+  onRoundModeChange,
   onChange,
   onDelete,
 }: SegmentPanelProps) {
@@ -149,6 +154,27 @@ export function SegmentPanel({
                     : cut?.status === 'over'
                       ? '継手が収まりません'
                       : '—'}
+            </div>
+          </div>
+
+          {/* 切り寸法の丸め（全体設定）。継手の取り出し寸法には適用しない。 */}
+          <div className="field round-field">
+            <span className="field-label">切り寸法の丸め</span>
+            <div className="round-toggle">
+              <button
+                type="button"
+                className={roundMode === 'round' ? 'active' : ''}
+                onClick={() => onRoundModeChange('round')}
+              >
+                四捨五入
+              </button>
+              <button
+                type="button"
+                className={roundMode === 'floor' ? 'active' : ''}
+                onClick={() => onRoundModeChange('floor')}
+              >
+                切り捨て
+              </button>
             </div>
           </div>
 

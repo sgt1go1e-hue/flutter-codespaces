@@ -349,6 +349,34 @@ body {
   padding: 4px 0;
 }
 
+/* 切り寸法の丸め切替（パネル内・全幅） */
+.round-field {
+  grid-column: 1 / -1;
+}
+
+.round-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.round-toggle button {
+  flex: 1;
+  background: #0b1220;
+  color: var(--hint);
+  border: 1px solid #334155;
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.round-toggle button.active {
+  background: var(--accent);
+  color: #04222e;
+  border-color: var(--accent);
+}
+
 .cut-field .cut-value {
   display: flex;
   align-items: center;

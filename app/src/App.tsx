@@ -175,6 +175,8 @@ export default function App() {
     pipeType?: string
     size?: string
     connection?: string
+    /** 切り寸法の丸め方（既定=四捨五入）。継手寸法には適用しない。 */
+    roundMode?: 'round' | 'floor'
   }>('piping-iso:defaults', {})
   // パーツパレットからのドラッグ状態（画面座標で ghost を追従表示）
   const [partDrag, setPartDrag] = useState<{
@@ -196,8 +198,8 @@ export default function App() {
   const byId = useMemo(() => buildSegmentMap(segments), [segments])
   // 各区間の切断（加工）寸法
   const cutById = useMemo(
-    () => computeAllCut(segments, effectiveById),
-    [segments, effectiveById],
+    () => computeAllCut(segments, effectiveById, defaults.roundMode ?? 'round'),
+    [segments, effectiveById, defaults.roundMode],
   )
   // 材料集計(BOM)。モーダルを開いたときに使う。
   const bom = useMemo(
@@ -399,6 +401,8 @@ export default function App() {
           inheritedPipeType={inheritedPipeType(selected, byId)}
           inheritedSize={inheritedSize(selected, byId)}
           cut={cutById[selected.id]}
+          roundMode={defaults.roundMode ?? 'round'}
+          onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}
           onChange={updateSelected}
           onDelete={deleteSelected}
         />
