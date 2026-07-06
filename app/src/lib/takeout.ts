@@ -128,7 +128,25 @@ function teeTakeout(
   return { mm: isRun ? dim.run : dim.branch, id }
 }
 
-function resolveEnd(inc: Inc, node: GNode): EndResult {
+// ノードの本管(run)軸のサイズ。貫通線があればその径、無ければ同一直線の端点ペアの径。
+function runAxisSize(
+  node: GNode,
+  effById: Record<string, Effective>,
+): string | undefined {
+  if (node.through.length > 0) return effById[node.through[0].id]?.size
+  for (let i = 0; i < node.incs.length; i++) {
+    for (let j = i + 1; j < node.incs.length; j++) {
+      if (dot(node.incs[i].into, node.incs[j].into) < -0.9) return node.incs[i].size
+    }
+  }
+  return undefined
+}
+
+function resolveEnd(
+  inc: Inc,
+  node: GNode,
+  effById: Record<string, Effective>,
+): EndResult {
   const others = node.incs.filter((i) => i.seg.id !== inc.seg.id)
   const throughs = node.through.filter((t) => t.id !== inc.seg.id)
   const degree = node.incs.length + 2 * throughs.length
@@ -149,8 +167,9 @@ function resolveEnd(inc: Inc, node: GNode): EndResult {
       throughParallel = Math.abs(dot(inc.into, tdir)) > 0.9
     }
     const isRun = Boolean(opposite) || throughParallel
-    const branchInc = others.find((o) => dot(inc.into, o.into) >= -0.9)
-    const runSize = isRun ? inc.size : (opposite?.size ?? inc.size)
+    // 本管軸のサイズ（貫通 or 同一直線ペア）。枝側は自分のサイズ。
+    const runSize = runAxisSize(node, effById) ?? inc.size
+    const branchInc = others.find((o) => Math.abs(dot(inc.into, o.into)) < 0.9)
     const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
     const t = teeTakeout(runSize, branchSize, isRun)
     return { role: isRun ? 'tee-run' : 'tee-branch', mm: t.mm, fittingId: t.id }
@@ -191,8 +210,8 @@ export function computeEnds(
     const startInc = startNode.incs.find((i) => i.seg.id === s.id && i.end === 'start')!
     const endInc = endNode.incs.find((i) => i.seg.id === s.id && i.end === 'end')!
     out[s.id] = {
-      start: resolveEnd(startInc, startNode),
-      end: resolveEnd(endInc, endNode),
+      start: resolveEnd(startInc, startNode, effById),
+      end: resolveEnd(endInc, endNode, effById),
     }
   }
   return out
