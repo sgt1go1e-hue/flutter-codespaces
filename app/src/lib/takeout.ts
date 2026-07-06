@@ -18,6 +18,7 @@ export type EndRole =
   | 'elbow'
   | 'reducer'
   | 'tee-run'
+  | 'tee-run-reducer' // チーズ(ラン)直後にレジューサーで縮径（ツキ合わせ）
   | 'tee-branch'
 
 export interface EndResult {
@@ -86,7 +87,7 @@ function elbowTakeout(inc: Inc, nb?: Inc): number {
     ? (inc.seg.fitting as string)
     : isElbowId(nb?.seg.fitting)
       ? (nb!.seg.fitting as string)
-      : 'elbow90_short'
+      : 'elbow90_long'
   const raw = getFitting(id)?.dims[nomKey]
   return typeof raw === 'number' ? raw : 0
 }
@@ -195,6 +196,7 @@ function resolveEnd(
     const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
     const t = teeTakeout(runSize, branchSize, isRun)
     let mm = t.mm
+    let role: EndRole = isRun ? 'tee-run' : 'tee-branch'
     // 本管(run)アームが本管ヘッダ径より小さい＝チーズ直後にレジューサーで縮径
     // （ツキ合わせ／パイプ0mmでチーズと直結）。tee-run 取り出しにレジューサー分を加算。
     if (isRun) {
@@ -202,9 +204,10 @@ function resolveEnd(
       const an = nominalOf(inc.size)
       if (rn != null && an != null && an < rn) {
         mm += reducerHmm(runSize, inc.size)
+        role = 'tee-run-reducer'
       }
     }
-    return { role: isRun ? 'tee-run' : 'tee-branch', mm, fittingId: t.id }
+    return { role, mm, fittingId: t.id }
   }
 
   // 次数2：端点隣接1本
@@ -220,7 +223,7 @@ function resolveEnd(
     }
     return { role: 'straight', mm: 0 }
   }
-  return { role: 'elbow', mm: elbowTakeout(inc, nb), fittingId: isElbowId(inc.seg.fitting) ? inc.seg.fitting : 'elbow90_short' }
+  return { role: 'elbow', mm: elbowTakeout(inc, nb), fittingId: isElbowId(inc.seg.fitting) ? inc.seg.fitting : 'elbow90_long' }
 }
 
 export interface SegEnds {

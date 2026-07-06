@@ -1,0 +1,81 @@
+import type { Point, Segment } from '../types'
+import { distanceToSegment, projectOnSegment, samePoint } from './isometric'
+
+/** 指定セグメントを点 P で前後2本に分割する（下流 B は上流 A を親に継承）。 */
+export function splitSegmentAt(
+  segments: Segment[],
+  targetId: string,
+  P: Point,
+  makeId: () => string,
+): Segment[] {
+  const target = segments.find((s) => s.id === targetId)
+  if (!target) return segments
+  const bId = makeId()
+  const A: Segment = { ...target, end: P }
+  const B: Segment = {
+    id: bId,
+    start: P,
+    end: target.end,
+    angle: target.angle,
+    parentId: target.id,
+    connection: target.connection,
+    // size/pipeType/fitting は持たせない → A から継承（ユーザーが後で変更可）
+  }
+  const result: Segment[] = []
+  for (const s of segments) {
+    if (s.id === targetId) {
+      result.push(A)
+      continue
+    }
+    // 元セグメントの子は、B 側に近ければ B を親に付け替える
+    if (s.parentId === targetId) {
+      const dA = distanceToSegment(s.start, A.start, A.end)
+      const dB = distanceToSegment(s.start, B.start, B.end)
+      result.push(dB < dA ? { ...s, parentId: bId } : s)
+      continue
+    }
+    result.push(s)
+  }
+  const idx = result.findIndex((s) => s.id === targetId)
+  result.splice(idx + 1, 0, B)
+  return result
+}
+
+/**
+ * 分岐点で本管を自動分割する。
+ * バットウェルド継手はランを切断するため、あるセグメントの端点が別セグメントの
+ * 途中（中間分岐＝チーズ）に乗っている場合、その本管を接点で2本に分ける。
+ * これにより分岐の奥側／手前側を独立して選択・サイズ・寸法入力できる。
+ * 描いた順序に依らず正規化するため、変化が無くなるまで繰り返す。
+ */
+export function normalizeBranchSplits(
+  segments: Segment[],
+  makeId: () => string,
+): Segment[] {
+  let list = segments
+  for (let guard = 0; guard < 50; guard++) {
+    let done = true
+    for (const s of list) {
+      let hit: Point | null = null
+      for (const o of list) {
+        if (o.id === s.id) continue
+        for (const pt of [o.start, o.end]) {
+          if (samePoint(pt, s.start) || samePoint(pt, s.end)) continue
+          if (distanceToSegment(pt, s.start, s.end) < 1.5) {
+            hit = pt
+            break
+          }
+        }
+        if (hit) break
+      }
+      if (!hit) continue
+      const { point: P, t } = projectOnSegment(hit, s.start, s.end)
+      if (t < 0.02 || t > 0.98) continue
+      list = splitSegmentAt(list, s.id, P, makeId)
+      done = false
+      break
+    }
+    if (done) break
+  }
+  return list
+}

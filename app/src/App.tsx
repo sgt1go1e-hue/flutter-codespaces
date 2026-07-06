@@ -11,6 +11,7 @@ import {
 } from './lib/isometric'
 import type { Point } from './types'
 import { computeCrossoverGaps } from './lib/crossover'
+import { normalizeBranchSplits } from './lib/branching'
 import { computeAllCut } from './lib/cutlength'
 import {
   buildSegmentMap,
@@ -219,7 +220,8 @@ export default function App() {
       if (defaults.pipeType) applied.pipeType = defaults.pipeType
       if (defaults.size) applied.size = defaults.size
     }
-    setSegments((prev) => [...prev, applied])
+    // 追加後、分岐点で貫通している本管を自動分割（奥側を独立して寸法入力可能に）
+    setSegments((prev) => normalizeBranchSplits([...prev, applied], makeId))
   }
 
   // 作図設定（defaults）の更新。管種変更時はサイズ整合をとる。

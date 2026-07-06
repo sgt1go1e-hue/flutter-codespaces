@@ -26,7 +26,7 @@ export interface Segment {
   centerLength?: number
   /**
    * この区間の継手種類（fittings.json の id）。始点・終点で別々には持たず1つに統合。
-   * 未設定なら継承ロジックと同様、分岐箇所は 'tee_equal'・それ以外は 'elbow90_short' を実効値とする。
+   * 未設定なら継承ロジックと同様、分岐箇所は 'tee_equal'・それ以外は 'elbow90_long'(ロング標準) を実効値とする。
    */
   fitting?: string
   /**

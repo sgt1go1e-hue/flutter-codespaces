@@ -253,7 +253,7 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
       ? (s.fitting as string)
       : isBranch
         ? 'tee_equal'
-        : 'elbow90_short'
+        : 'elbow90_long'
     out[s.id] = {
       pipeType: effectivePipeType(s, byId),
       size,

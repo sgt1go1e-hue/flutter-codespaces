@@ -30,6 +30,8 @@ function roleLabel(role: string): string {
       return 'レジューサー'
     case 'tee-run':
       return 'チーズ・ラン'
+    case 'tee-run-reducer':
+      return 'チーズ・ラン＋レジューサー'
     case 'tee-branch':
       return 'チーズ・枝'
     default:
