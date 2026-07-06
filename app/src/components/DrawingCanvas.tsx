@@ -212,6 +212,28 @@ export function DrawingCanvas({
     )
   }
 
+  // 末端（フリー端）に呼び径ラベルを描く。手書きアイソメと同様、各配管の
+  // 開放端に「100A」「50A」などのサイズを載せ、どの径の配管か一目で分かるようにする。
+  function terminusSize(s: Segment, at: 'start' | 'end', size: string) {
+    const pt = at === 'start' ? s.start : s.end
+    const other = at === 'start' ? s.end : s.start
+    const len = distance(pt, other) || 1
+    // 端点から外側（配管の反対方向）へ少しずらして配置
+    const ox = (pt.x - other.x) / len
+    const oy = (pt.y - other.y) / len
+    return (
+      <text
+        className="seg-label terminus"
+        x={pt.x + ox * 22}
+        y={pt.y + oy * 22}
+        textAnchor="middle"
+        dominantBaseline="middle"
+      >
+        {size}
+      </text>
+    )
+  }
+
   // レジューサーのシンボル。
   // 同心=二等辺三角形（大径=底辺→小径=頂点）、偏心=直角三角形（斜辺の向きが Top/Bottom 連動）。
   // 常に「上流(大径)側=底辺・下流(小径)側=頂点」。ルート向きが変わっても維持。
@@ -323,6 +345,15 @@ export function DrawingCanvas({
                 {eff.size}
               </text>
             )}
+            {/* 末端（フリー端）に呼び径を表示（手書きアイソメと同様） */}
+            {eff?.size &&
+              cutById[s.id] &&
+              !cutById[s.id].startConnected &&
+              terminusSize(s, 'start', eff.size)}
+            {eff?.size &&
+              cutById[s.id] &&
+              !cutById[s.id].endConnected &&
+              terminusSize(s, 'end', eff.size)}
             {/* 寸法2段表記: 上段=芯々(入力), 下段=切り寸(緑・下線)。芯々/芯先も表示 */}
             {(() => {
               const c = cutById[s.id]

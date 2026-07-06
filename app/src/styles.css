@@ -177,6 +177,14 @@ body {
   font-weight: 500;
 }
 
+/* 末端（フリー端）の呼び径ラベル。配管サイズを端に明示（手書き流） */
+.seg-label.terminus {
+  fill: #fbbf24;
+  font-size: 13px;
+  font-weight: 800;
+  stroke-width: 3.5px;
+}
+
 /* 寸法2段表記（セグメント下側） */
 .dim-center {
   fill: #94a3b8; /* 上段: 芯々寸法（控えめ） */
