@@ -222,8 +222,17 @@ export function DrawingCanvas({
     // 端点から外側（配管の反対方向）へ少しずらして配置
     const ox = (pt.x - other.x) / len
     const oy = (pt.y - other.y) / len
-    const cx = pt.x + ox * 22
-    const cy = pt.y + oy * 22
+    // 寸法2段表記(dim-center/dim-cut)は常にセグメント中点から「下方向」へ表示されるため、
+    // 末端ラベルは配管の延長方向に加えて「上向き」寄りの垂直方向へもずらし、
+    // 短いセグメントや交差点付近でも寸法表記と重ならないようにする。
+    let nx = -oy
+    let ny = ox
+    if (ny > 0) {
+      nx = -nx
+      ny = -ny
+    }
+    const cx = pt.x + ox * 20 + nx * 14
+    const cy = pt.y + oy * 20 + ny * 14
     // タップでその区間を選択（線が細くても押しやすいよう当たり判定を広めに）
     const onTap = (e: React.PointerEvent) => {
       e.stopPropagation()
@@ -420,9 +429,23 @@ export function DrawingCanvas({
                     {c.mode} {c.center}
                   </text>
                   {c.status === 'ok' && (
-                    <text className="dim-cut" x={mx} y={my + 30} textAnchor="middle">
-                      切 {c.cut}
-                    </text>
+                    <>
+                      {/* 縁取り(読みやすさ用)は下線を含めない別レイヤーで描く。
+                          同じテキストに縁取り(stroke)と下線(text-decoration)を
+                          両方かけると、下線にも縁取りが付いて二重線に見えるため分離。 */}
+                      <text
+                        className="dim-cut-outline"
+                        x={mx}
+                        y={my + 30}
+                        textAnchor="middle"
+                        aria-hidden="true"
+                      >
+                        切 {c.cut}
+                      </text>
+                      <text className="dim-cut" x={mx} y={my + 30} textAnchor="middle">
+                        切 {c.cut}
+                      </text>
+                    </>
                   )}
                   {c.status === 'zero' && (
                     <text className="dim-cut zero" x={mx} y={my + 30} textAnchor="middle">
