@@ -579,6 +579,92 @@ body {
   color: var(--text);
 }
 
+/* --- 材料集計(BOM)モーダル --- */
+.bom-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid #334155;
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+}
+
+.bom-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 16px;
+}
+
+.bom-section {
+  margin: 16px 0 6px;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.bom-section:first-child {
+  margin-top: 4px;
+}
+
+.bom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.bom-table th,
+.bom-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid #334155;
+  text-align: left;
+}
+
+.bom-table th {
+  color: var(--hint);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.bom-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bom-table tbody td {
+  color: var(--text);
+}
+
+.bom-actions {
+  flex-shrink: 0;
+  display: flex;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid #334155;
+}
+
+.bom-actions button {
+  flex: 1;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 50px;
+}
+
+.bom-csv {
+  background: #0ea5e9;
+  color: #04222e;
+}
+
+.bom-csv:disabled {
+  opacity: 0.4;
+}
+
 /* ドラッグ中に指へ追従する ghost */
 .part-ghost {
   position: fixed;

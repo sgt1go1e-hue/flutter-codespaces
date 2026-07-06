@@ -3,6 +3,8 @@ import { DrawingCanvas } from './components/DrawingCanvas'
 import { SegmentPanel, DrawSettingsPanel } from './components/AttributePanel'
 import { PartsPalette } from './components/PartsPalette'
 import { DisclaimerModal } from './components/DisclaimerModal'
+import { BomModal } from './components/BomModal'
+import { computeBom } from './lib/bom'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
   distanceToSegment,
@@ -165,6 +167,8 @@ export default function App() {
   }>('piping-iso:consent', {})
   // 免責事項の再確認モーダル（設定からいつでも表示）
   const [reviewDisclaimer, setReviewDisclaimer] = useState(false)
+  // 材料集計(BOM)モーダルの表示
+  const [showBom, setShowBom] = useState(false)
   const needConsent = consent.version !== CONSENT_VERSION
   // これから描く線に適用する初期設定（線を選択せず通常画面で入力）
   const [defaults, setDefaults] = useLocalStorage<{
@@ -194,6 +198,11 @@ export default function App() {
   const cutById = useMemo(
     () => computeAllCut(segments, effectiveById),
     [segments, effectiveById],
+  )
+  // 材料集計(BOM)。モーダルを開いたときに使う。
+  const bom = useMemo(
+    () => computeBom(segments, effectiveById, cutById),
+    [segments, effectiveById, cutById],
   )
 
   // 新規セグメントの親（上流）を、始点が接続している既存セグメントから決定する
@@ -347,6 +356,9 @@ export default function App() {
           <button onClick={clearAll} disabled={segments.length === 0}>
             全消去
           </button>
+          <button onClick={() => setShowBom(true)} disabled={segments.length === 0}>
+            集計
+          </button>
           <button onClick={() => setReviewDisclaimer(true)}>免責</button>
         </div>
       </header>
@@ -407,6 +419,9 @@ export default function App() {
         </span>
         <span className="count">セグメント数: {segments.length}</span>
       </footer>
+
+      {/* 材料集計(BOM) */}
+      {showBom && <BomModal bom={bom} onClose={() => setShowBom(false)} />}
 
       {/* 初回同意（同意するまで他操作をブロック） */}
       {needConsent && (
