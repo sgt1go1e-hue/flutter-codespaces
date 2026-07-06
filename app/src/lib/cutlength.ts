@@ -61,6 +61,12 @@ export function computeAllCut(
   segments: Segment[],
   effectiveById: Record<string, Effective>,
   roundMode: RoundMode = 'round',
+  // フランジの引きしろ(mm)。フランジが付いた端の取り出し寸法に加算する（全フランジ共通）。
+  // 溶接フランジ等は引きしろが規格化されず任意のため、ユーザーが入力する。
+  flangeAllow = 0,
+  // パッキン(ガスケット)厚(mm)。フランジ面間に必ず入る。加味する場合、フランジ端で差し引く。
+  // 加味しない場合は 0 を渡す。片フランジ・両フランジとも同様に適用。
+  gasketMm = 0,
 ): Record<string, CutResult> {
   const ends = computeEnds(segments, effectiveById)
   const out: Record<string, CutResult> = {}
@@ -68,8 +74,10 @@ export function computeAllCut(
   for (const s of segments) {
     const eff = effectiveById[s.id]
     const e = ends[s.id]
-    const startAllow = round1(e.start.mm)
-    const endAllow = round1(e.end.mm)
+    // 取り出し寸法 = 継手の取り出し + (端にフランジがあれば)フランジ引きしろ + パッキン厚
+    const flangeDeduct = flangeAllow + gasketMm
+    const startAllow = round1(e.start.mm) + (s.startFlange ? flangeDeduct : 0)
+    const endAllow = round1(e.end.mm) + (s.endFlange ? flangeDeduct : 0)
     const center = s.centerLength
     const hasCenter = center != null && !Number.isNaN(center)
     const rawCut = hasCenter ? round1(center! - startAllow - endAllow) : undefined

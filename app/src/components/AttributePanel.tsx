@@ -51,6 +51,13 @@ interface SegmentPanelProps {
   /** 切り寸法の丸め方（全体設定・既定=四捨五入） */
   roundMode: 'round' | 'floor'
   onRoundModeChange: (mode: 'round' | 'floor') => void
+  /** フランジの引きしろ(mm)・全フランジ共通 */
+  flangeAllow: number
+  onFlangeAllowChange: (mm: number) => void
+  /** パッキン(ガスケット)を加味するか・厚み(mm) */
+  gasketOn: boolean
+  gasketMm: number
+  onGasketChange: (on: boolean, mm: number) => void
   onChange: (patch: Partial<Segment>) => void
   onDelete: () => void
 }
@@ -63,6 +70,11 @@ export function SegmentPanel({
   cut,
   roundMode,
   onRoundModeChange,
+  flangeAllow,
+  onFlangeAllowChange,
+  gasketOn,
+  gasketMm,
+  onGasketChange,
   onChange,
   onDelete,
 }: SegmentPanelProps) {
@@ -177,6 +189,63 @@ export function SegmentPanel({
               </button>
             </div>
           </div>
+
+          {/* フランジ引きしろ（フランジが付いた端があるときだけ表示・全フランジ共通）。
+              溶接フランジ等は引きしろが任意のため手入力する。 */}
+          {(segment.startFlange || segment.endFlange) && (
+            <label className="field round-field">
+              <span className="field-label">
+                フランジ引きしろ(mm)
+                <span className="field-note">全フランジ共通</span>
+              </span>
+              <input
+                className="num-input"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                placeholder="例: 0"
+                value={flangeAllow || ''}
+                onChange={(e) =>
+                  onFlangeAllowChange(
+                    e.target.value === '' ? 0 : Number(e.target.value),
+                  )
+                }
+              />
+            </label>
+          )}
+
+          {/* パッキン(ガスケット)。フランジ面間に必ず入る。加味する場合、厚みを切り寸から差し引く。
+              片フランジ・両フランジとも同様。全フランジ共通設定。 */}
+          {(segment.startFlange || segment.endFlange) && (
+            <div className="field round-field">
+              <label className="gasket-check">
+                <input
+                  type="checkbox"
+                  checked={gasketOn}
+                  onChange={(e) =>
+                    onGasketChange(e.target.checked, gasketMm || 3)
+                  }
+                />
+                <span>パッキン厚を加味する</span>
+              </label>
+              {gasketOn && (
+                <div className="gasket-thick">
+                  <span className="field-note">パッキン厚(mm)</span>
+                  <select
+                    className="num-input"
+                    value={gasketMm || 3}
+                    onChange={(e) => onGasketChange(true, Number(e.target.value))}
+                  >
+                    {[1, 2, 3, 4, 5, 6].map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+            </div>
+          )}
 
           <label className="field">
             <span className="field-label">管種</span>

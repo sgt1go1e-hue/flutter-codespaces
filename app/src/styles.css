@@ -377,6 +377,32 @@ body {
   border-color: var(--accent);
 }
 
+/* パッキン加味チェック＋厚み */
+.gasket-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+  min-height: 44px;
+}
+
+.gasket-check input {
+  width: 22px;
+  height: 22px;
+}
+
+.gasket-thick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.gasket-thick .num-input {
+  width: 100px;
+}
+
 .cut-field .cut-value {
   display: flex;
   align-items: center;

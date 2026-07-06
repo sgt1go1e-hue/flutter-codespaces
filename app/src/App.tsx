@@ -177,6 +177,12 @@ export default function App() {
     connection?: string
     /** 切り寸法の丸め方（既定=四捨五入）。継手寸法には適用しない。 */
     roundMode?: 'round' | 'floor'
+    /** フランジの引きしろ(mm)。フランジが付いた端に共通で適用。 */
+    flangeAllow?: number
+    /** パッキン(ガスケット)厚を切り寸に加味するか */
+    gasketOn?: boolean
+    /** パッキン厚(mm, 1〜6) */
+    gasketMm?: number
   }>('piping-iso:defaults', {})
   // パーツパレットからのドラッグ状態（画面座標で ghost を追従表示）
   const [partDrag, setPartDrag] = useState<{
@@ -198,8 +204,22 @@ export default function App() {
   const byId = useMemo(() => buildSegmentMap(segments), [segments])
   // 各区間の切断（加工）寸法
   const cutById = useMemo(
-    () => computeAllCut(segments, effectiveById, defaults.roundMode ?? 'round'),
-    [segments, effectiveById, defaults.roundMode],
+    () =>
+      computeAllCut(
+        segments,
+        effectiveById,
+        defaults.roundMode ?? 'round',
+        defaults.flangeAllow ?? 0,
+        defaults.gasketOn ? (defaults.gasketMm ?? 0) : 0,
+      ),
+    [
+      segments,
+      effectiveById,
+      defaults.roundMode,
+      defaults.flangeAllow,
+      defaults.gasketOn,
+      defaults.gasketMm,
+    ],
   )
   // 材料集計(BOM)。モーダルを開いたときに使う。
   const bom = useMemo(
@@ -403,6 +423,13 @@ export default function App() {
           cut={cutById[selected.id]}
           roundMode={defaults.roundMode ?? 'round'}
           onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}
+          flangeAllow={defaults.flangeAllow ?? 0}
+          onFlangeAllowChange={(mm) => updateDefaults({ flangeAllow: mm })}
+          gasketOn={defaults.gasketOn ?? false}
+          gasketMm={defaults.gasketMm ?? 0}
+          onGasketChange={(on, mm) =>
+            updateDefaults({ gasketOn: on, gasketMm: mm })
+          }
           onChange={updateSelected}
           onDelete={deleteSelected}
         />

@@ -21,7 +21,6 @@ export interface FittingRow {
   count: number
 }
 export interface FlangeRow {
-  type: 'double' | 'single'
   label: string
   size: string
   count: number
@@ -159,25 +158,20 @@ export function computeBom(
   }
 
   // --- フランジ ---
+  // 材料としては片/両を区別せず「フランジ」で呼び径ごとに集計する。
   const flangeMap = new Map<string, FlangeRow>()
-  const addFlange = (type: 'double' | 'single', size: string) => {
-    const key = `${type}|${size}`
-    let row = flangeMap.get(key)
+  const addFlange = (size: string) => {
+    let row = flangeMap.get(size)
     if (!row) {
-      row = {
-        type,
-        label: type === 'double' ? '両フランジ' : '片フランジ',
-        size,
-        count: 0,
-      }
-      flangeMap.set(key, row)
+      row = { label: 'フランジ', size, count: 0 }
+      flangeMap.set(size, row)
     }
     row.count += 1
   }
   for (const s of segments) {
     const size = effById[s.id]?.size ?? '?'
-    if (s.startFlange) addFlange(s.startFlange, size)
-    if (s.endFlange) addFlange(s.endFlange, size)
+    if (s.startFlange) addFlange(size)
+    if (s.endFlange) addFlange(size)
   }
 
   // 呼び径の大きい順・種類順に並べて返す
