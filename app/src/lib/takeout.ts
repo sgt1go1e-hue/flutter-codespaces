@@ -128,18 +128,40 @@ function teeTakeout(
   return { mm: isRun ? dim.run : dim.branch, id }
 }
 
-// ノードの本管(run)軸のサイズ。貫通線があればその径、無ければ同一直線の端点ペアの径。
+// ノードの本管(run)軸のサイズ。貫通線・同一直線ペアのうち最大径を本管ヘッダ径とする。
+// （途中でレジューサーにより縮径していても、チーズ本体の呼びは大径側で決まるため）
 function runAxisSize(
   node: GNode,
   effById: Record<string, Effective>,
 ): string | undefined {
-  if (node.through.length > 0) return effById[node.through[0].id]?.size
+  const candidates: (string | undefined)[] = []
+  for (const t of node.through) candidates.push(effById[t.id]?.size)
   for (let i = 0; i < node.incs.length; i++) {
     for (let j = i + 1; j < node.incs.length; j++) {
-      if (dot(node.incs[i].into, node.incs[j].into) < -0.9) return node.incs[i].size
+      if (dot(node.incs[i].into, node.incs[j].into) < -0.9) {
+        candidates.push(node.incs[i].size, node.incs[j].size)
+      }
     }
   }
-  return undefined
+  let best: string | undefined
+  let bestN = -1
+  for (const c of candidates) {
+    const n = nominalOf(c)
+    if (n != null && n > bestN) {
+      bestN = n
+      best = c
+    }
+  }
+  return best
+}
+
+// 同心レジューサーの全長 H（大径→小径の縮径分）。本管軸上で径が変わる継手接続に足す。
+function reducerHmm(large?: string, small?: string): number {
+  const key = reducerKey(large, small)
+  const dim = key
+    ? (getFitting('reducer_concentric')?.dims[key] as ReducerDim | undefined)
+    : undefined
+  return dim?.H ?? 0
 }
 
 function resolveEnd(
@@ -167,12 +189,22 @@ function resolveEnd(
       throughParallel = Math.abs(dot(inc.into, tdir)) > 0.9
     }
     const isRun = Boolean(opposite) || throughParallel
-    // 本管軸のサイズ（貫通 or 同一直線ペア）。枝側は自分のサイズ。
+    // 本管軸のヘッダ径（最大径）。枝側は自分のサイズ。
     const runSize = runAxisSize(node, effById) ?? inc.size
     const branchInc = others.find((o) => Math.abs(dot(inc.into, o.into)) < 0.9)
     const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
     const t = teeTakeout(runSize, branchSize, isRun)
-    return { role: isRun ? 'tee-run' : 'tee-branch', mm: t.mm, fittingId: t.id }
+    let mm = t.mm
+    // 本管(run)アームが本管ヘッダ径より小さい＝チーズ直後にレジューサーで縮径
+    // （ツキ合わせ／パイプ0mmでチーズと直結）。tee-run 取り出しにレジューサー分を加算。
+    if (isRun) {
+      const rn = nominalOf(runSize)
+      const an = nominalOf(inc.size)
+      if (rn != null && an != null && an < rn) {
+        mm += reducerHmm(runSize, inc.size)
+      }
+    }
+    return { role: isRun ? 'tee-run' : 'tee-branch', mm, fittingId: t.id }
   }
 
   // 次数2：端点隣接1本
