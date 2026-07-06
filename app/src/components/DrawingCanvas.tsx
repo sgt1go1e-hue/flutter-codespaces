@@ -214,6 +214,7 @@ export function DrawingCanvas({
 
   // 末端（フリー端）に呼び径ラベルを描く。手書きアイソメと同様、各配管の
   // 開放端に「100A」「50A」などのサイズを載せ、どの径の配管か一目で分かるようにする。
+  // ラベル自体をタップするとその区間を選択し、サイズをすぐ変更できる（大きめの当たり判定）。
   function terminusSize(s: Segment, at: 'start' | 'end', size: string) {
     const pt = at === 'start' ? s.start : s.end
     const other = at === 'start' ? s.end : s.start
@@ -221,16 +222,60 @@ export function DrawingCanvas({
     // 端点から外側（配管の反対方向）へ少しずらして配置
     const ox = (pt.x - other.x) / len
     const oy = (pt.y - other.y) / len
+    const cx = pt.x + ox * 22
+    const cy = pt.y + oy * 22
+    // タップでその区間を選択（線が細くても押しやすいよう当たり判定を広めに）
+    const onTap = (e: React.PointerEvent) => {
+      e.stopPropagation()
+      onSelectSegment(s.id)
+    }
     return (
-      <text
-        className="seg-label terminus"
-        x={pt.x + ox * 22}
-        y={pt.y + oy * 22}
-        textAnchor="middle"
-        dominantBaseline="middle"
-      >
-        {size}
-      </text>
+      <g pointerEvents="auto" style={{ cursor: 'pointer' }} onPointerDown={onTap}>
+        <rect
+          x={cx - 22}
+          y={cy - 13}
+          width={44}
+          height={26}
+          rx={6}
+          fill="transparent"
+        />
+        <text
+          className="seg-label terminus"
+          x={cx}
+          y={cy}
+          textAnchor="middle"
+          dominantBaseline="middle"
+        >
+          {size}
+        </text>
+      </g>
+    )
+  }
+
+  // チーズ横のレジューサー記号を、指定端(=チーズ側)のすぐ内側に描く。
+  // 大径側(底辺)をチーズ側に、小径側(頂点)を配管本体側に向ける。チーズから少し離して
+  // 描くので、将来チーズとレジューサーの間にパイプが入っても位置関係が分かる。
+  function reducerAtEnd(s: Segment, at: 'start' | 'end') {
+    const pt = at === 'start' ? s.start : s.end
+    const other = at === 'start' ? s.end : s.start
+    const len = distance(pt, other) || 1
+    const dx = (other.x - pt.x) / len // 端点→本体（内側）方向
+    const dy = (other.y - pt.y) / len
+    const nx = -dy
+    const ny = dx
+    const L = 12 // 大径→小径の長さ
+    const W = 9 // 底辺の半幅
+    const gap = 12 // チーズ節点から少し離す
+    const baseCx = pt.x + dx * gap
+    const baseCy = pt.y + dy * gap
+    const c1 = { x: baseCx + nx * W, y: baseCy + ny * W }
+    const c2 = { x: baseCx - nx * W, y: baseCy - ny * W }
+    const apex = { x: baseCx + dx * L, y: baseCy + dy * L }
+    return (
+      <polygon
+        className="reducer-mark"
+        points={`${c1.x},${c1.y} ${c2.x},${c2.y} ${apex.x},${apex.y}`}
+      />
     )
   }
 
@@ -334,18 +379,27 @@ export function DrawingCanvas({
                 cutById[s.id]?.eccentric?.align,
                 cutById[s.id]?.reducerLargeAtStart ?? true,
               )}
-            {/* サイズは「切り替わった地点」だけに1箇所表示（データは全保持） */}
-            {eff?.showSizeLabel && eff.size && (
-              <text
-                className="seg-label"
-                x={(s.start.x + s.end.x) / 2}
-                y={(s.start.y + s.end.y) / 2 - 10}
-                textAnchor="middle"
-              >
-                {eff.size}
-              </text>
-            )}
-            {/* 末端（フリー端）に呼び径を表示（手書きアイソメと同様） */}
+            {/* チーズ横のレジューサー記号（径違い＝ツキ合わせ0mmでチーズ直結） */}
+            {cutById[s.id]?.startRole === 'tee-run-reducer' &&
+              reducerAtEnd(s, 'start')}
+            {cutById[s.id]?.endRole === 'tee-run-reducer' &&
+              reducerAtEnd(s, 'end')}
+            {/* 中間の径変化のみ、線上に1箇所表示（両端フリーでない内部区間だけ。
+                フリー端がある区間は末端ラベルで表示するので重複させない）。 */}
+            {eff?.showSizeLabel &&
+              eff.size &&
+              cutById[s.id]?.startConnected &&
+              cutById[s.id]?.endConnected && (
+                <text
+                  className="seg-label"
+                  x={(s.start.x + s.end.x) / 2}
+                  y={(s.start.y + s.end.y) / 2 - 10}
+                  textAnchor="middle"
+                >
+                  {eff.size}
+                </text>
+              )}
+            {/* 末端（フリー端）に呼び径を表示（手書きアイソメと同様・タップで変更） */}
             {eff?.size &&
               cutById[s.id] &&
               !cutById[s.id].startConnected &&

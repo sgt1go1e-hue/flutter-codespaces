@@ -29,11 +29,11 @@ function roleLabel(role: string): string {
     case 'reducer':
       return 'レジューサー'
     case 'tee-run':
-      return 'チーズ・ラン'
+      return 'チーズ'
     case 'tee-run-reducer':
-      return 'チーズ・ラン＋レジューサー'
+      return 'チーズ＋レジューサー'
     case 'tee-branch':
-      return 'チーズ・枝'
+      return 'チーズ'
     default:
       return role
   }
