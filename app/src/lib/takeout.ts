@@ -191,9 +191,14 @@ function resolveEnd(
     }
     const isRun = Boolean(opposite) || throughParallel
     // 本管軸のヘッダ径（最大径）。枝側は自分のサイズ。
-    const runSize = runAxisSize(node, effById) ?? inc.size
+    const autoRunSize = runAxisSize(node, effById) ?? inc.size
     const branchInc = others.find((o) => Math.abs(dot(inc.into, o.into)) < 0.9)
-    const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
+    const autoBranchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
+    // 「相手径」を手動指定していれば、自動判定(実配管のジオメトリから検出)より優先する。
+    // 径違いチーズの「相手径」欄は、この手動指定を反映するためのものなので、
+    // 編集しても計算に反映されない状態は不具合（表示だけで計算に使われていなかった）。
+    const runSize = !isRun && inc.seg.reducerSize ? inc.seg.reducerSize : autoRunSize
+    const branchSize = isRun && inc.seg.reducerSize ? inc.seg.reducerSize : autoBranchSize
     const t = teeTakeout(runSize, branchSize, isRun)
     let mm = t.mm
     let role: EndRole = isRun ? 'tee-run' : 'tee-branch'
