@@ -432,6 +432,7 @@ export default function App() {
           }
           onChange={updateSelected}
           onDelete={deleteSelected}
+          onClose={closeSelection}
         />
       )}
 

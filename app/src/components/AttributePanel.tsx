@@ -60,6 +60,8 @@ interface SegmentPanelProps {
   onGasketChange: (on: boolean, mm: number) => void
   onChange: (patch: Partial<Segment>) => void
   onDelete: () => void
+  /** パネルを閉じる（選択解除）。常に押しやすい固定位置のボタンとして用意。 */
+  onClose: () => void
 }
 
 export function SegmentPanel({
@@ -77,6 +79,7 @@ export function SegmentPanel({
   onGasketChange,
   onChange,
   onDelete,
+  onClose,
 }: SegmentPanelProps) {
   const dimRef = useRef<HTMLInputElement>(null)
 
@@ -127,6 +130,10 @@ export function SegmentPanel({
         <span className="panel-delete" role="button" onClick={onDelete}>
           削除
         </span>
+        {/* 常に押しやすい固定位置のクローズボタン（キーボード表示中もここは隠れない） */}
+        <button type="button" className="panel-close" onClick={onClose} aria-label="閉じる">
+          ✕
+        </button>
       </div>
       <div className="panel-body">
         <div className="panel-grid">

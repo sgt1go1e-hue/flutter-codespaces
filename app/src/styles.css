@@ -339,6 +339,28 @@ body {
   min-height: 40px;
   display: inline-flex;
   align-items: center;
+  flex-shrink: 0;
+}
+
+/* パネルを閉じる固定ボタン。ヘッダーは常に画面上部に表示されるため、
+   キーボード表示中でも狙いやすい大きな当たり判定を確保する。 */
+.panel-close {
+  background: #334155;
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.panel-close:active {
+  background: var(--accent);
+  color: #04222e;
 }
 
 .panel-body {

@@ -36,8 +36,16 @@ interface Props {
 const MOVE_THRESHOLD = 7
 // タップ位置からセグメントを拾うヒット距離(px)
 const HIT_DIST = 18
-// アイソメグリッドの間隔(px)＝格子スナップの基準
-const GRID_GAP = 40
+// アイソメグリッドの間隔(px)＝格子スナップの基準。
+// 画面幅が狭いほど間隔を詰め、スマホでも1画面に描ける範囲を広くする。
+const GRID_GAP_PHONE = 20 // 〜599px（スマホ）
+const GRID_GAP_TABLET = 30 // 600〜999px（iPad縦向き等）
+const GRID_GAP_WIDE = 40 // 1000px〜（iPad横向き・デスクトップ）
+function gridGapForWidth(w: number): number {
+  if (w > 0 && w < 600) return GRID_GAP_PHONE
+  if (w > 0 && w < 1000) return GRID_GAP_TABLET
+  return GRID_GAP_WIDE
+}
 // またぎ表示の途切れ幅(px)
 const CROSS_GAP = 9
 // 描画開始点を既存線上の格子点へ吸着する距離(px)。分岐の接続を確実にする。
@@ -59,6 +67,8 @@ export function DrawingCanvas({
     null,
   )
   const [size, setSize] = useState({ w: 0, h: 0 })
+  // 画面幅に応じた格子間隔（スマホは詰め、iPad/デスクトップは従来どおり）
+  const GRID_GAP = useMemo(() => gridGapForWidth(size.w), [size.w])
 
   // ジェスチャ状態
   const startLocalRef = useRef<Point | null>(null)
