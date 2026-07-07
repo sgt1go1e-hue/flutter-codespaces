@@ -411,6 +411,14 @@ export default function App() {
             {getPart(partDrag.partId)?.icon}
           </div>
         )}
+
+        {/* 作図設定（左上に浮かせて常設。これから描く線の初期値。選択時は自動で開かない） */}
+        <DrawSettingsPanel
+          defaults={defaults}
+          onChange={updateDefaults}
+          open={settingsOpen}
+          onToggle={() => setSettingsOpen((v) => !v)}
+        />
       </main>
 
       {/* 寸法・属性の編集パネル（線を選択したときだけ表示。作図設定とは独立） */}
@@ -436,23 +444,12 @@ export default function App() {
         />
       )}
 
-      {/* 作図設定バー（独立して開閉。選択・寸法入力では自動で開かない） */}
-      <DrawSettingsPanel
-        defaults={defaults}
-        onChange={updateDefaults}
-        open={settingsOpen}
-        onToggle={() => setSettingsOpen((v) => !v)}
-      />
-
       <PartsPalette
         onDragStart={(partId, x, y) => setPartDrag({ partId, x, y })}
         draggingId={partDrag?.partId ?? null}
       />
 
       <footer className="statusbar">
-        <span className="hint">
-          ドラッグで描画／線をタップで選択（寸法・属性を編集）
-        </span>
         <span className="count">セグメント数: {segments.length}</span>
       </footer>
 

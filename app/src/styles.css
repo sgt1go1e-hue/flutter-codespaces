@@ -111,17 +111,12 @@ body {
 .statusbar {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 12px;
   padding: 10px 14px;
   padding-bottom: max(10px, env(safe-area-inset-bottom));
   background: var(--panel);
   font-size: 13px;
-}
-
-.hint {
-  color: var(--hint);
-  margin-left: 6px;
 }
 
 .count {
@@ -282,6 +277,33 @@ body {
 
 .panel-header.static {
   cursor: default;
+}
+
+/* 作図設定は画面下部のバーではなく、キャンバス左上に浮かせて常設する
+   （下部はパーツパレット等で手狭なため、親指で届きやすい左上に配置）。 */
+.attr-panel.settings {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 15;
+  width: auto;
+  max-width: calc(100% - 20px);
+  border: 1px solid #334155;
+  border-radius: 12px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  overflow: hidden;
+}
+
+.attr-panel.settings .panel-header {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
+.attr-panel.settings .panel-body {
+  width: min(84vw, 340px);
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
 }
 
 .panel-caret {
@@ -571,7 +593,9 @@ body {
   padding: 8px 12px;
   min-height: 44px;
   font-size: 14px;
-  touch-action: none;
+  /* 横スクロール(パン)はブラウザに許可し、縦方向の動きだけ配管へのドラッグ開始として
+     JS側で判定する（pan-x以外は無効にし、判定が確定するまでは既定動作を妨げない）。 */
+  touch-action: pan-x;
   white-space: nowrap;
 }
 
