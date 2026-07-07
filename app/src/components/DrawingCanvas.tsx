@@ -50,6 +50,58 @@ function gridGapForWidth(w: number): number {
 const CROSS_GAP = 9
 // 描画開始点を既存線上の格子点へ吸着する距離(px)。分岐の接続を確実にする。
 const START_SNAP = 18
+// ピンチズームの拡大率の範囲
+const MIN_SCALE = 0.5
+const MAX_SCALE = 3
+
+// --- ラベル（末端の呼び径・寸法2段表記）の重なり回避 ---
+// 実測せずに簡易的な文字幅を見積もる（全角=1em、半角=0.62em として概算）。
+function estimateTextWidth(text: string, fontSize: number): number {
+  let w = 0
+  for (const ch of text) {
+    w += ch.charCodeAt(0) > 0x2e80 ? fontSize : fontSize * 0.62
+  }
+  return w
+}
+interface LabelBox {
+  cx: number
+  cy: number
+  w: number
+  h: number
+}
+function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
+  return (
+    Math.abs(a.cx - b.cx) * 2 < a.w + b.w && Math.abs(a.cy - b.cy) * 2 < a.h + b.h
+  )
+}
+interface LabelJob extends LabelBox {
+  key: string
+  /** 重なった場合に押し出す向き（単位ベクトル寄り） */
+  pushX: number
+  pushY: number
+}
+// 重なったラベルを、それぞれの推奨方向へ少しずつ押し出して重なりを減らす
+// （完全な重なり0を保証するものではないが、密集時のかぶりを大幅に軽減する）。
+function resolveOverlaps(jobs: LabelJob[]): Map<string, { cx: number; cy: number }> {
+  const placed: LabelBox[] = []
+  const result = new Map<string, { cx: number; cy: number }>()
+  for (const job of jobs) {
+    let cx = job.cx
+    let cy = job.cy
+    let attempts = 0
+    while (
+      attempts < 24 &&
+      placed.some((p) => boxesOverlap({ cx, cy, w: job.w, h: job.h }, p))
+    ) {
+      cx += job.pushX * 5
+      cy += job.pushY * 5
+      attempts++
+    }
+    placed.push({ cx, cy, w: job.w, h: job.h })
+    result.set(job.key, { cx, cy })
+  }
+  return result
+}
 
 export function DrawingCanvas({
   segments,
@@ -69,10 +121,25 @@ export function DrawingCanvas({
   const [size, setSize] = useState({ w: 0, h: 0 })
   // 画面幅に応じた格子間隔（スマホは詰め、iPad/デスクトップは従来どおり）
   const GRID_GAP = useMemo(() => gridGapForWidth(size.w), [size.w])
+  // 表示の拡大縮小・平行移動（ピンチズーム）。論理座標 -> 画面座標 = *scale + (tx,ty)
+  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 })
 
   // ジェスチャ状態
   const startLocalRef = useRef<Point | null>(null)
   const movedRef = useRef(false)
+  // 同時に触れている指（screen-local座標）。2本以上でピンチ/パンに切り替える。
+  const pointersRef = useRef(new Map<number, Point>())
+  const gestureRef = useRef<{
+    id1: number
+    id2: number
+    startDist: number
+    startMidScreen: Point
+    startScale: number
+    startTx: number
+    startTy: number
+  } | null>(null)
+  // このタッチシーケンス中に2本指ジェスチャが発生したか（描画/選択を抑止するため）
+  const gestureActiveRef = useRef(false)
 
   useEffect(() => {
     const el = svgRef.current
@@ -87,14 +154,25 @@ export function DrawingCanvas({
     return () => ro.disconnect()
   }, [])
 
-  const gridLines = useMemo(
-    () => isometricGrid(size.w, size.h, GRID_GAP),
-    [size.w, size.h],
-  )
+  // 現在表示中の論理領域(パン・ズーム後)を覆うグリッドを再生成する
+  const gridLines = useMemo(() => {
+    const ox = -view.tx / view.scale
+    const oy = -view.ty / view.scale
+    const w = size.w / view.scale
+    const h = size.h / view.scale
+    return isometricGrid(w, h, GRID_GAP, ox, oy)
+  }, [size.w, size.h, GRID_GAP, view])
 
-  function toLocal(clientX: number, clientY: number): Point {
+  // 画面座標(client) -> キャンバス要素基準のローカル座標(拡大縮小・移動前)
+  function toScreenLocal(clientX: number, clientY: number): Point {
     const rect = svgRef.current!.getBoundingClientRect()
     return { x: clientX - rect.left, y: clientY - rect.top }
+  }
+
+  // 画面座標(client) -> 論理座標(セグメント等が持つ座標系。パン・ズームの逆変換を適用)
+  function toLocal(clientX: number, clientY: number): Point {
+    const s = toScreenLocal(clientX, clientY)
+    return { x: (s.x - view.tx) / view.scale, y: (s.y - view.ty) / view.scale }
   }
 
   function hitSegment(p: Point): Segment | null {
@@ -138,15 +216,73 @@ export function DrawingCanvas({
     return { x: best.start.x + dir.x * step * k, y: best.start.y + dir.y * step * k }
   }
 
+  // 現在アクティブな2本指の組でピンチ/パンの基準(開始距離・中点・その時のview)を取り直す。
+  // 3本指以上で1本増減した場合や、ピンチ開始時にも呼ぶ。
+  function beginGesture() {
+    const ids = [...pointersRef.current.keys()]
+    const id1 = ids[0]
+    const id2 = ids[1]
+    const p1 = pointersRef.current.get(id1)
+    const p2 = pointersRef.current.get(id2)
+    if (!p1 || !p2) return
+    gestureRef.current = {
+      id1,
+      id2,
+      startDist: distance(p1, p2) || 1,
+      startMidScreen: { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 },
+      startScale: view.scale,
+      startTx: view.tx,
+      startTy: view.ty,
+    }
+  }
+
   function handlePointerDown(e: React.PointerEvent) {
     if (inputDisabled) return
     svgRef.current?.setPointerCapture(e.pointerId)
+    pointersRef.current.set(e.pointerId, toScreenLocal(e.clientX, e.clientY))
+
+    if (pointersRef.current.size >= 2) {
+      // 2本指以上 = ピンチ/パン開始。進行中だった単指の描画開始はキャンセルする。
+      gestureActiveRef.current = true
+      startLocalRef.current = null
+      setPreview(null)
+      beginGesture()
+      return
+    }
     startLocalRef.current = toLocal(e.clientX, e.clientY)
     movedRef.current = false
     setPreview(null)
   }
 
   function handlePointerMove(e: React.PointerEvent) {
+    if (pointersRef.current.has(e.pointerId)) {
+      pointersRef.current.set(e.pointerId, toScreenLocal(e.clientX, e.clientY))
+    }
+
+    if (gestureActiveRef.current && gestureRef.current) {
+      const g = gestureRef.current
+      const p1 = pointersRef.current.get(g.id1)
+      const p2 = pointersRef.current.get(g.id2)
+      if (p1 && p2) {
+        const dist = distance(p1, p2) || 1
+        const mid = { x: (p1.x + p2.x) / 2, y: (p1.y + p2.y) / 2 }
+        const newScale = Math.min(
+          MAX_SCALE,
+          Math.max(MIN_SCALE, g.startScale * (dist / g.startDist)),
+        )
+        // ピンチ開始時の中点にあった論理座標が、常に今の2本指の中点に来るよう
+        // tx,ty を解く（つまんだ場所を中心にズーム＋2本指パンを同時に実現）。
+        const logicalX = (g.startMidScreen.x - g.startTx) / g.startScale
+        const logicalY = (g.startMidScreen.y - g.startTy) / g.startScale
+        setView({
+          scale: newScale,
+          tx: mid.x - logicalX * newScale,
+          ty: mid.y - logicalY * newScale,
+        })
+      }
+      return
+    }
+
     const start = startLocalRef.current
     if (!start) return
     const p = toLocal(e.clientX, e.clientY)
@@ -162,6 +298,22 @@ export function DrawingCanvas({
   }
 
   function handlePointerUp(e: React.PointerEvent) {
+    pointersRef.current.delete(e.pointerId)
+
+    if (gestureActiveRef.current) {
+      if (pointersRef.current.size >= 2) {
+        // 3本指以上から1本離した等 → 残っているペアで基準を引き直して続行
+        beginGesture()
+      } else if (pointersRef.current.size === 0) {
+        // 全ての指を離した → ジェスチャ終了（このシーケンスでは描画/選択は発生させない）
+        gestureActiveRef.current = false
+        gestureRef.current = null
+      }
+      startLocalRef.current = null
+      setPreview(null)
+      return
+    }
+
     const start = startLocalRef.current
     startLocalRef.current = null
 
@@ -179,6 +331,81 @@ export function DrawingCanvas({
     }
     setPreview(null)
   }
+
+  // 末端の呼び径ラベル・寸法2段表記(dim block)の基準位置(重なり回避の押し出し前)を
+  // 全セグメント分まとめて求め、重なりを解消した最終位置を得る。
+  // ズーム・パン(view)には依存しない（すべて論理座標＝segment座標系で計算するため）。
+  const resolvedLabels = useMemo(() => {
+    const jobs: LabelJob[] = []
+    // 1) 中間の径変化ラベル（セグメント中点の上側）
+    for (const s of segments) {
+      const eff = effectiveById[s.id]
+      const c = cutById[s.id]
+      if (!eff?.showSizeLabel || !eff.size || !c?.startConnected || !c?.endConnected)
+        continue
+      const mx = (s.start.x + s.end.x) / 2
+      const my = (s.start.y + s.end.y) / 2
+      const w = estimateTextWidth(eff.size, 12) + 8
+      jobs.push({ key: `seg-${s.id}`, cx: mx, cy: my - 10, w, h: 18, pushX: 0, pushY: -1 })
+    }
+    // 2) 寸法2段表記（もっとも重要な情報のため優先度を高くする）
+    for (const s of segments) {
+      const c = cutById[s.id]
+      if (!c || c.status === 'none') continue
+      const mx = (s.start.x + s.end.x) / 2
+      const my = (s.start.y + s.end.y) / 2
+      const line1 = `${c.mode} ${c.center}`
+      const line2 =
+        c.status === 'ok'
+          ? `切 ${c.cut}`
+          : c.status === 'zero'
+            ? 'パイプ0（継手直結）'
+            : '継手不足'
+      const fs2 = c.status === 'ok' ? 12.5 : c.status === 'zero' ? 10.5 : 11
+      const w =
+        Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
+      // 押し出す向きは主に下方向だが、配管の向きに応じて少し斜めにばらけさせる
+      // （真下一辺倒だと、複数の寸法ブロックが縦一列に並んで押し合い続け、
+      //   避け切れないことがあるため）。
+      const len = distance(s.start, s.end) || 1
+      const perpX = -(s.end.y - s.start.y) / len
+      jobs.push({
+        key: `dim-${s.id}`,
+        cx: mx,
+        cy: my + 22,
+        w,
+        h: 32,
+        pushX: perpX * 0.4,
+        pushY: 1,
+      })
+    }
+    // 3) 末端の呼び径ラベル（寸法表記を避ける向きへ、必要ならさらに押し出す）
+    for (const s of segments) {
+      const eff = effectiveById[s.id]
+      const c = cutById[s.id]
+      if (!eff?.size || !c) continue
+      for (const at of ['start', 'end'] as const) {
+        const connected = at === 'start' ? c.startConnected : c.endConnected
+        if (connected) continue
+        const pt = at === 'start' ? s.start : s.end
+        const other = at === 'start' ? s.end : s.start
+        const len = distance(pt, other) || 1
+        const ox = (pt.x - other.x) / len
+        const oy = (pt.y - other.y) / len
+        let nx = -oy
+        let ny = ox
+        if (ny > 0) {
+          nx = -nx
+          ny = -ny
+        }
+        const cx = pt.x + ox * 20 + nx * 14
+        const cy = pt.y + oy * 20 + ny * 14
+        const w = estimateTextWidth(eff.size, 13) + 14
+        jobs.push({ key: `term-${s.id}-${at}`, cx, cy, w, h: 26, pushX: nx, pushY: ny })
+      }
+    }
+    return resolveOverlaps(jobs)
+  }, [segments, cutById, effectiveById])
 
   // フランジ記号を端点に描く。
   // 'double'(両) = 配管に直交する短い2本線、'single'(片) = 1本線（終端エンド）。
@@ -229,20 +456,18 @@ export function DrawingCanvas({
     const pt = at === 'start' ? s.start : s.end
     const other = at === 'start' ? s.end : s.start
     const len = distance(pt, other) || 1
-    // 端点から外側（配管の反対方向）へ少しずらして配置
     const ox = (pt.x - other.x) / len
     const oy = (pt.y - other.y) / len
-    // 寸法2段表記(dim-center/dim-cut)は常にセグメント中点から「下方向」へ表示されるため、
-    // 末端ラベルは配管の延長方向に加えて「上向き」寄りの垂直方向へもずらし、
-    // 短いセグメントや交差点付近でも寸法表記と重ならないようにする。
     let nx = -oy
     let ny = ox
     if (ny > 0) {
       nx = -nx
       ny = -ny
     }
-    const cx = pt.x + ox * 20 + nx * 14
-    const cy = pt.y + oy * 20 + ny * 14
+    // 重なり回避で押し出された最終位置（無ければ基準位置にフォールバック）
+    const resolved = resolvedLabels.get(`term-${s.id}-${at}`)
+    const cx = resolved?.cx ?? pt.x + ox * 20 + nx * 14
+    const cy = resolved?.cy ?? pt.y + oy * 20 + ny * 14
     // タップでその区間を選択（線が細くても押しやすいよう当たり判定を広めに）
     const onTap = (e: React.PointerEvent) => {
       e.stopPropagation()
@@ -348,6 +573,9 @@ export function DrawingCanvas({
       onPointerUp={handlePointerUp}
       onPointerCancel={handlePointerUp}
     >
+      {/* ピンチズーム・パン用の変換。中身は全て論理座標(=セグメント座標系)のまま描き、
+          この<g>だけを拡大縮小・移動する。 */}
+      <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`}>
       {/* アイソメ格子：30°/150° の菱形パターン（描画はこの交点間に拘束される） */}
       <g className="iso-grid" pointerEvents="none">
         {gridLines.map((l, i) => (
@@ -408,16 +636,17 @@ export function DrawingCanvas({
             {eff?.showSizeLabel &&
               eff.size &&
               cutById[s.id]?.startConnected &&
-              cutById[s.id]?.endConnected && (
-                <text
-                  className="seg-label"
-                  x={(s.start.x + s.end.x) / 2}
-                  y={(s.start.y + s.end.y) / 2 - 10}
-                  textAnchor="middle"
-                >
-                  {eff.size}
-                </text>
-              )}
+              cutById[s.id]?.endConnected &&
+              (() => {
+                const resolved = resolvedLabels.get(`seg-${s.id}`)
+                const cx = resolved?.cx ?? (s.start.x + s.end.x) / 2
+                const cy = resolved?.cy ?? (s.start.y + s.end.y) / 2 - 10
+                return (
+                  <text className="seg-label" x={cx} y={cy} textAnchor="middle">
+                    {eff.size}
+                  </text>
+                )
+              })()}
             {/* 末端（フリー端）に呼び径を表示（手書きアイソメと同様・タップで変更） */}
             {eff?.size &&
               cutById[s.id] &&
@@ -427,15 +656,21 @@ export function DrawingCanvas({
               cutById[s.id] &&
               !cutById[s.id].endConnected &&
               terminusSize(s, 'end', eff.size)}
-            {/* 寸法2段表記: 上段=芯々(入力), 下段=切り寸(緑・下線)。芯々/芯先も表示 */}
+            {/* 寸法2段表記: 上段=芯々(入力), 下段=切り寸(緑・下線)。芯々/芯先も表示
+                位置は重なり回避で押し出された最終位置（無ければ基準位置）を使う。 */}
             {(() => {
               const c = cutById[s.id]
               if (!c || c.status === 'none') return null
               const mx = (s.start.x + s.end.x) / 2
               const my = (s.start.y + s.end.y) / 2
+              const resolved = resolvedLabels.get(`dim-${s.id}`)
+              const cx = resolved?.cx ?? mx
+              const cCenter = resolved?.cy ?? my + 22
+              const y1 = cCenter - 8
+              const y2 = cCenter + 8
               return (
                 <>
-                  <text className="dim-center" x={mx} y={my + 14} textAnchor="middle">
+                  <text className="dim-center" x={cx} y={y1} textAnchor="middle">
                     {c.mode} {c.center}
                   </text>
                   {c.status === 'ok' && (
@@ -445,25 +680,25 @@ export function DrawingCanvas({
                           両方かけると、下線にも縁取りが付いて二重線に見えるため分離。 */}
                       <text
                         className="dim-cut-outline"
-                        x={mx}
-                        y={my + 30}
+                        x={cx}
+                        y={y2}
                         textAnchor="middle"
                         aria-hidden="true"
                       >
                         切 {c.cut}
                       </text>
-                      <text className="dim-cut" x={mx} y={my + 30} textAnchor="middle">
+                      <text className="dim-cut" x={cx} y={y2} textAnchor="middle">
                         切 {c.cut}
                       </text>
                     </>
                   )}
                   {c.status === 'zero' && (
-                    <text className="dim-cut zero" x={mx} y={my + 30} textAnchor="middle">
+                    <text className="dim-cut zero" x={cx} y={y2} textAnchor="middle">
                       パイプ0（継手直結）
                     </text>
                   )}
                   {c.status === 'over' && (
-                    <text className="dim-cut over" x={mx} y={my + 30} textAnchor="middle">
+                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
                       継手不足
                     </text>
                   )}
@@ -488,6 +723,7 @@ export function DrawingCanvas({
           pointerEvents="none"
         />
       )}
+      </g>
     </svg>
   )
 }

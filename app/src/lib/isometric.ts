@@ -76,14 +76,18 @@ const N_A = { x: -Math.sin(30 * DEG), y: Math.cos(30 * DEG) } // 30°線の法�
 const N_B = { x: -Math.sin(150 * DEG), y: Math.cos(150 * DEG) } // 150°線の法線
 
 /**
- * 指定角度(度)の平行線群を、原点(0,0)基準で w×h の領域を覆うように生成する。
- * 各線は p·n = k*gap 上に並ぶので、格子スナップ(snapToLattice)と必ず一致する。
+ * 指定角度(度)の平行線群を、(ox,oy)〜(ox+w,oy+h) の領域を覆うように生成する。
+ * 線の位置自体は常に原点(0,0)基準の p·n = k*gap 上（ox,oyは覆う範囲を決めるだけ）
+ * なので、格子スナップ(snapToLattice)と必ず一致する。パン・ズームで表示領域が
+ * 移動しても、この ox,oy に可視領域の左上を渡せば同じ絶対格子を再生成できる。
  */
 function parallelLines(
   w: number,
   h: number,
   gap: number,
   angleDeg: number,
+  ox = 0,
+  oy = 0,
 ): GridLine[] {
   if (w <= 0 || h <= 0 || gap <= 0) return []
   const rad = angleDeg * DEG
@@ -91,12 +95,12 @@ function parallelLines(
   const uy = Math.sin(rad)
   const nx = -uy // 線に垂直な方向（単位ベクトル）
   const ny = ux
-  // ビューポート四隅での p·n の範囲から、必要な k の範囲を求める
+  // ビューポート四隅(ox,oy)〜(ox+w,oy+h)での p·n の範囲から、必要な k の範囲を求める
   const corners = [
-    0,
-    w * nx,
-    h * ny,
-    w * nx + h * ny,
+    ox * nx + oy * ny,
+    (ox + w) * nx + oy * ny,
+    ox * nx + (oy + h) * ny,
+    (ox + w) * nx + (oy + h) * ny,
   ]
   const cmin = Math.min(...corners)
   const cmax = Math.max(...corners)
@@ -104,7 +108,7 @@ function parallelLines(
   const lines: GridLine[] = []
   for (let k = Math.floor(cmin / gap); k <= Math.ceil(cmax / gap); k++) {
     const c = k * gap
-    // 線 p·n = c 上の基準点（法線方向に c だけ進んだ点）
+    // 線 p·n = c 上の基準点（法線方向に c だけ進んだ点。原点基準＝絶対座標）
     const px = nx * c
     const py = ny * c
     lines.push({
@@ -120,11 +124,19 @@ function parallelLines(
 /**
  * アイソメ（等角投影）グリッドの線を生成する。
  * 30° と 150° の2方向の平行線群を重ねることで菱形（ひし形）パターンになる。
+ * ox,oy を渡すと、その左上を起点とする w×h の可視領域を覆うグリッドを生成する
+ * （パン・ズーム後の再生成用。省略時は原点(0,0)基準＝従来どおり）。
  */
-export function isometricGrid(w: number, h: number, gap: number): GridLine[] {
+export function isometricGrid(
+  w: number,
+  h: number,
+  gap: number,
+  ox = 0,
+  oy = 0,
+): GridLine[] {
   return [
-    ...parallelLines(w, h, gap, 30),
-    ...parallelLines(w, h, gap, 150),
+    ...parallelLines(w, h, gap, 30, ox, oy),
+    ...parallelLines(w, h, gap, 150, ox, oy),
   ]
 }
 
