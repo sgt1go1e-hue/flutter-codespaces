@@ -10,6 +10,7 @@ import {
   getSizeInfo,
   getPipeType,
   getFitting,
+  getConnectionMethod,
   connectionMethods,
 } from '../data/masters'
 
@@ -520,15 +521,17 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
   const pipeShort = defaults.pipeType
     ? (getPipeType(defaults.pipeType)?.short ?? defaults.pipeType)
     : '未設定'
+  const connectionName = getConnectionMethod(defaults.connection)?.name
 
   return (
     <section className={`attr-panel settings${open ? ' open' : ''}`}>
       <button className="panel-header" onClick={onToggle}>
         <span className="panel-caret">{open ? '▼' : '▲'}</span>
         <span className="panel-summary">
-          <span className="sum-mode">作図設定</span>
+          <span className="sum-mode">次の配管</span>
           <b>{pipeShort}</b>
           <b>{defaults.size ?? '未設定'}</b>
+          {connectionName && <b>{connectionName}</b>}
         </span>
       </button>
       {open && (
