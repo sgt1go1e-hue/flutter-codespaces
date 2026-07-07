@@ -1,5 +1,6 @@
 import type { Point, Segment } from '../types'
 import { distanceToSegment, samePoint } from './isometric'
+import { findTeeContext } from './takeout'
 
 export type SegmentMap = Record<string, Segment>
 
@@ -241,19 +242,33 @@ function buildDegreeLookup(segments: Segment[]): (p: Point) => number {
 export function computeEffective(segments: Segment[]): Record<string, Effective> {
   const byId = buildSegmentMap(segments)
   const degreeAt = buildDegreeLookup(segments)
+  // サイズだけ先に全セグメント分求めておく（分岐の同径/異径判定に使うため）。
+  const sizeById: Record<string, { size?: string }> = {}
+  for (const s of segments) sizeById[s.id] = { size: effectiveSize(s, byId) }
+
   const out: Record<string, Effective> = {}
   for (const s of segments) {
-    const size = effectiveSize(s, byId)
+    const size = sizeById[s.id].size
     const parent = s.parentId ? byId[s.parentId] : undefined
-    const parentSize = parent ? effectiveSize(parent, byId) : undefined
+    const parentSize = parent ? sizeById[parent.id]?.size : undefined
     // 分岐: いずれかの端点が次数3以上のノード
     const isBranch = degreeAt(s.start) >= 3 || degreeAt(s.end) >= 3
     const fittingOwn = s.fitting != null && s.fitting !== ''
-    const fitting = fittingOwn
-      ? (s.fitting as string)
-      : isBranch
-        ? 'tee_equal'
-        : 'elbow90_long'
+    let fitting: string
+    if (fittingOwn) {
+      fitting = s.fitting as string
+    } else if (isBranch) {
+      // メイン管／枝管の実サイズが異なれば「径違いチーズ」、同じなら「同径チーズ」を自動選択。
+      const tee = findTeeContext(segments, sizeById, s.id)
+      const mainN = nomA(tee?.mainSize)
+      const branchN = nomA(tee?.branchSize)
+      fitting =
+        mainN != null && branchN != null && mainN !== branchN
+          ? 'tee_reducing'
+          : 'tee_equal'
+    } else {
+      fitting = 'elbow90_long'
+    }
     out[s.id] = {
       pipeType: effectivePipeType(s, byId),
       size,

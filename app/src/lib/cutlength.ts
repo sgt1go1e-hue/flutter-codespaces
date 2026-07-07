@@ -117,9 +117,11 @@ export function computeAllCut(
       const small = a != null && b != null ? `${Math.min(a, b)}A` : undefined
       eccentric = { offset, align: s.reducerAlign, alignNeeded: !s.reducerAlign, large, small }
       needsCounterpart = !cp
-    } else if (s.fitting === 'reducer_concentric' || s.fitting === 'tee_reducing') {
+    } else if (s.fitting === 'reducer_concentric') {
       needsCounterpart = !(s.reducerSize ?? autoCounterpart)
     }
+    // tee_reducing(径違いチーズ)は「メイン管サイズ／枝管サイズ」で実サイズを直接編集する
+    // 方式のため、相手径待ちの警告は不要（ノードが分岐として成立していれば常に計算できる）。
 
     out[s.id] = {
       center,

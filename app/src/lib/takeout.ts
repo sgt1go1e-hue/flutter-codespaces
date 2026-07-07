@@ -7,10 +7,15 @@ import {
   type ReducerDim,
   type TeeDim,
 } from '../data/masters'
-import type { Effective } from './inheritance'
-
 // ノード同一判定の許容誤差(px)
 const NODE_EPS = 1
+
+// このファイルの関数は実効属性のうち size しか参照しないため、
+// inheritance.ts の Effective 全体ではなくこの最小限の形で受け取る
+// （inheritance.ts 側からも sizeのみのマップで安全に呼べるようにするため）。
+export interface SizeInfo {
+  size?: string
+}
 
 export type EndRole =
   | 'free' // 接続なし（芯出し基準）
@@ -51,7 +56,7 @@ const isReducerId = (id?: string) =>
 
 function buildGraph(
   segments: Segment[],
-  effById: Record<string, Effective>,
+  effById: Record<string, SizeInfo>,
 ): GNode[] {
   const nodes: GNode[] = []
   const findOrAdd = (p: Point) => {
@@ -133,7 +138,7 @@ function teeTakeout(
 // （途中でレジューサーにより縮径していても、チーズ本体の呼びは大径側で決まるため）
 function runAxisSize(
   node: GNode,
-  effById: Record<string, Effective>,
+  effById: Record<string, SizeInfo>,
 ): string | undefined {
   const candidates: (string | undefined)[] = []
   for (const t of node.through) candidates.push(effById[t.id]?.size)
@@ -168,7 +173,7 @@ function reducerHmm(large?: string, small?: string): number {
 function resolveEnd(
   inc: Inc,
   node: GNode,
-  effById: Record<string, Effective>,
+  effById: Record<string, SizeInfo>,
 ): EndResult {
   const others = node.incs.filter((i) => i.seg.id !== inc.seg.id)
   const throughs = node.through.filter((t) => t.id !== inc.seg.id)
@@ -191,14 +196,11 @@ function resolveEnd(
     }
     const isRun = Boolean(opposite) || throughParallel
     // 本管軸のヘッダ径（最大径）。枝側は自分のサイズ。
-    const autoRunSize = runAxisSize(node, effById) ?? inc.size
+    // 「メイン管サイズ／枝管サイズ」欄で実サイズを直接編集する方式にしたため、
+    // ここは常に実際のジオメトリ(隣接セグメントの実サイズ)から求める。
+    const runSize = runAxisSize(node, effById) ?? inc.size
     const branchInc = others.find((o) => Math.abs(dot(inc.into, o.into)) < 0.9)
-    const autoBranchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
-    // 「相手径」を手動指定していれば、自動判定(実配管のジオメトリから検出)より優先する。
-    // 径違いチーズの「相手径」欄は、この手動指定を反映するためのものなので、
-    // 編集しても計算に反映されない状態は不具合（表示だけで計算に使われていなかった）。
-    const runSize = !isRun && inc.seg.reducerSize ? inc.seg.reducerSize : autoRunSize
-    const branchSize = isRun && inc.seg.reducerSize ? inc.seg.reducerSize : autoBranchSize
+    const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
     const t = teeTakeout(runSize, branchSize, isRun)
     let mm = t.mm
     let role: EndRole = isRun ? 'tee-run' : 'tee-branch'
@@ -239,7 +241,7 @@ export interface SegEnds {
 /** 全セグメントの端ごとの取り出し寸法を計算 */
 export function computeEnds(
   segments: Segment[],
-  effById: Record<string, Effective>,
+  effById: Record<string, SizeInfo>,
 ): Record<string, SegEnds> {
   const nodes = buildGraph(segments, effById)
   const nodeAt = (p: Point) => nodes.find((n) => samePoint(n.p, p, NODE_EPS))!
@@ -255,6 +257,102 @@ export function computeEnds(
     }
   }
   return out
+}
+
+/** 分岐(チーズ)の「メイン管／枝管」情報。パネルでの直接編集用。 */
+export interface TeeContext {
+  /** 選択中セグメント自身がメイン管(本管)側か（false なら枝管側） */
+  selectedIsMain: boolean
+  /** メイン管を構成するセグメントid（貫通なら1つ、端点2本構成なら2つ） */
+  mainSegIds: string[]
+  /** メイン管の実効サイズ（未確定なら undefined） */
+  mainSize?: string
+  /** 枝管セグメントのid */
+  branchSegId?: string
+  /** 枝管の実効サイズ */
+  branchSize?: string
+}
+
+/**
+ * 指定セグメントが分岐(チーズ)ノードに接続していれば、その「メイン管／枝管」の
+ * 構成セグメントとサイズを返す。両端とも分岐でなければ undefined。
+ * パネルで「メイン管サイズ／枝管サイズ」を直接編集できるようにするための情報源。
+ */
+export function findTeeContext(
+  segments: Segment[],
+  effById: Record<string, SizeInfo>,
+  segmentId: string,
+): TeeContext | undefined {
+  const nodes = buildGraph(segments, effById)
+  const seg = segments.find((s) => s.id === segmentId)
+  if (!seg) return undefined
+
+  for (const end of ['start', 'end'] as const) {
+    const p = end === 'start' ? seg.start : seg.end
+    const node = nodes.find((n) => samePoint(n.p, p, NODE_EPS))
+    if (!node) continue
+    const inc = node.incs.find((i) => i.seg.id === segmentId && i.end === end)
+    if (!inc) continue
+    const others = node.incs.filter((i) => i.seg.id !== segmentId)
+    const throughs = node.through.filter((t) => t.id !== segmentId)
+    const degree = node.incs.length + 2 * throughs.length
+    if (degree < 3) continue
+
+    const opposite = others.find((o) => dot(inc.into, o.into) < -0.9)
+    const throughSeg = throughs[0]
+    let throughParallel = false
+    if (throughSeg) {
+      const tlen = distance(throughSeg.start, throughSeg.end) || 1
+      const tdir = {
+        x: (throughSeg.end.x - throughSeg.start.x) / tlen,
+        y: (throughSeg.end.y - throughSeg.start.y) / tlen,
+      }
+      throughParallel = Math.abs(dot(inc.into, tdir)) > 0.9
+    }
+    // 自分(inc)が本管方向か＝自分と正反対のincがある、または貫通線と平行
+    const selectedIsMain = Boolean(opposite) || throughParallel
+
+    const mainSegIds = new Set<string>()
+    let branchSegId: string | undefined
+    let branchSize: string | undefined
+
+    if (selectedIsMain) {
+      // 自分がメイン管側 → 自分 + 自分と正反対のセグメント(+貫通線)がメイン管
+      mainSegIds.add(segmentId)
+      if (opposite) mainSegIds.add(opposite.seg.id)
+      if (throughSeg) mainSegIds.add(throughSeg.id)
+      const branchInc = others.find((o) => Math.abs(dot(inc.into, o.into)) < 0.9)
+      branchSegId = branchInc?.seg.id
+      branchSize = branchInc?.size
+    } else {
+      // 自分が枝管側 → 自分以外(others)の中から、互いに正反対のペア(または貫通線)を
+      // 総当たりで探す（「自分から見て反対」ではなく、他のセグメント同士の関係を見る）。
+      if (throughSeg) {
+        mainSegIds.add(throughSeg.id)
+      } else {
+        outer: for (let i = 0; i < others.length; i++) {
+          for (let j = i + 1; j < others.length; j++) {
+            if (dot(others[i].into, others[j].into) < -0.9) {
+              mainSegIds.add(others[i].seg.id)
+              mainSegIds.add(others[j].seg.id)
+              break outer
+            }
+          }
+        }
+      }
+      branchSegId = segmentId
+      branchSize = inc.size
+    }
+
+    return {
+      selectedIsMain,
+      mainSegIds: [...mainSegIds],
+      mainSize: runAxisSize(node, effById),
+      branchSegId,
+      branchSize,
+    }
+  }
+  return undefined
 }
 
 export { isTeeId }

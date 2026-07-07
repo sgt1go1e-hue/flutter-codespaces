@@ -2,6 +2,7 @@ import { useEffect, useRef } from 'react'
 import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
+import type { TeeContext } from '../lib/takeout'
 import {
   fittings,
   pipeTypes,
@@ -48,6 +49,10 @@ interface SegmentPanelProps {
   inheritedPipeType?: string
   inheritedSize?: string
   cut?: CutResult
+  /** 分岐(チーズ)ノードに接続していれば「メイン管／枝管」の構成情報 */
+  teeContext?: TeeContext
+  /** メイン管／枝管サイズの直接編集（対象セグメントid配列とサイズを渡す） */
+  onSetTeeSize: (segmentIds: string[], size: string | undefined) => void
   /** 切り寸法の丸め方（全体設定・既定=四捨五入） */
   roundMode: 'round' | 'floor'
   onRoundModeChange: (mode: 'round' | 'floor') => void
@@ -70,6 +75,8 @@ export function SegmentPanel({
   inheritedPipeType,
   inheritedSize,
   cut,
+  teeContext,
+  onSetTeeSize,
   roundMode,
   onRoundModeChange,
   flangeAllow,
@@ -95,8 +102,9 @@ export function SegmentPanel({
   const effFittingId = effective?.fitting
   const isReducer =
     effFittingId === 'reducer_concentric' || effFittingId === 'reducer_eccentric'
-  const needsCounterpart =
-    isReducer || effFittingId === 'tee_reducing'
+  // 径違いチーズは「メイン管サイズ／枝管サイズ」欄で実サイズを直接編集するため、
+  // 相手径待ちのUI(reducer-grid)はレジューサー(同心/偏心)のみに限定する。
+  const needsCounterpart = isReducer
 
   const pipeShort = effPipe ? (getPipeType(effPipe)?.short ?? effPipe) : '—'
   const sizeText = segment.size ?? inheritedSize ?? '—'
@@ -268,7 +276,8 @@ export function SegmentPanel({
 
           <label className="field">
             <span className="field-label">
-              サイズ{od != null && <span className="field-note">⌀{od}</span>}
+              {teeContext ? (teeContext.selectedIsMain ? 'メイン管サイズ' : '枝管サイズ') : 'サイズ'}
+              {od != null && <span className="field-note">⌀{od}</span>}
             </span>
             <select
               value={segment.size ?? ''}
@@ -282,6 +291,39 @@ export function SegmentPanel({
               ))}
             </select>
           </label>
+
+          {/* 分岐(チーズ)接続時: もう一方(メイン管 or 枝管)のサイズもここで直接編集できる。
+              「サイズ」と「相手径」のような曖昧な関係をやめ、メイン管/枝管という
+              実務の呼び方で対になるサイズを直接編集する方式にした。 */}
+          {teeContext && (
+            <label className="field">
+              <span className="field-label">
+                {teeContext.selectedIsMain ? '枝管サイズ' : 'メイン管サイズ'}
+              </span>
+              <select
+                value={
+                  (teeContext.selectedIsMain
+                    ? teeContext.branchSize
+                    : teeContext.mainSize) ?? ''
+                }
+                onChange={(e) => {
+                  const ids = teeContext.selectedIsMain
+                    ? teeContext.branchSegId
+                      ? [teeContext.branchSegId]
+                      : []
+                    : teeContext.mainSegIds
+                  onSetTeeSize(ids, e.target.value || undefined)
+                }}
+              >
+                <option value="">未設定</option>
+                {sizes.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
 
           <label className="field">
             <span className="field-label">継手</span>

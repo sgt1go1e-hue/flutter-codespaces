@@ -15,6 +15,7 @@ import type { Point } from './types'
 import { computeCrossoverGaps } from './lib/crossover'
 import { normalizeBranchSplits } from './lib/branching'
 import { computeAllCut } from './lib/cutlength'
+import { findTeeContext } from './lib/takeout'
 import {
   buildSegmentMap,
   computeEffective,
@@ -200,6 +201,12 @@ export default function App() {
 
   // 実効属性（継承後）と、またぎ表示の途切れ位置をまとめて計算
   const effectiveById = useMemo(() => computeEffective(segments), [segments])
+  // 選択中セグメントが分岐(チーズ)ノードに繋がっていれば「メイン管／枝管」情報を得る
+  const teeContext = useMemo(
+    () =>
+      selected ? findTeeContext(segments, effectiveById, selected.id) : undefined,
+    [segments, effectiveById, selected],
+  )
   const crossoverGaps = useMemo(() => computeCrossoverGaps(segments), [segments])
   const byId = useMemo(() => buildSegmentMap(segments), [segments])
   // 各区間の切断（加工）寸法
@@ -271,6 +278,16 @@ export default function App() {
     if (!selectedId) return
     setSegments((prev) =>
       prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s)),
+    )
+  }
+
+  // 分岐(チーズ)の「メイン管サイズ／枝管サイズ」編集用。指定したセグメント群の
+  // 実サイズ(size)を直接書き換える（選択中セグメント以外も対象になり得る）。
+  function setSizeForSegments(segmentIds: string[], size: string | undefined) {
+    if (segmentIds.length === 0) return
+    const idSet = new Set(segmentIds)
+    setSegments((prev) =>
+      prev.map((s) => (idSet.has(s.id) ? { ...s, size } : s)),
     )
   }
 
@@ -429,6 +446,8 @@ export default function App() {
           inheritedPipeType={inheritedPipeType(selected, byId)}
           inheritedSize={inheritedSize(selected, byId)}
           cut={cutById[selected.id]}
+          teeContext={teeContext}
+          onSetTeeSize={setSizeForSegments}
           roundMode={defaults.roundMode ?? 'round'}
           onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}
           flangeAllow={defaults.flangeAllow ?? 0}
