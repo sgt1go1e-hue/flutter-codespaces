@@ -1,4 +1,4 @@
-import { Fragment } from 'react'
+import { Fragment, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { bomToCsv, type Bom } from '../lib/bom'
 import { PrintIsometric } from './PrintIsometric'
@@ -29,6 +29,10 @@ export function BomModal({
     bom.pipes.length === 0 &&
     bom.fittings.length === 0 &&
     bom.flanges.length === 0
+
+  // PDF/印刷レイアウト: 詳細(複数ページ, パイプ1本ごとの明細つき) か
+  // 1ページ集約(アイソメ図を縮小・パイプ明細は小計のみ、改ページなし) かを選べる。
+  const [compact, setCompact] = useState(false)
 
   function downloadCsv() {
     // Excel(日本語)で文字化けしないよう BOM 付き UTF-8 で出力
@@ -146,6 +150,20 @@ export function BomModal({
             </>
           )}
         </div>
+        <div className="pdf-mode-row">
+          <button
+            className={`pdf-mode-btn${!compact ? ' active' : ''}`}
+            onClick={() => setCompact(false)}
+          >
+            詳細（複数ページ）
+          </button>
+          <button
+            className={`pdf-mode-btn${compact ? ' active' : ''}`}
+            onClick={() => setCompact(true)}
+          >
+            1ページに集約
+          </button>
+        </div>
         <div className="bom-actions">
           <button className="bom-pdf" onClick={printAsPdf} disabled={empty}>
             PDFで見る
@@ -165,7 +183,7 @@ export function BomModal({
         2ページ目以降が印刷されなくなるため、body直下へ portal で逃がす。
         画面には出さず、印刷/PDF化(window.print)のときだけ表示する。 */}
     {createPortal(
-      <div className="bom-print-only">
+      <div className={`bom-print-only${compact ? ' compact' : ''}`}>
         <h1>配管アイソメ図 材料集計表</h1>
         <p className="print-meta">作成日: {dateStr}</p>
 
@@ -196,18 +214,19 @@ export function BomModal({
               <tbody>
                 {bom.pipes.map((p, i) => (
                   <Fragment key={i}>
-                    {p.cuts.map((c, j) => (
-                      <tr key={j}>
-                        <td>{p.pipeShort}</td>
-                        <td>{p.size ?? '—'}</td>
-                        <td>{round1(c)}</td>
-                        <td>1</td>
-                      </tr>
-                    ))}
+                    {!compact &&
+                      p.cuts.map((c, j) => (
+                        <tr key={j}>
+                          <td>{p.pipeShort}</td>
+                          <td>{p.size ?? '—'}</td>
+                          <td>{round1(c)}</td>
+                          <td>1</td>
+                        </tr>
+                      ))}
                     <tr className="print-subtotal">
                       <td>{p.pipeShort}</td>
                       <td>{p.size ?? '—'}</td>
-                      <td>小計 {round1(p.totalMm)}</td>
+                      <td>{compact ? '計' : '小計'} {round1(p.totalMm)}</td>
                       <td>{p.count}</td>
                     </tr>
                   </Fragment>

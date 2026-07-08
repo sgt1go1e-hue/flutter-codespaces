@@ -846,6 +846,31 @@ body {
   opacity: 0.4;
 }
 
+/* PDFのページ構成切替（詳細＝複数ページ／1ページ集約） */
+.pdf-mode-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 4px;
+}
+
+.pdf-mode-btn {
+  flex: 1;
+  border: 1px solid #334155;
+  background: #0b1220;
+  color: var(--hint);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  min-height: 36px;
+}
+
+.pdf-mode-btn.active {
+  background: #a78bfa;
+  border-color: #a78bfa;
+  color: #1e1b3a;
+}
+
 /* 印刷専用レイアウト。画面表示では隠しておき、印刷/PDF化のときだけ表示する。 */
 .bom-print-only {
   display: none;
@@ -928,6 +953,41 @@ body {
     height: 620px;
     border: 1px solid #999;
     background: #fff;
+  }
+
+  /* 1ページ集約モード: アイソメ図を縮小して改ページせずに続け、パイプ明細は
+     1本ごとの切り寸法行を省き小計行のみにし、余白・文字サイズを詰める。 */
+  .bom-print-only.compact {
+    padding: 10px;
+  }
+  .bom-print-only.compact h1 {
+    font-size: 14px;
+    margin: 0 0 2px;
+  }
+  .bom-print-only.compact h2 {
+    font-size: 11px;
+    margin: 8px 0 3px;
+    padding-bottom: 1px;
+  }
+  .bom-print-only.compact .print-meta {
+    font-size: 9px;
+    margin: 0 0 6px;
+  }
+  .bom-print-only.compact th,
+  .bom-print-only.compact td {
+    padding: 2px 5px;
+    font-size: 9.5px;
+  }
+  .bom-print-only.compact table {
+    margin-bottom: 4px;
+  }
+  .bom-print-only.compact .print-iso-wrap {
+    page-break-after: auto;
+    break-after: auto;
+    margin-bottom: 6px;
+  }
+  .bom-print-only.compact .print-iso-svg {
+    height: 240px;
   }
 }
 
