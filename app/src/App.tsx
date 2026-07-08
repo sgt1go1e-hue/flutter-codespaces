@@ -103,6 +103,7 @@ function splitForDoubleFlange(
 
 // レジューサー: ドロップ位置でセグメントを前後に分割し、下流(B)を1段小さいサイズにする。
 // A(上流)は元サイズを保持、B(下流)は小径＋レジューサー継手＋相手径=A径。交点以外にも挿入可。
+// 戻り値の newId は、芯々寸法の既定値（継手直結=0mm）を後段で設定するために使う。
 function splitForReducer(
   segments: Segment[],
   targetId: string,
@@ -110,11 +111,11 @@ function splitForReducer(
   kind: 'concentric' | 'eccentric',
   largeSize: string | undefined,
   smallSize: string | undefined,
-): Segment[] {
+): { segments: Segment[]; newId?: string } {
   const target = segments.find((s) => s.id === targetId)
-  if (!target) return segments
+  if (!target) return { segments }
   const { point: P, t } = projectOnSegment(dropPoint, target.start, target.end)
-  if (t < 0.02 || t > 0.98) return segments // 端に寄りすぎは無視
+  if (t < 0.02 || t > 0.98) return { segments } // 端に寄りすぎは無視
 
   const bId = makeId()
   const A: Segment = { ...target, end: P }
@@ -144,7 +145,7 @@ function splitForReducer(
   }
   const idx = result.findIndex((s) => s.id === targetId)
   result.splice(idx + 1, 0, B)
-  return result
+  return { segments: result, newId: bId }
 }
 
 // 片フランジ: 分割せず、ドロップ位置に近い端を終端フランジとしてマークする。
@@ -428,9 +429,41 @@ export default function App() {
       const kind = part.action.reducer
       const large = effectiveById[targetId]?.size
       const small = nextSmallerSize(large)
-      setSegments((prev) =>
-        splitForReducer(prev, targetId, dropPoint, kind, large, small),
-      )
+      setSegments((prev) => {
+        const target = prev.find((s) => s.id === targetId)
+        const originalCenter = target?.centerLength
+        const { segments: next, newId } = splitForReducer(
+          prev,
+          targetId,
+          dropPoint,
+          kind,
+          large,
+          small,
+        )
+        if (!newId) return next
+        // 新しくできた区間(レジューサー〜隣の継手側)は、既定で「継手直結(0mm)」に
+        // なる芯々寸法を自動設定する（レジューサーと隣の継手が突き合わせという
+        // 最も一般的なケースを既定値にする。間に配管を入れたい場合は芯々寸法を
+        // 増やせばよい）。上流側には、元の芯々寸法からその分を差し引いた残りを
+        // 引き継ぎ、分割前に入力していた全体の実測値を保つ。
+        const effTmp = computeEffective(next)
+        const cutTmp = computeAllCut(
+          next,
+          effTmp,
+          defaults.roundMode ?? 'round',
+          defaults.flangeAllow ?? 0,
+          defaults.gasketOn ? (defaults.gasketMm ?? 0) : 0,
+        )
+        const round1 = (x: number) => Math.round(x * 10) / 10
+        const bAllow =
+          (cutTmp[newId]?.startAllow ?? 0) + (cutTmp[newId]?.endAllow ?? 0)
+        return next.map((s) => {
+          if (s.id === newId) return { ...s, centerLength: round1(bAllow) }
+          if (s.id === targetId && originalCenter != null)
+            return { ...s, centerLength: round1(originalCenter - bAllow) }
+          return s
+        })
+      })
     }
     // 分割後は選択状態をリセット（前後が別データになるため）
     setSelectedId(null)
