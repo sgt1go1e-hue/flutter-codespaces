@@ -114,8 +114,15 @@ function splitForReducer(
 ): { segments: Segment[]; newId?: string } {
   const target = segments.find((s) => s.id === targetId)
   if (!target) return { segments }
-  const { point: P, t } = projectOnSegment(dropPoint, target.start, target.end)
-  if (t < 0.02 || t > 0.98) return { segments } // 端に寄りすぎは無視
+  // 隣の継手のすぐ際へ置きたいことが多いため、端に寄った位置は弾かず、
+  // 安全な最小マージンへスナップする（ピクセル単位で狙わなくても確実に置ける）。
+  const { t: rawT } = projectOnSegment(dropPoint, target.start, target.end)
+  const MARGIN = 0.03
+  const t = Math.min(1 - MARGIN, Math.max(MARGIN, rawT))
+  const P: Point = {
+    x: target.start.x + t * (target.end.x - target.start.x),
+    y: target.start.y + t * (target.end.y - target.start.y),
+  }
 
   const bId = makeId()
   const A: Segment = { ...target, end: P }
@@ -210,6 +217,22 @@ export default function App() {
 
   const stageRef = useRef<HTMLElement>(null)
 
+  // 「元に戻す」の履歴。配列の並び順に依存せず、作図・パーツ配置・削除等の
+  // 構造的な操作を行った直前の状態を積んでおき、常に本当に最後に行った操作から
+  // 正しい順序で戻せるようにする（segments配列の末尾要素を消すだけの実装だと、
+  // レジューサー等の分割で配列の途中に挿入された場合に無関係な要素が消えてしまう）。
+  const [history, setHistory] = useState<Segment[][]>([])
+  function mutateSegments(updater: (prev: Segment[]) => Segment[]) {
+    // setSegments の更新関数の中で setHistory を呼ぶと、React 18 の
+    // StrictMode(開発時)がその更新関数を2回呼ぶ影響で履歴が二重に積まれて
+    // しまうため、setHistory/setSegments は互いに独立した通常の呼び出しにする。
+    const next = updater(segments)
+    if (next !== segments) {
+      setHistory((h) => [...h, segments].slice(-50))
+      setSegments(next)
+    }
+  }
+
   // ツールバーが横スクロール可能なとき、右端に「まだ続きがある」ヒントを出す
   // （初見でも「集計・拾い出し」等がスクロール先にあると気づけるように）。
   const toolsRef = useRef<HTMLDivElement>(null)
@@ -252,6 +275,7 @@ export default function App() {
   }, [segments, drawingId])
 
   function createNewDrawing() {
+    setHistory([])
     setDrawingId(makeDrawingId())
     setSegments([])
     setSelectedId(null)
@@ -259,6 +283,7 @@ export default function App() {
   }
 
   function openDrawing(id: string) {
+    setHistory([])
     setDrawingId(id)
     setSegments(loadDrawingSegments(id))
     setSelectedId(null)
@@ -334,7 +359,7 @@ export default function App() {
       if (defaults.size) applied.size = defaults.size
     }
     // 追加後、分岐点で貫通している本管を自動分割（奥側を独立して寸法入力可能に）
-    setSegments((prev) => normalizeBranchSplits([...prev, applied], makeId))
+    mutateSegments((prev) => normalizeBranchSplits([...prev, applied], makeId))
   }
 
   // 作図設定（defaults）の更新。管種変更時はサイズ整合をとる。
@@ -378,20 +403,23 @@ export default function App() {
   function deleteSelected() {
     if (!selectedId) return
     if (confirm('このセグメントを削除しますか？')) {
-      setSegments((prev) => prev.filter((s) => s.id !== selectedId))
+      mutateSegments((prev) => prev.filter((s) => s.id !== selectedId))
     }
     closeSelection()
   }
 
   function undo() {
-    setSegments((prev) => prev.slice(0, -1))
+    if (history.length === 0) return
+    const prevState = history[history.length - 1]
+    setHistory((h) => h.slice(0, -1))
+    setSegments(prevState)
     closeSelection()
   }
 
   function clearAll() {
     if (segments.length === 0) return
     if (confirm('図面をすべて消去しますか？')) {
-      setSegments([])
+      mutateSegments(() => [])
       closeSelection()
     }
   }
@@ -421,15 +449,15 @@ export default function App() {
     const dropPoint = p
     if (part.action.type === 'flange') {
       if (part.action.flange === 'double') {
-        setSegments((prev) => splitForDoubleFlange(prev, targetId, dropPoint))
+        mutateSegments((prev) => splitForDoubleFlange(prev, targetId, dropPoint))
       } else {
-        setSegments((prev) => markSingleFlange(prev, targetId, dropPoint))
+        mutateSegments((prev) => markSingleFlange(prev, targetId, dropPoint))
       }
     } else if (part.action.type === 'reducer') {
       const kind = part.action.reducer
       const large = effectiveById[targetId]?.size
       const small = nextSmallerSize(large)
-      setSegments((prev) => {
+      mutateSegments((prev) => {
         const target = prev.find((s) => s.id === targetId)
         const originalCenter = target?.centerLength
         const { segments: next, newId } = splitForReducer(
@@ -509,7 +537,7 @@ export default function App() {
           <div className="tools" ref={toolsRef}>
             <button onClick={createNewDrawing}>新規作成</button>
             <button onClick={goToLauncher}>過去の図面</button>
-            <button onClick={undo} disabled={segments.length === 0}>
+            <button onClick={undo} disabled={history.length === 0}>
               元に戻す
             </button>
             <button onClick={clearAll} disabled={segments.length === 0}>
