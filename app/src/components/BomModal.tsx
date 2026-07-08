@@ -1,4 +1,5 @@
 import { Fragment } from 'react'
+import { createPortal } from 'react-dom'
 import { bomToCsv, type Bom } from '../lib/bom'
 import { PrintIsometric } from './PrintIsometric'
 import type { Segment } from '../types'
@@ -57,6 +58,7 @@ export function BomModal({
   })
 
   return (
+    <>
     <div className="disclaimer-overlay" onClick={onClose}>
       <div className="bom-card" onClick={(e) => e.stopPropagation()}>
         <div className="disclaimer-header">材料集計（BOM）</div>
@@ -156,8 +158,13 @@ export function BomModal({
           </button>
         </div>
       </div>
+    </div>
 
-      {/* 印刷専用レイアウト。画面には出さず、印刷/PDF化(window.print)のときだけ表示する。 */}
+    {/* 印刷専用レイアウト。position:fixed のモーダル(disclaimer-overlay)の中に
+        置くと、印刷時にその祖先のfixed配置(=1ページ分の高さに固定)へ引きずられて
+        2ページ目以降が印刷されなくなるため、body直下へ portal で逃がす。
+        画面には出さず、印刷/PDF化(window.print)のときだけ表示する。 */}
+    {createPortal(
       <div className="bom-print-only">
         <h1>配管アイソメ図 材料集計表</h1>
         <p className="print-meta">作成日: {dateStr}</p>
@@ -261,7 +268,9 @@ export function BomModal({
             </table>
           </>
         )}
-      </div>
-    </div>
+      </div>,
+      document.body,
+    )}
+    </>
   )
 }

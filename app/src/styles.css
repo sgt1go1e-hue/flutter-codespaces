@@ -852,19 +852,26 @@ body {
 }
 
 @media print {
-  body * {
-    visibility: hidden;
+  @page {
+    size: A4;
+    margin: 12mm;
   }
-  .bom-print-only,
-  .bom-print-only * {
-    visibility: visible;
+  /* アプリ本体(#root)は fixed/absolute配置と 100vh 固定+overflow:hidden の
+     1画面レイアウトなので、これを印刷対象に含めると1ページ分の高さで
+     切り取られてしまう。印刷時は#root自体を非表示にし、.bom-print-only は
+     body直下(portal)の通常フロー要素として実寸の高さで複数ページに正しく
+     分割されるようにする。 */
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+  }
+  #root {
+    display: none !important;
   }
   .bom-print-only {
     display: block;
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
+    position: static;
     background: #fff;
     color: #111;
     padding: 16px;
@@ -879,6 +886,8 @@ body {
     margin: 18px 0 6px;
     border-bottom: 1px solid #999;
     padding-bottom: 2px;
+    break-after: avoid;
+    page-break-after: avoid;
   }
   .bom-print-only .print-meta {
     font-size: 11px;
@@ -889,6 +898,13 @@ body {
     width: 100%;
     border-collapse: collapse;
     margin-bottom: 8px;
+  }
+  .bom-print-only thead {
+    display: table-header-group;
+  }
+  .bom-print-only tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   .bom-print-only th,
   .bom-print-only td {
@@ -904,6 +920,8 @@ body {
   .bom-print-only .print-iso-wrap {
     page-break-after: always;
     break-after: page;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
   .print-iso-svg {
     width: 100%;
