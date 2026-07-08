@@ -28,6 +28,8 @@ function roleLabel(role: string): string {
       return '直管'
     case 'elbow':
       return 'エルボ'
+    case 'elbow-reducer':
+      return 'エルボ＋レジューサー'
     case 'reducer':
       return 'レジューサー'
     case 'tee-run':

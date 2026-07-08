@@ -305,8 +305,12 @@ export function PrintIsometric({
                 cutById[s.id]?.eccentric?.align,
                 cutById[s.id]?.reducerLargeAtStart ?? true,
               )}
-            {cutById[s.id]?.startRole === 'tee-run-reducer' && reducerAtEnd(s, 'start')}
-            {cutById[s.id]?.endRole === 'tee-run-reducer' && reducerAtEnd(s, 'end')}
+            {(cutById[s.id]?.startRole === 'tee-run-reducer' ||
+              cutById[s.id]?.startRole === 'elbow-reducer') &&
+              reducerAtEnd(s, 'start')}
+            {(cutById[s.id]?.endRole === 'tee-run-reducer' ||
+              cutById[s.id]?.endRole === 'elbow-reducer') &&
+              reducerAtEnd(s, 'end')}
             {eff?.showSizeLabel &&
               eff.size &&
               cutById[s.id]?.startConnected &&

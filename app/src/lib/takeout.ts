@@ -21,6 +21,7 @@ export type EndRole =
   | 'free' // 接続なし（芯出し基準）
   | 'straight' // 直管接続（同径・一直線）
   | 'elbow'
+  | 'elbow-reducer' // エルボの直後に突き合わせ(継手直結)のレジューサーが続く場合、まとめて1つの取り出しとして扱う
   | 'reducer'
   | 'tee-run'
   | 'tee-run-reducer' // チーズ(ラン)直後にレジューサーで縮径（ツキ合わせ）
@@ -32,6 +33,8 @@ export interface EndResult {
   mm: number
   /** 参照した継手 id（表示用） */
   fittingId?: string
+  /** elbow-reducer のとき、突き合わせレジューサーの相手径（BOM表示用） */
+  reducerCounterpart?: string
 }
 
 interface Inc {
@@ -256,6 +259,76 @@ export function computeEnds(
       end: resolveEnd(endInc, endNode, effById),
     }
   }
+
+  // 突き合わせ(継手直結のまま)のレジューサーがエルボの直後に続く場合、現場の
+  // 考え方（突き合わせレジューサーは隣の異形パイプの一部）に合わせて、その先の
+  // 取り出し寸法もまとめてエルボ側の取り出し寸法へ折り込む。レジューサー側に
+  // 実際にパイプを足していれば(芯々寸法が突き合わせ既定値より大きい)折り込まない。
+  // レジューサー分割で生じる寸法もサイズも持たない極小の中間区間(透過区間)を
+  // 挟んでいる場合は、そこを透過してレジューサーまでたどる。
+  const isPhantomSeg = (seg: Segment) =>
+    !seg.size && !seg.fitting && seg.centerLength == null
+
+  // 折り込んだ経路上の端は、BOM 集計で二重計上されないよう別途 'straight'
+  // へ差し替える（切り寸法計算に使う mm 値はここでは変えない。抑制のみ最後に適用）。
+  const suppressed = new Set<string>()
+
+  for (const s of segments) {
+    for (const end of ['start', 'end'] as const) {
+      const result = out[s.id][end]
+      if (result.role !== 'elbow') continue
+      const p = end === 'start' ? s.start : s.end
+      const node = nodeAt(p)
+      let nb = node.incs.find((i) => i.seg.id !== s.id)
+      const visited = new Set<string>([s.id])
+      const path: string[] = []
+      let found: Inc | undefined
+      while (nb) {
+        if (visited.has(nb.seg.id)) break
+        visited.add(nb.seg.id)
+        // このセグメントにレジューサーの継手が付いていても、今たどり着いた側の
+        // 端が実際にサイズの変わる直線接続(role:'reducer')でなければ、単なる
+        // 反対側のエルボ(同径)なので折り込み対象にしない。
+        if (out[nb.seg.id]?.[nb.end]?.role === 'reducer') {
+          found = nb
+          path.push(`${nb.seg.id}:${nb.end}`)
+          break
+        }
+        if (!isPhantomSeg(nb.seg)) break
+        // 透過区間自体は継手を持たないため、両端ともBOMでは対象外にする
+        path.push(`${nb.seg.id}:start`, `${nb.seg.id}:end`)
+        const farEnd = nb.end === 'start' ? 'end' : 'start'
+        const farPoint = farEnd === 'start' ? nb.seg.start : nb.seg.end
+        const farNode = nodeAt(farPoint)
+        const farOthers = farNode.incs.filter((i) => i.seg.id !== nb!.seg.id)
+        nb = farOthers.length === 1 ? farOthers[0] : undefined
+      }
+      if (!found) continue
+      const nbEnds = out[found.seg.id]
+      if (!nbEnds) continue
+      const nbOwnMm = nbEnds.start.mm + nbEnds.end.mm
+      const nbCenter = found.seg.centerLength
+      const stillDefault = nbCenter == null || Math.abs(nbCenter - nbOwnMm) < 0.6
+      if (!stillDefault) continue
+      out[s.id][end] = {
+        ...result,
+        role: 'elbow-reducer',
+        mm: result.mm + nbOwnMm,
+        reducerCounterpart: found.size,
+      }
+      for (const key of path) suppressed.add(key)
+    }
+  }
+
+  for (const key of suppressed) {
+    const sep = key.lastIndexOf(':')
+    const segId = key.slice(0, sep)
+    const end = key.slice(sep + 1) as 'start' | 'end'
+    if (out[segId]?.[end]) {
+      out[segId][end] = { ...out[segId][end], role: 'straight' }
+    }
+  }
+
   return out
 }
 

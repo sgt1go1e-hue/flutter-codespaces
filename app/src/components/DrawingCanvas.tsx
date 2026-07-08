@@ -637,10 +637,12 @@ export function DrawingCanvas({
                 cutById[s.id]?.eccentric?.align,
                 cutById[s.id]?.reducerLargeAtStart ?? true,
               )}
-            {/* チーズ横のレジューサー記号（径違い＝ツキ合わせ0mmでチーズ直結） */}
-            {cutById[s.id]?.startRole === 'tee-run-reducer' &&
+            {/* チーズ／エルボ横のレジューサー記号（径違い＝ツキ合わせ0mmで継手に直結） */}
+            {(cutById[s.id]?.startRole === 'tee-run-reducer' ||
+              cutById[s.id]?.startRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'start')}
-            {cutById[s.id]?.endRole === 'tee-run-reducer' &&
+            {(cutById[s.id]?.endRole === 'tee-run-reducer' ||
+              cutById[s.id]?.endRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'end')}
             {/* 中間の径変化のみ、線上に1箇所表示（両端フリーでない内部区間だけ。
                 フリー端がある区間は末端ラベルで表示するので重複させない）。 */}

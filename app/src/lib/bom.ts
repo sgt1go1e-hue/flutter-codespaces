@@ -161,6 +161,12 @@ export function computeBom(
         if (e.role === 'tee-run-reducer')
           addFit('reducer_concentric', pairLabel(runSize, e.size))
       }
+    } else if (roles.includes('elbow-reducer')) {
+      // エルボ直後の突き合わせレジューサー（区間は分けず、取り出し寸法だけ
+      // 隣のエルボ側へ折り込んでいる）。エルボ本体とレジューサーを別々に計上する。
+      const e = cl.find((x) => x.role === 'elbow-reducer')!
+      addFit(e.fittingId ?? 'elbow90_long', `${e.size ?? '?'}`)
+      if (e.reducerCounterpart) addFit('reducer_concentric', pairLabel(e.size, e.reducerCounterpart))
     } else if (roles.includes('elbow')) {
       const e = cl.find((x) => x.role === 'elbow')!
       addFit(e.fittingId ?? 'elbow90_long', `${e.size ?? '?'}`)
