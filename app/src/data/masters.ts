@@ -112,6 +112,26 @@ export function nextSmallerSize(code?: string): string | undefined {
   return code
 }
 
+/**
+ * レジューサーを置くときの既定の小径を返す。呼び径の並び上「1段小さい」
+ * サイズ（nextSmallerSize）は、実際のレジューサー規格には存在しない組み合わせ
+ * のことがある（例: 100A→90A は規格に無い）。その場合、取り出し寸法(H)が
+ * 0として扱われてしまい、芯々寸法の自動計算が壊れる。そのため、レジューサー
+ * の実カタログ(fittings.json)に実在する組み合わせのうち、最も大径寄り
+ * （＝最も一般的な1段落とし）の小径を優先して選ぶ。
+ */
+export function nextReducerSize(largeCode?: string): string | undefined {
+  const largeN = nominalOf(largeCode)
+  if (largeN == null) return nextSmallerSize(largeCode)
+  const dims = getFitting('reducer_concentric')?.dims ?? {}
+  let best: number | undefined
+  for (const key of Object.keys(dims)) {
+    const [l, s] = key.split('_').map(Number)
+    if (l === largeN && (best == null || s > best)) best = s
+  }
+  return best != null ? `${best}A` : nextSmallerSize(largeCode)
+}
+
 /** レジューサーの大径_小径キー（2つの呼び径コードから、大→小の順で組む） */
 export function reducerKey(sizeCodeA?: string, sizeCodeB?: string): string | undefined {
   const a = nominalOf(sizeCodeA)

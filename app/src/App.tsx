@@ -32,7 +32,7 @@ import {
   inheritedSize,
 } from './lib/inheritance'
 import { getPart } from './data/parts'
-import { sizesForPipeType, nextSmallerSize } from './data/masters'
+import { sizesForPipeType, nextReducerSize } from './data/masters'
 import type { Segment } from './types'
 
 // パーツをドロップしたとき、対象セグメントを拾うヒット距離(px)
@@ -125,7 +125,11 @@ function splitForReducer(
   }
 
   const bId = makeId()
-  const A: Segment = { ...target, end: P }
+  // A の新しい終点(P)はレジューサーの内部分割点であり、元のセグメントの
+  // 終点(フランジがあれば付いていた場所)ではないため、endFlangeは引き継がない
+  // （引き継ぐと存在しない場所にフランジが付いたことになってしまう）。
+  // 元の終点はBが引き継ぐので、endFlange・接続方法はBへ渡す。
+  const A: Segment = { ...target, end: P, endFlange: undefined }
   const B: Segment = {
     id: bId,
     start: P,
@@ -135,6 +139,8 @@ function splitForReducer(
     size: smallSize,
     fitting: `reducer_${kind}`,
     reducerSize: largeSize,
+    endFlange: target.endFlange,
+    connection: target.connection,
   }
   const result: Segment[] = []
   for (const s of segments) {
@@ -499,10 +505,12 @@ export default function App() {
     } else if (part.action.type === 'reducer') {
       const kind = part.action.reducer
       const large = effectiveById[targetId]?.size
-      // 反対側(小径側)のサイズは、置いた時点では仮の値(1段小さいサイズ)にして
-      // おき、選択パネルを自動で開いて実際のサイズをすぐ選び直せるようにする
-      // （置いた直後にサイズを選ぶ、という流れの方が迷いにくいため）。
-      const small = nextSmallerSize(large)
+      // 反対側(小径側)のサイズは、置いた時点では仮の値にしておき、選択パネルを
+      // 自動で開いて実際のサイズをすぐ選び直せるようにする（置いた直後に
+      // サイズを選ぶ、という流れの方が迷いにくいため）。仮の値はレジューサー
+      // の実カタログに実在する組み合わせから選ぶ（呼び径の並び上の1段小さい
+      // サイズだと規格に無い組み合わせになり得るため）。
+      const small = nextReducerSize(large)
       const target = segments.find((s) => s.id === targetId)
       const originalCenter = target?.centerLength
       const { segments: next, newId } = splitForReducer(
