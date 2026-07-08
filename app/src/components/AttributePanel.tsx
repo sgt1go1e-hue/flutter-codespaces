@@ -528,7 +528,7 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
       <button className="panel-header" onClick={onToggle}>
         <span className="panel-caret">{open ? '▼' : '▲'}</span>
         <span className="panel-summary">
-          <span className="sum-mode">次の配管</span>
+          <span className="sum-mode">配管設定</span>
           <b>{pipeShort}</b>
           <b>{defaults.size ?? '未設定'}</b>
           {connectionName && <b>{connectionName}</b>}
