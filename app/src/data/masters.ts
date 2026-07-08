@@ -76,6 +76,11 @@ export function connectionLabelForSource(source?: string | null): string {
   return '—'
 }
 
+/** セグメントの接続方法(connection)からフランジの品名を決める。ねじ込み以外は溶接フランジ扱い */
+export function flangeLabelForConnection(connection?: string): string {
+  return connection === 'thread' ? 'ねじ込みフランジ' : '溶接フランジ'
+}
+
 // --- 参照ヘルパー ---
 export function getPipeType(id?: string): PipeType | undefined {
   return pipeTypes.find((p) => p.id === id)

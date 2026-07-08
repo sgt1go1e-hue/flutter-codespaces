@@ -8,6 +8,7 @@ import {
   getPipeType,
   nominalOf,
   connectionLabelForSource,
+  flangeLabelForConnection,
 } from '../data/masters'
 
 // BOM(部品表)の行
@@ -173,20 +174,22 @@ export function computeBom(
   }
 
   // --- フランジ ---
-  // 材料としては片/両を区別せず「フランジ」で呼び径ごとに集計する。
+  // 材料としては片/両を区別せず、品名(溶接フランジ/ねじ込みフランジ)と呼び径ごとに集計する。
   const flangeMap = new Map<string, FlangeRow>()
-  const addFlange = (size: string) => {
-    let row = flangeMap.get(size)
+  const addFlange = (size: string, label: string) => {
+    const key = `${label}|${size}`
+    let row = flangeMap.get(key)
     if (!row) {
-      row = { label: 'フランジ', size, count: 0, connection: 'フランジ接合' }
-      flangeMap.set(size, row)
+      row = { label, size, count: 0, connection: 'フランジ接合' }
+      flangeMap.set(key, row)
     }
     row.count += 1
   }
   for (const s of segments) {
     const size = effById[s.id]?.size ?? '?'
-    if (s.startFlange) addFlange(size)
-    if (s.endFlange) addFlange(size)
+    const label = flangeLabelForConnection(s.connection)
+    if (s.startFlange) addFlange(size, label)
+    if (s.endFlange) addFlange(size, label)
   }
 
   // 呼び径の大きい順・種類順に並べて返す
@@ -198,7 +201,9 @@ export function computeBom(
       (a, b) =>
         a.fittingId.localeCompare(b.fittingId) || byNomDesc(a.size, b.size),
     ),
-    flanges: [...flangeMap.values()].sort((a, b) => byNomDesc(a.size, b.size)),
+    flanges: [...flangeMap.values()].sort(
+      (a, b) => a.label.localeCompare(b.label) || byNomDesc(a.size, b.size),
+    ),
   }
 }
 
