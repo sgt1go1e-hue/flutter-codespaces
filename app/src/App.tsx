@@ -4,8 +4,17 @@ import { SegmentPanel, DrawSettingsPanel } from './components/AttributePanel'
 import { PartsPalette } from './components/PartsPalette'
 import { DisclaimerModal } from './components/DisclaimerModal'
 import { BomModal } from './components/BomModal'
+import { DrawingLauncher } from './components/DrawingLauncher'
 import { computeBom } from './lib/bom'
 import { useLocalStorage } from './hooks/useLocalStorage'
+import {
+  type DrawingMeta,
+  makeDrawingId,
+  loadDrawingSegments,
+  saveDrawingSegments,
+  saveIndex,
+  migrateLegacyDrawing,
+} from './lib/drawingStore'
 import {
   distanceToSegment,
   projectOnSegment,
@@ -26,7 +35,6 @@ import { getPart } from './data/parts'
 import { sizesForPipeType, nextSmallerSize } from './data/masters'
 import type { Segment } from './types'
 
-const STORAGE_KEY = 'piping-iso:segments'
 // パーツをドロップしたとき、対象セグメントを拾うヒット距離(px)
 const DROP_HIT = 28
 // 免責事項の版。文面を更新して再同意を求めたい場合はこの数値を上げる。
@@ -157,7 +165,14 @@ function markSingleFlange(
 }
 
 export default function App() {
-  const [segments, setSegments] = useLocalStorage<Segment[]>(STORAGE_KEY, [])
+  // 起動時は必ず「新規作成／過去の図面」を選ぶ画面から始める。
+  // 図面は名前を付けず自動保存され、複数を切り替えて管理できる。
+  const [screen, setScreen] = useState<'launcher' | 'drawing'>('launcher')
+  const [drawingIndex, setDrawingIndex] = useState<DrawingMeta[]>(() =>
+    migrateLegacyDrawing(),
+  )
+  const [drawingId, setDrawingId] = useState<string | null>(null)
+  const [segments, setSegments] = useState<Segment[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 「作図設定」バーの開閉（寸法入力とは独立。既定は畳んだ状態で割り込まない）
   const [settingsOpen, setSettingsOpen] = useState(false)
@@ -193,6 +208,46 @@ export default function App() {
   } | null>(null)
 
   const stageRef = useRef<HTMLElement>(null)
+
+  // 開いている図面を自動保存し、一覧の更新日時・セグメント数を更新する。
+  // 新規作成直後、まだ何も描いていない図面は一覧を汚さないよう登録を見送る。
+  useEffect(() => {
+    if (!drawingId) return
+    saveDrawingSegments(drawingId, segments)
+    setDrawingIndex((prev) => {
+      const now = Date.now()
+      const exists = prev.some((m) => m.id === drawingId)
+      if (!exists && segments.length === 0) return prev
+      const next = exists
+        ? prev.map((m) =>
+            m.id === drawingId
+              ? { ...m, updatedAt: now, segCount: segments.length }
+              : m,
+          )
+        : [...prev, { id: drawingId, createdAt: now, updatedAt: now, segCount: segments.length }]
+      saveIndex(next)
+      return next
+    })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [segments, drawingId])
+
+  function createNewDrawing() {
+    setDrawingId(makeDrawingId())
+    setSegments([])
+    setSelectedId(null)
+    setScreen('drawing')
+  }
+
+  function openDrawing(id: string) {
+    setDrawingId(id)
+    setSegments(loadDrawingSegments(id))
+    setSelectedId(null)
+    setScreen('drawing')
+  }
+
+  function goToLauncher() {
+    setScreen('launcher')
+  }
 
   const selected = useMemo(
     () => segments.find((s) => s.id === selectedId) ?? null,
@@ -386,9 +441,21 @@ export default function App() {
 
   return (
     <div className="app">
+      {screen === 'launcher' && (
+        <DrawingLauncher
+          drawings={drawingIndex}
+          onCreate={createNewDrawing}
+          onOpen={openDrawing}
+        />
+      )}
+
+      {screen === 'drawing' && (
+        <>
       <header className="topbar">
         <div className="title">配管アイソメ図</div>
         <div className="tools">
+          <button onClick={createNewDrawing}>新規作成</button>
+          <button onClick={goToLauncher}>過去の図面</button>
           <button onClick={undo} disabled={segments.length === 0}>
             元に戻す
           </button>
@@ -483,8 +550,10 @@ export default function App() {
           onClose={() => setShowBom(false)}
         />
       )}
+        </>
+      )}
 
-      {/* 初回同意（同意するまで他操作をブロック） */}
+      {/* 初回同意（同意するまで他操作をブロック）。画面(launcher/drawing)を問わず表示する。 */}
       {needConsent && (
         <DisclaimerModal mode="consent" onAgree={agreeDisclaimer} />
       )}
