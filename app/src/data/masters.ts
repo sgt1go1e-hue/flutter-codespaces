@@ -67,6 +67,15 @@ export function getConnectionMethod(id?: string): ConnectionMethod | undefined {
   return connectionMethods.find((c) => c.id === id)
 }
 
+/** 継手マスタの source(例: "inoc_SUS304_buttweld")から接続方法(溶接/ねじ込み等)を推定する */
+export function connectionLabelForSource(source?: string | null): string {
+  if (!source) return '—'
+  if (source.includes('buttweld')) return '溶接'
+  if (source.includes('thread')) return 'ねじ込み'
+  if (source.includes('socket')) return '差込（ソケット）'
+  return '—'
+}
+
 // --- 参照ヘルパー ---
 export function getPipeType(id?: string): PipeType | undefined {
   return pipeTypes.find((p) => p.id === id)

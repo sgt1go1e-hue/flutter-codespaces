@@ -1,3 +1,4 @@
+import { Fragment } from 'react'
 import { bomToCsv, type Bom } from '../lib/bom'
 
 interface Props {
@@ -27,6 +28,18 @@ export function BomModal({ bom, onClose }: Props) {
     a.remove()
     URL.revokeObjectURL(url)
   }
+
+  // PDF化: 印刷専用レイアウト(.bom-print-only)だけを表示する印刷スタイルに切り替えて
+  // ブラウザの印刷ダイアログを開く。iPad/iPhoneではその場で「PDFに保存」を選べる。
+  function printAsPdf() {
+    window.print()
+  }
+
+  const dateStr = new Date().toLocaleDateString('ja-JP', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+  })
 
   return (
     <div className="disclaimer-overlay" onClick={onClose}>
@@ -72,6 +85,7 @@ export function BomModal({ bom, onClose }: Props) {
                   <tr>
                     <th>品名</th>
                     <th>呼び径</th>
+                    <th>接続方法</th>
                     <th className="num">数量</th>
                   </tr>
                 </thead>
@@ -80,6 +94,7 @@ export function BomModal({ bom, onClose }: Props) {
                     <tr key={i}>
                       <td>{f.label}</td>
                       <td>{f.size}</td>
+                      <td>{f.connection}</td>
                       <td className="num">{f.count}</td>
                     </tr>
                   ))}
@@ -96,6 +111,7 @@ export function BomModal({ bom, onClose }: Props) {
                   <tr>
                     <th>品名</th>
                     <th>呼び径</th>
+                    <th>接続方法</th>
                     <th className="num">枚数</th>
                   </tr>
                 </thead>
@@ -104,6 +120,7 @@ export function BomModal({ bom, onClose }: Props) {
                     <tr key={i}>
                       <td>{f.label}</td>
                       <td>{f.size}</td>
+                      <td>{f.connection}</td>
                       <td className="num">{f.count}</td>
                     </tr>
                   ))}
@@ -113,6 +130,9 @@ export function BomModal({ bom, onClose }: Props) {
           )}
         </div>
         <div className="bom-actions">
+          <button className="bom-pdf" onClick={printAsPdf} disabled={empty}>
+            PDFで見る
+          </button>
           <button className="bom-csv" onClick={downloadCsv} disabled={empty}>
             CSVダウンロード
           </button>
@@ -120,6 +140,100 @@ export function BomModal({ bom, onClose }: Props) {
             完了
           </button>
         </div>
+      </div>
+
+      {/* 印刷専用レイアウト。画面には出さず、印刷/PDF化(window.print)のときだけ表示する。 */}
+      <div className="bom-print-only">
+        <h1>配管アイソメ図 材料集計表</h1>
+        <p className="print-meta">作成日: {dateStr}</p>
+
+        {bom.pipes.length > 0 && (
+          <>
+            <h2>パイプ（切り寸法明細）</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>管種</th>
+                  <th>呼び径</th>
+                  <th>切り寸法(mm)</th>
+                  <th>本数</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bom.pipes.map((p, i) => (
+                  <Fragment key={i}>
+                    {p.cuts.map((c, j) => (
+                      <tr key={j}>
+                        <td>{p.pipeShort}</td>
+                        <td>{p.size ?? '—'}</td>
+                        <td>{round1(c)}</td>
+                        <td>1</td>
+                      </tr>
+                    ))}
+                    <tr className="print-subtotal">
+                      <td>{p.pipeShort}</td>
+                      <td>{p.size ?? '—'}</td>
+                      <td>小計 {round1(p.totalMm)}</td>
+                      <td>{p.count}</td>
+                    </tr>
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {bom.fittings.length > 0 && (
+          <>
+            <h2>継手</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>品名</th>
+                  <th>呼び径</th>
+                  <th>接続方法</th>
+                  <th>数量</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bom.fittings.map((f, i) => (
+                  <tr key={i}>
+                    <td>{f.label}</td>
+                    <td>{f.size}</td>
+                    <td>{f.connection}</td>
+                    <td>{f.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {bom.flanges.length > 0 && (
+          <>
+            <h2>フランジ</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>品名</th>
+                  <th>呼び径</th>
+                  <th>接続方法</th>
+                  <th>枚数</th>
+                </tr>
+              </thead>
+              <tbody>
+                {bom.flanges.map((f, i) => (
+                  <tr key={i}>
+                    <td>{f.label}</td>
+                    <td>{f.size}</td>
+                    <td>{f.connection}</td>
+                    <td>{f.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
       </div>
     </div>
   )

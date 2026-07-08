@@ -814,6 +814,7 @@ body {
 .bom-actions {
   flex-shrink: 0;
   display: flex;
+  flex-wrap: wrap;
   gap: 10px;
   padding: 14px 16px;
   border-top: 1px solid #334155;
@@ -821,6 +822,7 @@ body {
 
 .bom-actions button {
   flex: 1;
+  min-width: 100px;
   border: none;
   border-radius: 10px;
   padding: 14px;
@@ -834,8 +836,71 @@ body {
   color: #04222e;
 }
 
-.bom-csv:disabled {
+.bom-pdf {
+  background: #a78bfa;
+  color: #1e1b3a;
+}
+
+.bom-csv:disabled,
+.bom-pdf:disabled {
   opacity: 0.4;
+}
+
+/* 印刷専用レイアウト。画面表示では隠しておき、印刷/PDF化のときだけ表示する。 */
+.bom-print-only {
+  display: none;
+}
+
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .bom-print-only,
+  .bom-print-only * {
+    visibility: visible;
+  }
+  .bom-print-only {
+    display: block;
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    background: #fff;
+    color: #111;
+    padding: 16px;
+    font-family: sans-serif;
+  }
+  .bom-print-only h1 {
+    font-size: 18px;
+    margin: 0 0 4px;
+  }
+  .bom-print-only h2 {
+    font-size: 14px;
+    margin: 18px 0 6px;
+    border-bottom: 1px solid #999;
+    padding-bottom: 2px;
+  }
+  .bom-print-only .print-meta {
+    font-size: 11px;
+    color: #555;
+    margin: 0 0 10px;
+  }
+  .bom-print-only table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-bottom: 8px;
+  }
+  .bom-print-only th,
+  .bom-print-only td {
+    border: 1px solid #888;
+    padding: 4px 8px;
+    font-size: 12px;
+    text-align: left;
+  }
+  .bom-print-only tr.print-subtotal td {
+    font-weight: 700;
+    background: #f0f0f0;
+  }
 }
 
 /* ドラッグ中に指へ追従する ghost */

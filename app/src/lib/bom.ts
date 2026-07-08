@@ -3,7 +3,12 @@ import type { Effective } from './inheritance'
 import type { CutResult } from './cutlength'
 import { computeEnds, type EndRole, type EndResult } from './takeout'
 import { samePoint } from './isometric'
-import { getFitting, getPipeType, nominalOf } from '../data/masters'
+import {
+  getFitting,
+  getPipeType,
+  nominalOf,
+  connectionLabelForSource,
+} from '../data/masters'
 
 // BOM(部品表)の行
 export interface PipeRow {
@@ -19,11 +24,15 @@ export interface FittingRow {
   label: string
   size: string // "100A" or "100A×50A"
   count: number
+  /** 接続方法(溶接/ねじ込み/差込等)。継手マスタのsourceから推定。 */
+  connection: string
 }
 export interface FlangeRow {
   label: string
   size: string
   count: number
+  /** 接続方法。フランジは常に「フランジ接合」。 */
+  connection: string
 }
 export interface Bom {
   pipes: PipeRow[]
@@ -112,7 +121,13 @@ export function computeBom(
     const key = `${fittingId}|${size}`
     let row = fitMap.get(key)
     if (!row) {
-      row = { fittingId, label: fittingLabel(fittingId), size, count: 0 }
+      row = {
+        fittingId,
+        label: fittingLabel(fittingId),
+        size,
+        count: 0,
+        connection: connectionLabelForSource(getFitting(fittingId)?.source),
+      }
       fitMap.set(key, row)
     }
     row.count += 1
@@ -163,7 +178,7 @@ export function computeBom(
   const addFlange = (size: string) => {
     let row = flangeMap.get(size)
     if (!row) {
-      row = { label: 'フランジ', size, count: 0 }
+      row = { label: 'フランジ', size, count: 0, connection: 'フランジ接合' }
       flangeMap.set(size, row)
     }
     row.count += 1
@@ -195,26 +210,27 @@ const round1 = (x: number) => Math.round(x * 10) / 10
  */
 export function bomToCsv(bom: Bom): string {
   const rows: string[][] = []
-  rows.push(['区分', '品名', '呼び径', '切り寸法(mm)', '数量'])
+  rows.push(['区分', '品名', '呼び径', '接続方法', '切り寸法(mm)', '数量'])
   for (const p of bom.pipes) {
     // 1本ごとの明細（切る寸法）
     for (const cut of p.cuts) {
-      rows.push(['パイプ', p.pipeShort, p.size ?? '', String(round1(cut)), '1'])
+      rows.push(['パイプ', p.pipeShort, p.size ?? '', '', String(round1(cut)), '1'])
     }
     // サイズ別の小計
     rows.push([
       'パイプ小計',
       p.pipeShort,
       p.size ?? '',
+      '',
       String(round1(p.totalMm)),
       String(p.count),
     ])
   }
   for (const f of bom.fittings) {
-    rows.push(['継手', f.label, f.size, '', String(f.count)])
+    rows.push(['継手', f.label, f.size, f.connection, '', String(f.count)])
   }
   for (const f of bom.flanges) {
-    rows.push(['フランジ', f.label, f.size, '', String(f.count)])
+    rows.push(['フランジ', f.label, f.size, f.connection, '', String(f.count)])
   }
   return rows
     .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(','))
