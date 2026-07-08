@@ -7,6 +7,7 @@ import {
   latticeStep,
   projectOnSegment,
   snapEndFromStart,
+  snapToEndpoints,
   snapToLattice,
 } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
@@ -188,9 +189,19 @@ export function DrawingCanvas({
     return best
   }
 
-  // 描画開始点のスナップ。既存線の近くなら、その線上の格子点へ吸着して
-  // 分岐（チーズ）が確実に接続するようにする。それ以外は通常の格子スナップ。
+  // 描画開始点のスナップ。既存の端点(セグメントの始点・終点)が近ければ最優先で
+  // そこへ厳密に吸着する（見た目はつながっているのに実は接続していない、と
+  // いう事故を防ぐため）。しきい値は画面上の見た目の距離を一定に保つよう
+  // ズーム倍率で補正する。端点が無ければ、既存線の近くならその線上の格子点へ
+  // 吸着して分岐（チーズ）が確実に接続するようにする。それ以外は通常の格子スナップ。
   function snapStart(raw: Point): Point {
+    const endpoints: Point[] = []
+    for (const s of segments) {
+      endpoints.push(s.start, s.end)
+    }
+    const toEndpoint = snapToEndpoints(raw, endpoints, START_SNAP / view.scale)
+    if (toEndpoint !== raw) return toEndpoint
+
     const global = snapToLattice(raw, GRID_GAP)
     // すでにいずれかの線上に乗っていればそのまま
     for (const s of segments) {
@@ -198,7 +209,7 @@ export function DrawingCanvas({
     }
     // 近くの線を探し、その線上の最寄り格子点へ
     let best: Segment | null = null
-    let bestDist = START_SNAP
+    let bestDist = START_SNAP / view.scale
     for (const s of segments) {
       const d = distanceToSegment(raw, s.start, s.end)
       if (d < bestDist) {
