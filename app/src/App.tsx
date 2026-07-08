@@ -12,6 +12,7 @@ import {
   makeDrawingId,
   loadDrawingSegments,
   saveDrawingSegments,
+  deleteDrawingSegments,
   saveIndex,
   migrateLegacyDrawing,
 } from './lib/drawingStore'
@@ -314,6 +315,35 @@ export default function App() {
     setScreen('launcher')
   }
 
+  function renameDrawing(id: string, currentName: string) {
+    const input = window.prompt(
+      '図面の名前を入力してください（空にすると未設定に戻ります）',
+      currentName,
+    )
+    if (input === null) return
+    const name = input.trim()
+    setDrawingIndex((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, name: name || undefined } : m))
+      saveIndex(next)
+      return next
+    })
+  }
+
+  function deleteDrawing(id: string) {
+    if (!window.confirm('この図面を削除しますか？元に戻せません。')) return
+    setDrawingIndex((prev) => {
+      const next = prev.filter((m) => m.id !== id)
+      saveIndex(next)
+      return next
+    })
+    deleteDrawingSegments(id)
+    if (drawingId === id) {
+      setDrawingId(null)
+      setSegments([])
+      setHistory([])
+    }
+  }
+
   const selected = useMemo(
     () => segments.find((s) => s.id === selectedId) ?? null,
     [segments, selectedId],
@@ -576,6 +606,8 @@ export default function App() {
           drawings={drawingIndex}
           onCreate={createNewDrawing}
           onOpen={openDrawing}
+          onRename={renameDrawing}
+          onDelete={deleteDrawing}
         />
       )}
 

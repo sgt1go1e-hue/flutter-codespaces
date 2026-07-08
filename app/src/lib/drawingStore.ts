@@ -8,6 +8,8 @@ export interface DrawingMeta {
   createdAt: number
   updatedAt: number
   segCount: number
+  /** ユーザーが付けた任意の名前。未設定なら一覧では更新日時を表示する。 */
+  name?: string
 }
 
 const INDEX_KEY = 'piping-iso:index'
@@ -50,6 +52,15 @@ export function saveDrawingSegments(id: string, segments: Segment[]) {
     localStorage.setItem(drawingKey(id), JSON.stringify(segments))
   } catch {
     // 保存失敗（容量超過など）は無視する
+  }
+}
+
+/** 図面本体のストレージを削除する（一覧(index)からの削除は呼び出し側で行う）。 */
+export function deleteDrawingSegments(id: string) {
+  try {
+    localStorage.removeItem(drawingKey(id))
+  } catch {
+    // 削除失敗は無視する
   }
 }
 
