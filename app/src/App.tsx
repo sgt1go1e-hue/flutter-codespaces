@@ -209,6 +209,25 @@ export default function App() {
 
   const stageRef = useRef<HTMLElement>(null)
 
+  // ツールバーが横スクロール可能なとき、右端に「まだ続きがある」ヒントを出す
+  // （初見でも「集計・拾い出し」等がスクロール先にあると気づけるように）。
+  const toolsRef = useRef<HTMLDivElement>(null)
+  const [toolsOverflow, setToolsOverflow] = useState(false)
+  useEffect(() => {
+    const el = toolsRef.current
+    if (!el) return
+    const update = () =>
+      setToolsOverflow(el.scrollWidth - el.scrollLeft - el.clientWidth > 4)
+    update()
+    el.addEventListener('scroll', update)
+    const ro = new ResizeObserver(update)
+    ro.observe(el)
+    return () => {
+      el.removeEventListener('scroll', update)
+      ro.disconnect()
+    }
+  }, [screen])
+
   // 開いている図面を自動保存し、一覧の更新日時・セグメント数を更新する。
   // 新規作成直後、まだ何も描いていない図面は一覧を汚さないよう登録を見送る。
   useEffect(() => {
@@ -453,23 +472,28 @@ export default function App() {
         <>
       <header className="topbar">
         <div className="title">配管アイソメ図</div>
-        <div className="tools">
-          <button onClick={createNewDrawing}>新規作成</button>
-          <button onClick={goToLauncher}>過去の図面</button>
-          <button onClick={undo} disabled={segments.length === 0}>
-            元に戻す
-          </button>
-          <button onClick={clearAll} disabled={segments.length === 0}>
-            全消去
-          </button>
-          <button
-            className="primary"
-            onClick={() => setShowBom(true)}
-            disabled={segments.length === 0}
-          >
-            集計・拾い出し
-          </button>
-          <button onClick={() => setReviewDisclaimer(true)}>免責</button>
+        <div className={`tools-wrap${toolsOverflow ? ' has-more' : ''}`}>
+          <div className="tools" ref={toolsRef}>
+            <button onClick={createNewDrawing}>新規作成</button>
+            <button onClick={goToLauncher}>過去の図面</button>
+            <button onClick={undo} disabled={segments.length === 0}>
+              元に戻す
+            </button>
+            <button onClick={clearAll} disabled={segments.length === 0}>
+              全消去
+            </button>
+            <button
+              className="primary"
+              onClick={() => setShowBom(true)}
+              disabled={segments.length === 0}
+            >
+              集計・拾い出し
+            </button>
+            <button onClick={() => setReviewDisclaimer(true)}>免責</button>
+          </div>
+          <span className="tools-scroll-hint" aria-hidden="true">
+            ›
+          </span>
         </div>
       </header>
 

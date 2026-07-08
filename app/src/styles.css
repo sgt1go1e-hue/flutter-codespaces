@@ -127,11 +127,35 @@ body {
   flex-shrink: 0;
 }
 
+/* ツールバーの横スクロール領域＋「まだ続きがある」ヒント表示用の外枠 */
+.tools-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
 .tools {
   display: flex;
   gap: 8px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
+  /* スクロールバーを白っぽく・見やすく（Firefox / Android Chrome等） */
+  scrollbar-width: thin;
+  scrollbar-color: rgba(226, 232, 240, 0.7) transparent;
+}
+
+.tools::-webkit-scrollbar {
+  height: 5px;
+}
+
+.tools::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tools::-webkit-scrollbar-thumb {
+  background: rgba(226, 232, 240, 0.75);
+  border-radius: 4px;
 }
 
 .tools button {
@@ -144,6 +168,50 @@ body {
   min-height: 44px;
   white-space: nowrap;
   flex-shrink: 0;
+}
+
+/* 右端がスクロールで隠れているとき、フェードと矢印で「まだ続きがある」と示す。
+   iOS等スクロールバー自体を装飾できない環境でも確実に気づけるようにするため。 */
+.tools-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  background: linear-gradient(to right, transparent, var(--panel) 75%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tools-wrap.has-more::after {
+  opacity: 1;
+}
+
+.tools-scroll-hint {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(241, 245, 249, 0.92);
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tools-wrap.has-more .tools-scroll-hint {
+  opacity: 1;
 }
 
 .tools button:disabled {
