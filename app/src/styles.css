@@ -901,6 +901,16 @@ body {
     font-weight: 700;
     background: #f0f0f0;
   }
+  .bom-print-only .print-iso-wrap {
+    page-break-after: always;
+    break-after: page;
+  }
+  .print-iso-svg {
+    width: 100%;
+    height: 620px;
+    border: 1px solid #999;
+    background: #fff;
+  }
 }
 
 /* ドラッグ中に指へ追従する ghost */

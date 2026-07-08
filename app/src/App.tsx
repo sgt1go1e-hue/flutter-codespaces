@@ -473,7 +473,16 @@ export default function App() {
       </footer>
 
       {/* 材料集計(BOM) */}
-      {showBom && <BomModal bom={bom} onClose={() => setShowBom(false)} />}
+      {showBom && (
+        <BomModal
+          bom={bom}
+          segments={segments}
+          effectiveById={effectiveById}
+          crossoverGaps={crossoverGaps}
+          cutById={cutById}
+          onClose={() => setShowBom(false)}
+        />
+      )}
 
       {/* 初回同意（同意するまで他操作をブロック） */}
       {needConsent && (

@@ -1,14 +1,29 @@
 import { Fragment } from 'react'
 import { bomToCsv, type Bom } from '../lib/bom'
+import { PrintIsometric } from './PrintIsometric'
+import type { Segment } from '../types'
+import type { Effective } from '../lib/inheritance'
+import type { CutResult } from '../lib/cutlength'
 
 interface Props {
   bom: Bom
+  segments: Segment[]
+  effectiveById: Record<string, Effective>
+  crossoverGaps: Record<string, number[]>
+  cutById: Record<string, CutResult>
   onClose: () => void
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
 
-export function BomModal({ bom, onClose }: Props) {
+export function BomModal({
+  bom,
+  segments,
+  effectiveById,
+  crossoverGaps,
+  cutById,
+  onClose,
+}: Props) {
   const empty =
     bom.pipes.length === 0 &&
     bom.fittings.length === 0 &&
@@ -146,6 +161,18 @@ export function BomModal({ bom, onClose }: Props) {
       <div className="bom-print-only">
         <h1>配管アイソメ図 材料集計表</h1>
         <p className="print-meta">作成日: {dateStr}</p>
+
+        {segments.length > 0 && (
+          <div className="print-iso-wrap">
+            <h2>アイソメ図</h2>
+            <PrintIsometric
+              segments={segments}
+              effectiveById={effectiveById}
+              crossoverGaps={crossoverGaps}
+              cutById={cutById}
+            />
+          </div>
+        )}
 
         {bom.pipes.length > 0 && (
           <>
