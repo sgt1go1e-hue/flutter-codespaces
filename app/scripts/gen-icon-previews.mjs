@@ -221,7 +221,69 @@ function drawE(S) {
   return cv.rgba
 }
 
-const variants = { A: drawA, B: drawB, C: drawC, D: drawD, E: drawE }
+// 配管の端に直交する短いティック(フランジ記号)を描く。アプリ本体の
+// flangeMarker と同じ考え方：端点での配管方向に垂直な線分を引く。
+function flangeTick(p, other, S, half = S * 0.09) {
+  const len = Math.hypot(other[0] - p[0], other[1] - p[1]) || 1
+  const ux = (other[0] - p[0]) / len
+  const uy = (other[1] - p[1]) / len
+  const nx = -uy
+  const ny = ux
+  return [
+    [p[0] - nx * half, p[1] - ny * half],
+    [p[0] + nx * half, p[1] + ny * half],
+  ]
+}
+
+// --- F: 3節スプール(エルボ2つ・フランジ端) ---
+// 現場のスプール図(部分詳細図)らしく、アイソメ角で折れ曲がる配管ルートに
+// フランジ端(直交ティック)を付けたモチーフ。
+function drawF(S) {
+  const cv = makeCanvas(S)
+  fillBg(cv)
+  const a = P(S, 0.2, 0.72)
+  const b = P(S, 0.42, 0.58)
+  const c = P(S, 0.42, 0.3)
+  const d = P(S, 0.72, 0.16)
+  const w = S * 0.05
+  strokeSegs(cv, [[a, b], [b, c], [c, d]], w, BLUE)
+  fillCircles(cv, [b, c], S * 0.045, NODE)
+  // 両端にフランジのティック
+  const [f1a, f1b] = flangeTick(a, b, S)
+  const [f2a, f2b] = flangeTick(d, c, S)
+  strokeSegs(cv, [[f1a, f1b], [f2a, f2b]], S * 0.032, NODE)
+  return cv.rgba
+}
+
+// --- G: フランジ付き直管スプール(1本・両端フランジ) ---
+function drawG(S) {
+  const cv = makeCanvas(S)
+  fillBg(cv)
+  const a = P(S, 0.22, 0.66)
+  const b = P(S, 0.78, 0.34)
+  const w = S * 0.06
+  strokeSegs(cv, [[a, b]], w, BLUE)
+  const [f1a, f1b] = flangeTick(a, b, S, S * 0.1)
+  const [f2a, f2b] = flangeTick(b, a, S, S * 0.1)
+  strokeSegs(cv, [[f1a, f1b], [f2a, f2b]], S * 0.035, NODE)
+  return cv.rgba
+}
+
+// --- H: 溶接点付きスプール(エルボ+レジューサー風の径変化) ---
+function drawH(S) {
+  const cv = makeCanvas(S)
+  fillBg(cv)
+  const a = P(S, 0.18, 0.3)
+  const b = P(S, 0.46, 0.46)
+  const c = P(S, 0.46, 0.78)
+  strokeSegs(cv, [[a, b]], S * 0.065, BLUE)
+  strokeSegs(cv, [[b, c]], S * 0.04, BLUE)
+  // 溶接点(小さいアンバーの丸)を継ぎ目に
+  fillCircles(cv, [a, b, c], S * 0.032, AMBER)
+  return cv.rgba
+}
+
+const variants = { A: drawA, B: drawB, C: drawC, D: drawD, E: drawE, F: drawF, G: drawG, H: drawH }
 for (const [key, fn] of Object.entries(variants)) {
   const S = 512
   const rgba = fn(S)
