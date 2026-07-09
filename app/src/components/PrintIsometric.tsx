@@ -88,8 +88,11 @@ export function PrintIsometric({
     for (const s of segments) {
       const c = cutById[s.id]
       if (!c || c.status === 'none') continue
-      const mx = (s.start.x + s.end.x) / 2
-      const my = (s.start.y + s.end.y) / 2
+      let t = 0.5
+      if (!c.startConnected && c.endConnected) t = 0.3
+      else if (c.startConnected && !c.endConnected) t = 0.7
+      const mx = s.start.x + (s.end.x - s.start.x) * t
+      const my = s.start.y + (s.end.y - s.start.y) * t
       const line1 = `${c.mode} ${c.center}`
       const line2 =
         c.status === 'ok'
@@ -390,8 +393,11 @@ export function PrintIsometric({
             {(() => {
               const c = cutById[s.id]
               if (!c || c.status === 'none') return null
-              const mx = (s.start.x + s.end.x) / 2
-              const my = (s.start.y + s.end.y) / 2
+              let t = 0.5
+              if (!c.startConnected && c.endConnected) t = 0.3
+              else if (c.startConnected && !c.endConnected) t = 0.7
+              const mx = s.start.x + (s.end.x - s.start.x) * t
+              const my = s.start.y + (s.end.y - s.start.y) * t
               const resolvedPos = resolvedLabels.get(`dim-${s.id}`)
               const cx = resolvedPos?.cx ?? mx
               const cCenter = resolvedPos?.cy ?? my + 22

@@ -221,6 +221,21 @@ export function SegmentPanel({
             </div>
           </div>
 
+          {/* エルボtoエルボの間隔不足の提案は、スクロールしないと気づけない下部の
+              詳細情報より先に、寸法入力のすぐ下（目に入りやすい位置）に出す。 */}
+          {cut?.status === 'over' && elbowClash && onApplyElbowClash && (
+            <div className="elbow-clash-suggest">
+              <p>
+                {elbowClash.suggestion === 'double45'
+                  ? 'エルボtoエルボの間隔が狭いようです。前後を45°エルボ×2に振り分けると芯々を短縮できます。'
+                  : 'エルボtoエルボの間隔が狭いようです。前後を90°＋45°エルボに振り分けると芯々を短縮できます。'}
+              </p>
+              <button type="button" className="elbow-clash-apply" onClick={onApplyElbowClash}>
+                {elbowClash.suggestion === 'double45' ? '45°エルボ×2に変更' : '90°＋45°エルボに変更'}
+              </button>
+            </div>
+          )}
+
           {/* 切り寸法の丸め（全体設定）。継手の取り出し寸法には適用しない。 */}
           <div className="field round-field">
             <span className="field-label">切り寸法の丸め</span>
@@ -468,18 +483,6 @@ export function SegmentPanel({
           <p className="cut-warn danger">
             継手が収まりません（芯々寸法が不足）。芯々寸法を大きくするか継手を見直してください。
           </p>
-        )}
-        {cut?.status === 'over' && elbowClash && onApplyElbowClash && (
-          <div className="elbow-clash-suggest">
-            <p>
-              {elbowClash.suggestion === 'double45'
-                ? 'エルボtoエルボの間隔が狭いようです。前後を45°エルボ×2に振り分けると芯々を短縮できます。'
-                : 'エルボtoエルボの間隔が狭いようです。前後を90°＋45°エルボに振り分けると芯々を短縮できます。'}
-            </p>
-            <button type="button" className="elbow-clash-apply" onClick={onApplyElbowClash}>
-              {elbowClash.suggestion === 'double45' ? '45°エルボ×2に変更' : '90°＋45°エルボに変更'}
-            </button>
-          </div>
         )}
         {cut?.status === 'zero' && (
           <p className="cut-hint">

@@ -603,6 +603,10 @@ body {
   grid-column: 1 / -1;
 }
 
+.offset-field {
+  grid-column: 1 / -1;
+}
+
 .round-toggle {
   display: flex;
   gap: 8px;
@@ -704,6 +708,7 @@ body {
 
 /* エルボtoエルボの間隔不足時、45°×2 / 90°+45° への振り分け提案 */
 .elbow-clash-suggest {
+  grid-column: 1 / -1;
   margin: 8px 2px 0;
   padding: 10px 12px;
   background: #1e1b0f;

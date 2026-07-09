@@ -368,8 +368,15 @@ export function DrawingCanvas({
     for (const s of segments) {
       const c = cutById[s.id]
       if (!c || c.status === 'none') continue
-      const mx = (s.start.x + s.end.x) / 2
-      const my = (s.start.y + s.end.y) / 2
+      // 既定の基準位置は中点だが、片端がフリー端（開放された空間側）のときは
+      // そちら寄りに置く。中点は他区間との結合部や交差点に近くなりがちで、
+      // 読み取りにくい位置に固定されてしまうことがあったため、より開けている
+      // フリー端側へ寄せておくことで見やすい場所に出やすくする。
+      let t = 0.5
+      if (!c.startConnected && c.endConnected) t = 0.3
+      else if (c.startConnected && !c.endConnected) t = 0.7
+      const mx = s.start.x + (s.end.x - s.start.x) * t
+      const my = s.start.y + (s.end.y - s.start.y) * t
       const line1 = `${c.mode} ${c.center}`
       const line2 =
         c.status === 'ok'
@@ -731,8 +738,11 @@ export function DrawingCanvas({
             {(() => {
               const c = cutById[s.id]
               if (!c || c.status === 'none') return null
-              const mx = (s.start.x + s.end.x) / 2
-              const my = (s.start.y + s.end.y) / 2
+              let t = 0.5
+              if (!c.startConnected && c.endConnected) t = 0.3
+              else if (c.startConnected && !c.endConnected) t = 0.7
+              const mx = s.start.x + (s.end.x - s.start.x) * t
+              const my = s.start.y + (s.end.y - s.start.y) * t
               const resolved = resolvedLabels.get(`dim-${s.id}`)
               const cx = resolved?.cx ?? mx
               const cCenter = resolved?.cy ?? my + 22
