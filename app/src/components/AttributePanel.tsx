@@ -171,8 +171,7 @@ export function SegmentPanel({
             const dimField = (
               <label className="field dim-field" key="dim">
                 <span className="field-label">
-                  芯々寸法(mm)
-                  {isKickSegment && <span className="field-note">斜め管の実寸（トラベル）</span>}
+                  {isKickSegment ? '芯々寸法(自動計算, mm)' : '芯々寸法(mm)'}
                 </span>
                 <input
                   ref={dimRef}
@@ -200,8 +199,7 @@ export function SegmentPanel({
             const offsetField = isKickSegment && (
               <label className="field offset-field" key="offset">
                 <span className="field-label">
-                  オフセット寸法(逃げ, mm)
-                  <span className="field-note">現場で測る横方向の寸法はこちら</span>
+                  逃げ寸法(現場実測はこちら, mm)
                 </span>
                 <input
                   ref={offsetRef}
