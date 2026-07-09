@@ -172,17 +172,22 @@ export function SegmentPanel({
             />
           </label>
 
-          {/* 45°エルボ×2に挟まれた区間(ローリングオフセットのトラベル管)は、
+          {/* 45°エルボが片側以上に入った、2つのエルボに挟まれた区間(斜めのキック管)は、
               現場で分かりやすい「オフセット(逃げ)寸法」から芯々寸法を逆算できる。
-              トラベル = オフセット ÷ sin45°（= オフセット × 1.4142）。 */}
+              45°×2（平行→平行のローリングオフセット）でも、90°+45°（垂直⇄水平の
+              切替時、片方のエルボを45°ぶんずらして繋ぐ場合）でも、斜め管自体は
+              直角二等辺三角形の斜辺になるため式は共通（トラベル=オフセット×1.4142）。
+              各端の取り出し寸法(152.4/63.1等)はそれぞれの継手自身のカタログ値を
+              そのまま差し引くだけでよく、追加の三角関数は不要。 */}
           {cut?.startRole === 'elbow' &&
             cut?.endRole === 'elbow' &&
-            cut?.startFittingId === 'elbow45_long' &&
-            cut?.endFittingId === 'elbow45_long' && (
+            (cut?.startFittingId === 'elbow45_long' || cut?.endFittingId === 'elbow45_long') &&
+            (cut?.startFittingId === 'elbow45_long' || cut?.startFittingId === 'elbow90_long') &&
+            (cut?.endFittingId === 'elbow45_long' || cut?.endFittingId === 'elbow90_long') && (
               <label className="field offset-field">
                 <span className="field-label">
                   オフセット寸法(逃げ, mm)
-                  <span className="field-note">45°×2 芯々=オフセット×1.4142</span>
+                  <span className="field-note">斜め管 芯々=オフセット×1.4142</span>
                 </span>
                 <input
                   className="num-input"
