@@ -195,8 +195,16 @@ export function SegmentPanel({
                   inputMode="numeric"
                   min={0}
                   placeholder="例: 200"
+                  value={
+                    segment.centerLength != null
+                      ? Math.round((segment.centerLength / Math.SQRT2) * 10) / 10
+                      : ''
+                  }
                   onChange={(e) => {
-                    if (e.target.value === '') return
+                    if (e.target.value === '') {
+                      onChange({ centerLength: undefined })
+                      return
+                    }
                     const offset = Number(e.target.value)
                     if (Number.isNaN(offset)) return
                     onChange({ centerLength: Math.round(offset * Math.SQRT2 * 10) / 10 })
