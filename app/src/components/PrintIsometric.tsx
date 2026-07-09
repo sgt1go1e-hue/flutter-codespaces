@@ -1,5 +1,5 @@
 import { useMemo } from 'react'
-import type { Segment } from '../types'
+import type { Point, Segment } from '../types'
 import { distance } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
 import type { Effective } from '../lib/inheritance'
@@ -62,6 +62,29 @@ function resolveOverlaps(
   return result
 }
 
+// この区間に45°エルボの「45°」マークが表示される位置（無ければnull）。
+// 寸法ラベルをマークと反対側へ押し出すための判定に使う。
+function elbow45MarkPos(
+  s: Segment,
+  eff: Effective | undefined,
+  c: CutResult | undefined,
+): Point | null {
+  if (eff?.fitting !== 'elbow45_long' || !c) return null
+  for (const at of ['start', 'end'] as const) {
+    const role = at === 'start' ? c.startRole : c.endRole
+    if (role !== 'elbow' && role !== 'elbow-reducer') continue
+    const pt = at === 'start' ? s.start : s.end
+    const other = at === 'start' ? s.end : s.start
+    const len = distance(pt, other) || 1
+    const dx = (other.x - pt.x) / len
+    const dy = (other.y - pt.y) / len
+    const nx = -dy
+    const ny = dx
+    return { x: pt.x + dx * 20 + nx * 11, y: pt.y + dy * 20 + ny * 11 }
+  }
+  return null
+}
+
 /**
  * BOM の PDF/印刷ページに埋め込む、配管アイソメ図の静止版。
  * DrawingCanvas と違い、入力操作は一切持たず、図面全体が収まる viewBox を
@@ -108,7 +131,15 @@ export function PrintIsometric({
       const dy = (s.end.y - s.start.y) / len
       let perpX = -dy
       let perpY = dx
-      if (perpY < 0) {
+      const markPos = elbow45MarkPos(s, effectiveById[s.id], c)
+      if (markPos) {
+        const toMarkX = markPos.x - mx
+        const toMarkY = markPos.y - my
+        if (perpX * toMarkX + perpY * toMarkY > 0) {
+          perpX = -perpX
+          perpY = -perpY
+        }
+      } else if (perpY < 0) {
         perpX = -perpX
         perpY = -perpY
       }

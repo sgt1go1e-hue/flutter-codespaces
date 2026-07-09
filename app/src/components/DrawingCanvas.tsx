@@ -109,6 +109,29 @@ function resolveOverlaps(
   return result
 }
 
+// この区間に45°エルボの「45°」マークが表示される位置（無ければnull）。
+// 寸法ラベルをマークと反対側へ押し出すための判定に使う。
+function elbow45MarkPos(
+  s: Segment,
+  eff: Effective | undefined,
+  c: CutResult | undefined,
+): Point | null {
+  if (eff?.fitting !== 'elbow45_long' || !c) return null
+  for (const at of ['start', 'end'] as const) {
+    const role = at === 'start' ? c.startRole : c.endRole
+    if (role !== 'elbow' && role !== 'elbow-reducer') continue
+    const pt = at === 'start' ? s.start : s.end
+    const other = at === 'start' ? s.end : s.start
+    const len = distance(pt, other) || 1
+    const dx = (other.x - pt.x) / len
+    const dy = (other.y - pt.y) / len
+    const nx = -dy
+    const ny = dx
+    return { x: pt.x + dx * 20 + nx * 11, y: pt.y + dy * 20 + ny * 11 }
+  }
+  return null
+}
+
 export function DrawingCanvas({
   segments,
   selectedId,
@@ -396,7 +419,18 @@ export function DrawingCanvas({
       const dy = (s.end.y - s.start.y) / len
       let perpX = -dy
       let perpY = dx
-      if (perpY < 0) {
+      // 45°マークがこの区間にあるときは、マークと反対側に寄せる（「次の配管が
+      // 曲がった先の進行方向の逆」に出すと重ならず収まりやすいという現場の
+      // 感覚に合わせたもの）。マークが無ければ従来どおり画面下側を既定にする。
+      const markPos = elbow45MarkPos(s, effectiveById[s.id], cutById[s.id])
+      if (markPos) {
+        const toMarkX = markPos.x - mx
+        const toMarkY = markPos.y - my
+        if (perpX * toMarkX + perpY * toMarkY > 0) {
+          perpX = -perpX
+          perpY = -perpY
+        }
+      } else if (perpY < 0) {
         perpX = -perpX
         perpY = -perpY
       }

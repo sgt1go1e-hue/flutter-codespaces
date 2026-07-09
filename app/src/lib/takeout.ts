@@ -342,7 +342,12 @@ export function computeEnds(
   // オフセット寸法欄などで独自の切り寸（正の値）が付いていても、その区間は
   // あくまで基準点〜先端の一連の測り方の途中にすぎないため、畳み込みは
   // キック区間の切り寸の有無に関わらず常に行う。
+  // ただし畳み込むのは「45°エルボ側」だけ（この区間自身の継手が明示的に
+  // elbow45_long のとき）。90°エルボ側は、キックが挟まる前と変わらない
+  // ごく普通の基準点として扱い、そちら側の隣接区間まで畳み込むと、90°側の
+  // 区間の寸法が意図せず縮んでしまう（90°側は元々どおり単独の取り出しのみでよい）。
   for (const s of segments) {
+    if (s.fitting !== 'elbow45_long') continue
     for (const end of ['start', 'end'] as const) {
       const result = out[s.id][end]
       if (result.role !== 'elbow') continue
