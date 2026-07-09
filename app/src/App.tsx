@@ -26,6 +26,7 @@ import { computeCrossoverGaps } from './lib/crossover'
 import { normalizeBranchSplits } from './lib/branching'
 import { computeAllCut } from './lib/cutlength'
 import { findTeeContext } from './lib/takeout'
+import { detectElbowClashes, applyElbowSuggestion, type ElbowClash } from './lib/elbowClash'
 import {
   buildSegmentMap,
   computeEffective,
@@ -383,6 +384,18 @@ export default function App() {
     () => computeBom(segments, effectiveById, cutById),
     [segments, effectiveById, cutById],
   )
+  // エルボtoエルボで芯々寸法が足りず継手が収まらない箇所（45°×2 / 90°+45° 振り分けの提案対象）
+  const elbowClashes = useMemo(
+    () => detectElbowClashes(segments, cutById),
+    [segments, cutById],
+  )
+  const selectedClash = useMemo(
+    () => (selectedId ? elbowClashes.find((c) => c.midSegId === selectedId) : undefined),
+    [elbowClashes, selectedId],
+  )
+  function applyElbowClash(clash: ElbowClash) {
+    mutateSegments((prev) => applyElbowSuggestion(prev, clash))
+  }
 
   // 新規セグメントの親（上流）を、始点が接続している既存セグメントから決定する
   function findParentId(start: Segment['start']): string | undefined {
@@ -680,6 +693,8 @@ export default function App() {
           inheritedPipeType={inheritedPipeType(selected, byId)}
           inheritedSize={inheritedSize(selected, byId)}
           cut={cutById[selected.id]}
+          elbowClash={selectedClash}
+          onApplyElbowClash={() => selectedClash && applyElbowClash(selectedClash)}
           teeContext={teeContext}
           onSetTeeSize={setSizeForSegments}
           roundMode={defaults.roundMode ?? 'round'}

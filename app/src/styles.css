@@ -702,6 +702,33 @@ body {
   line-height: 1.6;
 }
 
+/* エルボtoエルボの間隔不足時、45°×2 / 90°+45° への振り分け提案 */
+.elbow-clash-suggest {
+  margin: 8px 2px 0;
+  padding: 10px 12px;
+  background: #1e1b0f;
+  border: 1px solid #78350f;
+  border-radius: 10px;
+}
+
+.elbow-clash-suggest p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #fbbf24;
+  line-height: 1.6;
+}
+
+.elbow-clash-apply {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: #f59e0b;
+  color: #1e1b0f;
+  font-weight: 700;
+  font-size: 14px;
+}
+
 .ecc-box {
   margin-top: 10px;
   padding: 10px 12px;

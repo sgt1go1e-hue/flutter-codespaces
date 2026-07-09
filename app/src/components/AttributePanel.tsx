@@ -3,6 +3,7 @@ import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
 import type { TeeContext } from '../lib/takeout'
+import type { ElbowClash } from '../lib/elbowClash'
 import {
   fittings,
   pipeTypes,
@@ -52,6 +53,9 @@ interface SegmentPanelProps {
   inheritedPipeType?: string
   inheritedSize?: string
   cut?: CutResult
+  /** この区間がエルボtoエルボで芯々寸法不足のとき、45°×2 / 90°+45° への振り分け提案 */
+  elbowClash?: ElbowClash
+  onApplyElbowClash?: () => void
   /** 分岐(チーズ)ノードに接続していれば「メイン管／枝管」の構成情報 */
   teeContext?: TeeContext
   /** メイン管／枝管サイズの直接編集（対象セグメントid配列とサイズを渡す） */
@@ -78,6 +82,8 @@ export function SegmentPanel({
   inheritedPipeType,
   inheritedSize,
   cut,
+  elbowClash,
+  onApplyElbowClash,
   teeContext,
   onSetTeeSize,
   roundMode,
@@ -434,6 +440,18 @@ export function SegmentPanel({
           <p className="cut-warn danger">
             継手が収まりません（芯々寸法が不足）。芯々寸法を大きくするか継手を見直してください。
           </p>
+        )}
+        {cut?.status === 'over' && elbowClash && onApplyElbowClash && (
+          <div className="elbow-clash-suggest">
+            <p>
+              {elbowClash.suggestion === 'double45'
+                ? 'エルボtoエルボの間隔が狭いようです。前後を45°エルボ×2に振り分けると芯々を短縮できます。'
+                : 'エルボtoエルボの間隔が狭いようです。前後を90°＋45°エルボに振り分けると芯々を短縮できます。'}
+            </p>
+            <button type="button" className="elbow-clash-apply" onClick={onApplyElbowClash}>
+              {elbowClash.suggestion === 'double45' ? '45°エルボ×2に変更' : '90°＋45°エルボに変更'}
+            </button>
+          </div>
         )}
         {cut?.status === 'zero' && (
           <p className="cut-hint">
