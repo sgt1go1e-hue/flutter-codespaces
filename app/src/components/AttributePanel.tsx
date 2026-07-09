@@ -98,12 +98,25 @@ export function SegmentPanel({
   onClose,
 }: SegmentPanelProps) {
   const dimRef = useRef<HTMLInputElement>(null)
+  const offsetRef = useRef<HTMLInputElement>(null)
 
-  // 別の線を選ぶたびに芯々寸法欄へフォーカス（連続入力を最短タップに）
+  // 2つのエルボ(45°を含む)に挟まれた斜めのキック区間かどうか。現場では横方向の
+  // 逃げ寸法(オフセット)しか測らないことが多く、芯々（斜め管の実寸）は逆算する
+  // ものなので、この区間を選んだときはオフセット欄を優先して見せる・フォーカスする。
+  const isKickSegment =
+    cut?.startRole === 'elbow' &&
+    cut?.endRole === 'elbow' &&
+    (cut?.startFittingId === 'elbow45_long' || cut?.endFittingId === 'elbow45_long') &&
+    (cut?.startFittingId === 'elbow45_long' || cut?.startFittingId === 'elbow90_long') &&
+    (cut?.endFittingId === 'elbow45_long' || cut?.endFittingId === 'elbow90_long')
+
+  // 別の線を選ぶたびに、キック区間ならオフセット欄へ、それ以外は芯々寸法欄へ
+  // フォーカス（連続入力を最短タップに）。
   useEffect(() => {
-    dimRef.current?.focus()
-    dimRef.current?.select()
-  }, [segment.id])
+    const target = isKickSegment ? offsetRef.current : dimRef.current
+    target?.focus()
+    target?.select()
+  }, [segment.id, isKickSegment])
 
   const effPipe = segment.pipeType ?? inheritedPipeType
   const sizes = sizesForPipeType(effPipe)
@@ -154,42 +167,44 @@ export function SegmentPanel({
       </div>
       <div className="panel-body">
         <div className="panel-grid">
-          <label className="field dim-field">
-            <span className="field-label">芯々寸法(mm)</span>
-            <input
-              ref={dimRef}
-              className="num-input"
-              type="number"
-              inputMode="numeric"
-              min={0}
-              placeholder="例: 1200"
-              value={segment.centerLength ?? ''}
-              onChange={(e) =>
-                onChange({
-                  centerLength: e.target.value === '' ? undefined : Number(e.target.value),
-                })
-              }
-            />
-          </label>
-
-          {/* 45°エルボが片側以上に入った、2つのエルボに挟まれた区間(斜めのキック管)は、
-              現場で分かりやすい「オフセット(逃げ)寸法」から芯々寸法を逆算できる。
-              45°×2（平行→平行のローリングオフセット）でも、90°+45°（垂直⇄水平の
-              切替時、片方のエルボを45°ぶんずらして繋ぐ場合）でも、斜め管自体は
-              直角二等辺三角形の斜辺になるため式は共通（トラベル=オフセット×1.4142）。
-              各端の取り出し寸法(152.4/63.1等)はそれぞれの継手自身のカタログ値を
-              そのまま差し引くだけでよく、追加の三角関数は不要。 */}
-          {cut?.startRole === 'elbow' &&
-            cut?.endRole === 'elbow' &&
-            (cut?.startFittingId === 'elbow45_long' || cut?.endFittingId === 'elbow45_long') &&
-            (cut?.startFittingId === 'elbow45_long' || cut?.startFittingId === 'elbow90_long') &&
-            (cut?.endFittingId === 'elbow45_long' || cut?.endFittingId === 'elbow90_long') && (
-              <label className="field offset-field">
+          {(() => {
+            const dimField = (
+              <label className="field dim-field" key="dim">
                 <span className="field-label">
-                  オフセット寸法(逃げ, mm)
-                  <span className="field-note">斜め管 芯々=オフセット×1.4142</span>
+                  芯々寸法(mm)
+                  {isKickSegment && <span className="field-note">斜め管の実寸（トラベル）</span>}
                 </span>
                 <input
+                  ref={dimRef}
+                  className="num-input"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  placeholder="例: 1200"
+                  value={segment.centerLength ?? ''}
+                  onChange={(e) =>
+                    onChange({
+                      centerLength: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+            )
+            // 45°エルボが片側以上に入った、2つのエルボに挟まれた区間(斜めのキック管)は、
+            // 現場で分かりやすい「オフセット(逃げ)寸法」から芯々寸法を逆算できる。
+            // 現場では横方向の逃げ寸法しか測らず、斜め管の実寸(芯々)を直接測ることは
+            // ほぼ無いため、この区間ではオフセット欄を芯々欄より前・優先で見せる。
+            // 45°×2（平行→平行のローリングオフセット）でも、90°+45°（垂直⇄水平の
+            // 切替時、片方のエルボを45°ぶんずらして繋ぐ場合）でも、斜め管自体は
+            // 直角二等辺三角形の斜辺になるため式は共通（トラベル=オフセット×1.4142）。
+            const offsetField = isKickSegment && (
+              <label className="field offset-field" key="offset">
+                <span className="field-label">
+                  オフセット寸法(逃げ, mm)
+                  <span className="field-note">現場で測る横方向の寸法はこちら</span>
+                </span>
+                <input
+                  ref={offsetRef}
                   className="num-input"
                   type="number"
                   inputMode="numeric"
@@ -211,7 +226,16 @@ export function SegmentPanel({
                   }}
                 />
               </label>
-            )}
+            )
+            return isKickSegment ? (
+              <>
+                {offsetField}
+                {dimField}
+              </>
+            ) : (
+              dimField
+            )
+          })()}
 
           <div className="field cut-field">
             <span className="field-label">
