@@ -83,8 +83,13 @@ interface LabelJob extends LabelBox {
 }
 // 重なったラベルを、それぞれの推奨方向へ少しずつ押し出して重なりを減らす
 // （完全な重なり0を保証するものではないが、密集時のかぶりを大幅に軽減する）。
-function resolveOverlaps(jobs: LabelJob[]): Map<string, { cx: number; cy: number }> {
-  const placed: LabelBox[] = []
+// obstacles（線どうしの交差点など、動かせない固定の避けたい領域）を渡すと、
+// それらとも重ならないよう先に確保しておく。
+function resolveOverlaps(
+  jobs: LabelJob[],
+  obstacles: LabelBox[] = [],
+): Map<string, { cx: number; cy: number }> {
+  const placed: LabelBox[] = [...obstacles]
   const result = new Map<string, { cx: number; cy: number }>()
   for (const job of jobs) {
     let cx = job.cx
@@ -415,8 +420,24 @@ export function DrawingCanvas({
         jobs.push({ key: `term-${s.id}-${at}`, cx, cy, w, h: 26, pushX: nx, pushY: ny })
       }
     }
-    return resolveOverlaps(jobs)
-  }, [segments, cutById, effectiveById])
+    // データ上つながっていない線どうしが視覚的に交差する箇所は、複数のラベルの
+    // 既定位置（セグメント中点付近）が同じ場所に集まりやすく、重なって読めなく
+    // なりやすい。交差点そのものを避けたい固定領域として扱う。
+    const crossObstacles: LabelBox[] = []
+    for (const s of segments) {
+      const centers = crossoverGaps[s.id]
+      if (!centers) continue
+      for (const t of centers) {
+        crossObstacles.push({
+          cx: s.start.x + (s.end.x - s.start.x) * t,
+          cy: s.start.y + (s.end.y - s.start.y) * t,
+          w: 40,
+          h: 40,
+        })
+      }
+    }
+    return resolveOverlaps(jobs, crossObstacles)
+  }, [segments, cutById, effectiveById, crossoverGaps])
 
   // フランジ記号を端点に描く。
   // 'double'(両) = 配管に直交する短い2本線、'single'(片) = 1本線（終端エンド）。
