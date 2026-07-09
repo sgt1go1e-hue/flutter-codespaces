@@ -427,6 +427,16 @@ body {
   stroke-linejoin: round;
 }
 
+/* 45°エルボ使用箇所のマーク（90°エルボと区別できるよう明示） */
+.elbow45-mark {
+  fill: #f472b6;
+  font-size: 11px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: #0f172a;
+  stroke-width: 3px;
+}
+
 /* フランジ記号（配管に直交する2本線） */
 .flange-mark {
   stroke: #e2e8f0;

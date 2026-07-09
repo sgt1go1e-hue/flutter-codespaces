@@ -380,19 +380,27 @@ export function DrawingCanvas({
       const fs2 = c.status === 'ok' ? 12.5 : c.status === 'zero' ? 10.5 : 11
       const w =
         Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
-      // 押し出す向きは主に下方向だが、配管の向きに応じて少し斜めにばらけさせる
-      // （真下一辺倒だと、複数の寸法ブロックが縦一列に並んで押し合い続け、
-      //   避け切れないことがあるため）。
+      // 押し出す向きはセグメントに対して垂直な向きに固定する（セグメントの向き
+      // なりに押すと、切り立った斜め/縦の配管では押し出しがほぼ線に沿った方向に
+      // なってしまい、ラベルが自分の区間を越えて隣の区間の場所までズレて、
+      // どちらの配管の寸法か分からなくなる事故があったため）。
       const len = distance(s.start, s.end) || 1
-      const perpX = -(s.end.y - s.start.y) / len
+      const dx = (s.end.x - s.start.x) / len
+      const dy = (s.end.y - s.start.y) / len
+      let perpX = -dy
+      let perpY = dx
+      if (perpY < 0) {
+        perpX = -perpX
+        perpY = -perpY
+      }
       jobs.push({
         key: `dim-${s.id}`,
-        cx: mx,
-        cy: my + 22,
+        cx: mx + perpX * 22,
+        cy: my + perpY * 22,
         w,
         h: 32,
-        pushX: perpX * 0.4,
-        pushY: 1,
+        pushX: perpX,
+        pushY: perpY,
       })
     }
     // 3) 末端の呼び径ラベル（寸法表記を避ける向きへ、必要ならさらに押し出す）
@@ -555,6 +563,26 @@ export function DrawingCanvas({
     )
   }
 
+  // 45°エルボを使用した端に「45°」マークを表示（90°エルボとの区別を現場ですぐ判別できるように）
+  function elbow45Mark(s: Segment, at: 'start' | 'end') {
+    const pt = at === 'start' ? s.start : s.end
+    const other = at === 'start' ? s.end : s.start
+    const len = distance(pt, other) || 1
+    const dx = (other.x - pt.x) / len
+    const dy = (other.y - pt.y) / len
+    const nx = -dy
+    const ny = dx
+    const gap = 20
+    const off = 11
+    const cx = pt.x + dx * gap + nx * off
+    const cy = pt.y + dy * gap + ny * off
+    return (
+      <text className="elbow45-mark" x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+        45°
+      </text>
+    )
+  }
+
   // レジューサーのシンボル。
   // 同心=二等辺三角形（大径=底辺→小径=頂点）、偏心=直角三角形（斜辺の向きが Top/Bottom 連動）。
   // 常に「上流(大径)側=底辺・下流(小径)側=頂点」。ルート向きが変わっても維持。
@@ -665,6 +693,14 @@ export function DrawingCanvas({
             {(cutById[s.id]?.endRole === 'tee-run-reducer' ||
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'end')}
+            {(cutById[s.id]?.startRole === 'elbow' ||
+              cutById[s.id]?.startRole === 'elbow-reducer') &&
+              eff?.fitting === 'elbow45_long' &&
+              elbow45Mark(s, 'start')}
+            {(cutById[s.id]?.endRole === 'elbow' ||
+              cutById[s.id]?.endRole === 'elbow-reducer') &&
+              eff?.fitting === 'elbow45_long' &&
+              elbow45Mark(s, 'end')}
             {/* 中間の径変化のみ、線上に1箇所表示（両端フリーでない内部区間だけ。
                 フリー端がある区間は末端ラベルで表示するので重複させない）。 */}
             {eff?.showSizeLabel &&

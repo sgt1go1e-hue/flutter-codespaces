@@ -101,15 +101,22 @@ export function PrintIsometric({
       const w =
         Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
       const len = distance(s.start, s.end) || 1
-      const perpX = -(s.end.y - s.start.y) / len
+      const dx = (s.end.x - s.start.x) / len
+      const dy = (s.end.y - s.start.y) / len
+      let perpX = -dy
+      let perpY = dx
+      if (perpY < 0) {
+        perpX = -perpX
+        perpY = -perpY
+      }
       jobs.push({
         key: `dim-${s.id}`,
-        cx: mx,
-        cy: my + 22,
+        cx: mx + perpX * 22,
+        cy: my + perpY * 22,
         w,
         h: 32,
-        pushX: perpX * 0.4,
-        pushY: 1,
+        pushX: perpX,
+        pushY: perpY,
       })
     }
     for (const s of segments) {
@@ -253,6 +260,26 @@ export function PrintIsometric({
     )
   }
 
+  // 45°エルボを使用した端に「45°」マークを表示（90°エルボとの区別を現場ですぐ判別できるように）
+  function elbow45Mark(s: Segment, at: 'start' | 'end') {
+    const pt = at === 'start' ? s.start : s.end
+    const other = at === 'start' ? s.end : s.start
+    const len = distance(pt, other) || 1
+    const dx = (other.x - pt.x) / len
+    const dy = (other.y - pt.y) / len
+    const nx = -dy
+    const ny = dx
+    const gap = 20
+    const off = 11
+    const cx = pt.x + dx * gap + nx * off
+    const cy = pt.y + dy * gap + ny * off
+    return (
+      <text className="elbow45-mark" x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+        45°
+      </text>
+    )
+  }
+
   function reducerSymbol(
     s: Segment,
     kind: 'concentric' | 'eccentric',
@@ -330,6 +357,14 @@ export function PrintIsometric({
             {(cutById[s.id]?.endRole === 'tee-run-reducer' ||
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'end')}
+            {(cutById[s.id]?.startRole === 'elbow' ||
+              cutById[s.id]?.startRole === 'elbow-reducer') &&
+              eff?.fitting === 'elbow45_long' &&
+              elbow45Mark(s, 'start')}
+            {(cutById[s.id]?.endRole === 'elbow' ||
+              cutById[s.id]?.endRole === 'elbow-reducer') &&
+              eff?.fitting === 'elbow45_long' &&
+              elbow45Mark(s, 'end')}
             {eff?.showSizeLabel &&
               eff.size &&
               cutById[s.id]?.startConnected &&
