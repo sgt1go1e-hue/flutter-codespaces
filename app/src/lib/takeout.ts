@@ -338,10 +338,10 @@ export function computeEnds(
   // 短い連結配管）を、隣接する長い区間の芯先/芯々計算へ自動的に畳み込む。
   // 現場では「1000」等の寸法を手前の基準点（本来1本エルボだった位置）から
   // 先端まで測るため、途中に挟まる短いキック区間の全長も先端側の取り出し
-  // 寸法へ合算しないと、切り寸が実際より長く出てしまう。
-  // キック区間自体が単体で継手が収まらない（=独立した配管として成立していない）
-  // ときだけ畳み込む。十分な長さがあり単独で有効な配管として成立している
-  // 場合は、意図的な独立区間の可能性があるため畳み込まない。
+  // 寸法へ合算しないと、切り寸が実際より長く出てしまう。キック区間自体に
+  // オフセット寸法欄などで独自の切り寸（正の値）が付いていても、その区間は
+  // あくまで基準点〜先端の一連の測り方の途中にすぎないため、畳み込みは
+  // キック区間の切り寸の有無に関わらず常に行う。
   for (const s of segments) {
     for (const end of ['start', 'end'] as const) {
       const result = out[s.id][end]
@@ -354,8 +354,6 @@ export function computeEnds(
       if (!nbEnds) continue
       const nbOtherEnd = nb.end === 'start' ? 'end' : 'start'
       if (nbEnds[nb.end].role !== 'elbow' || nbEnds[nbOtherEnd].role !== 'elbow') continue
-      const nbTakeoutSum = nbEnds.start.mm + nbEnds.end.mm
-      if (nb.seg.centerLength - nbTakeoutSum >= -0.5) continue
       out[s.id][end] = { ...result, mm: result.mm + nb.seg.centerLength }
     }
   }

@@ -451,7 +451,34 @@ export function DrawingCanvas({
         })
       }
     }
-    return resolveOverlaps(jobs, crossObstacles)
+    // 45°エルボの「45°」マークも、寸法ラベルが重なって文字が読めなくならないよう
+    // 固定の回避領域として扱う（特に短いキック区間ではマークと寸法が近接しがち）。
+    const elbow45Obstacles: LabelBox[] = []
+    for (const s of segments) {
+      const eff = effectiveById[s.id]
+      if (eff?.fitting !== 'elbow45_long') continue
+      const c = cutById[s.id]
+      for (const at of ['start', 'end'] as const) {
+        const role = at === 'start' ? c?.startRole : c?.endRole
+        if (role !== 'elbow' && role !== 'elbow-reducer') continue
+        const pt = at === 'start' ? s.start : s.end
+        const other = at === 'start' ? s.end : s.start
+        const len = distance(pt, other) || 1
+        const dx = (other.x - pt.x) / len
+        const dy = (other.y - pt.y) / len
+        const nx = -dy
+        const ny = dx
+        const gap = 20
+        const off = 11
+        elbow45Obstacles.push({
+          cx: pt.x + dx * gap + nx * off,
+          cy: pt.y + dy * gap + ny * off,
+          w: 34,
+          h: 22,
+        })
+      }
+    }
+    return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles])
   }, [segments, cutById, effectiveById, crossoverGaps])
 
   // フランジ記号を端点に描く。
