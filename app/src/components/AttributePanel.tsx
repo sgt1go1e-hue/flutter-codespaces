@@ -172,6 +172,34 @@ export function SegmentPanel({
             />
           </label>
 
+          {/* 45°エルボ×2に挟まれた区間(ローリングオフセットのトラベル管)は、
+              現場で分かりやすい「オフセット(逃げ)寸法」から芯々寸法を逆算できる。
+              トラベル = オフセット ÷ sin45°（= オフセット × 1.4142）。 */}
+          {cut?.startRole === 'elbow' &&
+            cut?.endRole === 'elbow' &&
+            cut?.startFittingId === 'elbow45_long' &&
+            cut?.endFittingId === 'elbow45_long' && (
+              <label className="field offset-field">
+                <span className="field-label">
+                  オフセット寸法(逃げ, mm)
+                  <span className="field-note">45°×2 芯々=オフセット×1.4142</span>
+                </span>
+                <input
+                  className="num-input"
+                  type="number"
+                  inputMode="numeric"
+                  min={0}
+                  placeholder="例: 200"
+                  onChange={(e) => {
+                    if (e.target.value === '') return
+                    const offset = Number(e.target.value)
+                    if (Number.isNaN(offset)) return
+                    onChange({ centerLength: Math.round(offset * Math.SQRT2 * 10) / 10 })
+                  }}
+                />
+              </label>
+            )}
+
           <div className="field cut-field">
             <span className="field-label">
               切り寸法{cut && cut.status !== 'none' && (

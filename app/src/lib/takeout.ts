@@ -233,7 +233,12 @@ function resolveEnd(
     }
     return { role: 'straight', mm: 0 }
   }
-  return { role: 'elbow', mm: elbowTakeout(inc, nb), fittingId: isElbowId(inc.seg.fitting) ? inc.seg.fitting : 'elbow90_long' }
+  const elbowFittingId = isElbowId(inc.seg.fitting)
+    ? (inc.seg.fitting as string)
+    : isElbowId(nb.seg.fitting)
+      ? (nb.seg.fitting as string)
+      : 'elbow90_long'
+  return { role: 'elbow', mm: elbowTakeout(inc, nb), fittingId: elbowFittingId }
 }
 
 export interface SegEnds {

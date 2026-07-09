@@ -18,6 +18,9 @@ export interface CutResult {
   endAllow: number
   startRole: EndRole
   endRole: EndRole
+  /** 各端で実際に取り出し寸法の計算に使われた継手id（45°ローリングオフセット判定などに使用） */
+  startFittingId?: string
+  endFittingId?: string
   /** 表示用の切り寸法(mm)。0未満は0にクランプ済み */
   cut?: number
   /** クランプ前の切り寸法（負値あり＝継手が収まらない判定用） */
@@ -129,6 +132,8 @@ export function computeAllCut(
       endAllow,
       startRole: e.start.role,
       endRole: e.end.role,
+      startFittingId: e.start.fittingId,
+      endFittingId: e.end.fittingId,
       cut,
       rawCut,
       status,
