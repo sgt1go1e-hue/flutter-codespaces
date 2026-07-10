@@ -62,27 +62,51 @@ function resolveOverlaps(
   return result
 }
 
-// この区間に45°エルボの「45°」マークが表示される位置（無ければnull）。
-// 寸法ラベルをマークと反対側へ押し出すための判定に使う。
-function elbow45MarkPos(
-  s: Segment,
-  eff: Effective | undefined,
-  c: CutResult | undefined,
-): Point | null {
-  if (eff?.fitting !== 'elbow45_long' || !c) return null
-  for (const at of ['start', 'end'] as const) {
-    const role = at === 'start' ? c.startRole : c.endRole
-    if (role !== 'elbow' && role !== 'elbow-reducer') continue
-    const pt = at === 'start' ? s.start : s.end
-    const other = at === 'start' ? s.end : s.start
-    const len = distance(pt, other) || 1
-    const dx = (other.x - pt.x) / len
-    const dy = (other.y - pt.y) / len
-    const nx = -dy
-    const ny = dx
-    return { x: pt.x + dx * 20 + nx * 11, y: pt.y + dy * 20 + ny * 11 }
+// アイソメ図上に実際に表示される「45°」マークの位置を全て求める
+// （描画条件と同じ: 継手が elbow45_long のセグメント自身のエルボ端）。
+// この位置は、そのマークを描いているセグメント自身だけでなく、ノードを
+// 共有する隣接セグメント（キック区間など）の寸法ラベルからも見えるため、
+// 寸法ラベル側は「自分がその継手を持っているか」ではなく「近くにマークが
+// 実在するか」で反対側へ避ける必要がある。
+function allElbow45MarkPositions(
+  segments: Segment[],
+  effectiveById: Record<string, Effective>,
+  cutById: Record<string, CutResult>,
+): Point[] {
+  const marks: Point[] = []
+  for (const s of segments) {
+    const eff = effectiveById[s.id]
+    if (eff?.fitting !== 'elbow45_long') continue
+    const c = cutById[s.id]
+    if (!c) continue
+    for (const at of ['start', 'end'] as const) {
+      const role = at === 'start' ? c.startRole : c.endRole
+      if (role !== 'elbow' && role !== 'elbow-reducer') continue
+      const pt = at === 'start' ? s.start : s.end
+      const other = at === 'start' ? s.end : s.start
+      const len = distance(pt, other) || 1
+      const dx = (other.x - pt.x) / len
+      const dy = (other.y - pt.y) / len
+      const nx = -dy
+      const ny = dx
+      marks.push({ x: pt.x + dx * 20 + nx * 11, y: pt.y + dy * 20 + ny * 11 })
+    }
   }
-  return null
+  return marks
+}
+
+// 指定座標に最も近い45°マーク（一定距離内にあるものだけ）。無ければnull。
+function nearestElbow45Mark(marks: Point[], x: number, y: number): Point | null {
+  let best: Point | null = null
+  let bestD = 150
+  for (const m of marks) {
+    const d = Math.hypot(m.x - x, m.y - y)
+    if (d < bestD) {
+      bestD = d
+      best = m
+    }
+  }
+  return best
 }
 
 /**
@@ -98,6 +122,7 @@ export function PrintIsometric({
 }: Props) {
   const resolvedLabels = useMemo(() => {
     const jobs: LabelJob[] = []
+    const elbow45Marks = allElbow45MarkPositions(segments, effectiveById, cutById)
     for (const s of segments) {
       const eff = effectiveById[s.id]
       const c = cutById[s.id]
@@ -131,7 +156,7 @@ export function PrintIsometric({
       const dy = (s.end.y - s.start.y) / len
       let perpX = -dy
       let perpY = dx
-      const markPos = elbow45MarkPos(s, effectiveById[s.id], c)
+      const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
       if (markPos) {
         const toMarkX = markPos.x - mx
         const toMarkY = markPos.y - my
