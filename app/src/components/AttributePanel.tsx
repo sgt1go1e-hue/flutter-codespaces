@@ -242,7 +242,7 @@ export function SegmentPanel({
               )}
             </span>
             <div
-              className={`cut-value${cut?.status === 'over' ? ' over' : ''}${cut?.status === 'zero' ? ' zero' : ''}`}
+              className={`cut-value${cut?.status === 'over' ? ' over' : ''}${cut?.status === 'zero' ? ' zero' : ''}${cut?.socketWeldGapWarning ? ' tight' : ''}`}
             >
               {cut?.needsCounterpart
                 ? '要相手径'
@@ -255,6 +255,17 @@ export function SegmentPanel({
                       : '—'}
             </div>
           </div>
+
+          {/* 差込（ソケット）溶接同士を直結していて、溶接代（直管部）が目安未満のときの警告。
+              突き合わせ溶接と違いソケット部の隅肉溶接同士が近すぎると施工できないため。 */}
+          {cut?.socketWeldGapWarning && (
+            <div className="socket-gap-warn">
+              <p>
+                差込（ソケット）溶接の継手同士が近すぎます（切り寸 {cut.cut}mm）。
+                溶接代として目安50mm以上の直管部を確保してください。
+              </p>
+            </div>
+          )}
 
           {/* エルボtoエルボの間隔不足の提案は、スクロールしないと気づけない下部の
               詳細情報より先に、寸法入力のすぐ下（目に入りやすい位置）に出す。 */}

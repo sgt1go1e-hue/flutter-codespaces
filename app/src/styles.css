@@ -419,6 +419,10 @@ body {
   stroke-width: 3.5px;
 }
 
+.dim-cut.tight {
+  fill: #fb923c;
+}
+
 /* レジューサー記号（三角形） */
 .reducer-mark {
   fill: rgba(56, 189, 248, 0.25);
@@ -676,6 +680,10 @@ body {
   font-size: 14px;
 }
 
+.cut-field .cut-value.tight {
+  color: #fb923c;
+}
+
 .cut-warn.danger {
   color: #f87171;
   font-weight: 700;
@@ -732,6 +740,23 @@ body {
   color: #1e1b0f;
   font-weight: 700;
   font-size: 14px;
+}
+
+/* 差込溶接の溶接代不足警告 */
+.socket-gap-warn {
+  grid-column: 1 / -1;
+  margin: 8px 2px 0;
+  padding: 10px 12px;
+  background: #1e1509;
+  border: 1px solid #9a3412;
+  border-radius: 10px;
+}
+
+.socket-gap-warn p {
+  margin: 0;
+  font-size: 13px;
+  color: #fb923c;
+  line-height: 1.6;
 }
 
 .ecc-box {

@@ -44,9 +44,24 @@ export interface CutResult {
   eccentric?: EccentricInfo
   /** レジューサー描画用: 大径側が始点側か */
   reducerLargeAtStart?: boolean
+  /**
+   * 差込（ソケット）溶接継手同士を直結していて、間の直管部（溶接代）が
+   * 目安寸法(SOCKET_WELD_MIN_GAP)未満しか取れていない。status='ok'（切り寸>0）
+   * のときのみ意味を持つ警告フラグ。
+   */
+  socketWeldGapWarning: boolean
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
+
+// 差込（ソケット）溶接は継手のソケット部に管を差し込んで隅肉溶接するため、
+// 突き合わせ溶接と違い継手同士を直結できない。溶接ビード（と熱影響部）が
+// 干渉しないよう、間に最低限の直管部（溶接代）を残す必要がある。
+// JIS/ASME等に明確な規定値はなく現場慣習上の目安のため、一般的に言われる
+// 50mmを下回った場合に警告する（実際の管理値は現場の仕様に従うこと）。
+const SOCKET_WELD_MIN_GAP = 50
+
+const isSocketWeldFittingId = (id?: string) => !!id && id.endsWith('_socket')
 
 // 切り寸法の丸め方。継手の取り出し寸法(startAllow/endAllow)には適用せず、
 // 最終の切り寸法(cut)だけに適用する。
@@ -151,6 +166,12 @@ export function computeAllCut(
         s.fitting === 'reducer_socket'
           ? reducerLargeAtStart(s, segments, effectiveById, s.reducerSize ?? autoCounterpart)
           : undefined,
+      socketWeldGapWarning:
+        status === 'ok' &&
+        cut != null &&
+        cut < SOCKET_WELD_MIN_GAP &&
+        isSocketWeldFittingId(e.start.fittingId) &&
+        isSocketWeldFittingId(e.end.fittingId),
     }
   }
   return out

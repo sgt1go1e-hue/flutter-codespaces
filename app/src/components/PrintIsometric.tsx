@@ -144,7 +144,7 @@ export function PrintIsometric({
       const line1 = `${c.mode} ${c.center}`
       const line2 =
         c.status === 'ok'
-          ? `切 ${c.cut}`
+          ? `切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}`
           : c.status === 'zero'
             ? 'パイプ0（継手直結）'
             : '継手不足'
@@ -492,8 +492,14 @@ export function PrintIsometric({
                     {c.mode} {c.center}
                   </text>
                   {c.status === 'ok' && (
-                    <text className="dim-cut" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className={`dim-cut${c.socketWeldGapWarning ? ' tight' : ''}`}
+                      x={cx}
+                      y={y2}
+                      textAnchor="middle"
+                    >
                       切 {c.cut}
+                      {c.socketWeldGapWarning ? '（溶接代不足）' : ''}
                     </text>
                   )}
                   {c.status === 'zero' && (
