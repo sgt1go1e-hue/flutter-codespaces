@@ -96,14 +96,22 @@ function buildGraph(
   return nodes
 }
 
+// エルボの継手id。自セグメント／隣接セグメントに明示指定があればそれを使い、
+// どちらも未指定(自動)なら、いずれかの接続方法が「差込（ソケット）」なら差込式、
+// それ以外は突き合わせ溶接(ロング)を既定にする（接続方法を差込に変えても
+// 継手が突き合わせ溶接のままになってしまう不具合の修正）。
+function defaultElbowId(inc: Inc, nb?: Inc): string {
+  if (isElbowId(inc.seg.fitting)) return inc.seg.fitting as string
+  if (isElbowId(nb?.seg.fitting)) return nb!.seg.fitting as string
+  return inc.seg.connection === 'socket' || nb?.seg.connection === 'socket'
+    ? 'elbow90_socket'
+    : 'elbow90_long'
+}
+
 // エルボの取り出し寸法（自セグメントのサイズで）
 function elbowTakeout(inc: Inc, nb?: Inc): number {
   const nomKey = String(nominalOf(inc.size) ?? '')
-  const id = isElbowId(inc.seg.fitting)
-    ? (inc.seg.fitting as string)
-    : isElbowId(nb?.seg.fitting)
-      ? (nb!.seg.fitting as string)
-      : 'elbow90_long'
+  const id = defaultElbowId(inc, nb)
   const raw = getFitting(id)?.dims[nomKey]
   return typeof raw === 'number' ? raw : 0
 }
@@ -215,10 +223,14 @@ function resolveEnd(
     const runSize = runAxisSize(node, effById) ?? inc.size
     const branchInc = others.find((o) => Math.abs(dot(inc.into, o.into)) < 0.9)
     const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
-    // このノードのいずれかの脚に差込式チーズの継手が明示されていれば、差込式の寸法を使う
-    const socketTee = node.incs.some(
-      (i) => i.seg.fitting === 'tee_equal_socket' || i.seg.fitting === 'tee_reducing_socket',
-    )
+    // このノードのいずれかの脚にチーズ継手が明示されていればそれに従う（突き合わせ/差込とも）。
+    // どの脚にも明示指定がなければ、いずれかの脚の接続方法が「差込（ソケット）」なら
+    // 差込式の寸法を使う（接続方法を差込に変えても継手が突き合わせ溶接のままになって
+    // しまう不具合の修正）。
+    const explicitTeeId = node.incs.map((i) => i.seg.fitting).find(isTeeId)
+    const socketTee = explicitTeeId
+      ? explicitTeeId.endsWith('_socket')
+      : node.incs.some((i) => i.seg.connection === 'socket')
     const t = teeTakeout(runSize, branchSize, isRun, socketTee)
     let mm = t.mm
     let role: EndRole = isRun ? 'tee-run' : 'tee-branch'
@@ -248,12 +260,7 @@ function resolveEnd(
     }
     return { role: 'straight', mm: 0 }
   }
-  const elbowFittingId = isElbowId(inc.seg.fitting)
-    ? (inc.seg.fitting as string)
-    : isElbowId(nb.seg.fitting)
-      ? (nb.seg.fitting as string)
-      : 'elbow90_long'
-  return { role: 'elbow', mm: elbowTakeout(inc, nb), fittingId: elbowFittingId }
+  return { role: 'elbow', mm: elbowTakeout(inc, nb), fittingId: defaultElbowId(inc, nb) }
 }
 
 export interface SegEnds {

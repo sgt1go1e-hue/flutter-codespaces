@@ -255,6 +255,10 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
     const isBranch = degreeAt(s.start) >= 3 || degreeAt(s.end) >= 3
     const fittingOwn = s.fitting != null && s.fitting !== ''
     let fitting: string
+    // 接続方法が「差込（ソケット）」のとき、継手未指定(自動)の既定値も
+    // 突き合わせ溶接ではなく差込式の継手を選ぶ（接続方法だけ変えても
+    // 継手が突き合わせ溶接のままになってしまう不具合の修正）。
+    const socket = s.connection === 'socket'
     if (fittingOwn) {
       fitting = s.fitting as string
     } else if (isBranch) {
@@ -262,12 +266,16 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
       const tee = findTeeContext(segments, sizeById, s.id)
       const mainN = nomA(tee?.mainSize)
       const branchN = nomA(tee?.branchSize)
-      fitting =
-        mainN != null && branchN != null && mainN !== branchN
-          ? 'tee_reducing'
+      const reducing = mainN != null && branchN != null && mainN !== branchN
+      fitting = reducing
+        ? socket
+          ? 'tee_reducing_socket'
+          : 'tee_reducing'
+        : socket
+          ? 'tee_equal_socket'
           : 'tee_equal'
     } else {
-      fitting = 'elbow90_long'
+      fitting = socket ? 'elbow90_socket' : 'elbow90_long'
     }
     out[s.id] = {
       pipeType: effectivePipeType(s, byId),
