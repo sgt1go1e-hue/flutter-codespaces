@@ -45,11 +45,13 @@ export interface CutResult {
   /** レジューサー描画用: 大径側が始点側か */
   reducerLargeAtStart?: boolean
   /**
-   * 差込（ソケット）溶接継手同士を直結していて、間の直管部（溶接代）が
-   * 目安寸法(SOCKET_WELD_MIN_GAP)未満しか取れていない。status='ok'（切り寸>0）
-   * のときのみ意味を持つ警告フラグ。
+   * 差込（ソケット）溶接継手同士を直結していて、両継手のツラ（差込み口の
+   * 開口面）間の隙間が目安寸法(SOCKET_WELD_MIN_GAP)未満しか取れていない。
+   * status='ok'（切り寸>0）のときのみ意味を持つ警告フラグ。
    */
   socketWeldGapWarning: boolean
+  /** 差込溶接継手同士のツラ〜ツラ間の隙間(mm)。socketWeldGapWarning判定の元値（表示用）。 */
+  socketWeldFaceGap?: number
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -62,6 +64,39 @@ const round1 = (x: number) => Math.round(x * 10) / 10
 const SOCKET_WELD_MIN_GAP = 50
 
 const isSocketWeldFittingId = (id?: string) => !!id && id.endsWith('_socket')
+
+// 差込み深さ C(参考値, mm)。呼び径ごと。90°エルボ／チーズ(ラン・枝とも)は共通の
+// ソケット深さ、45°エルボはソケット形状が異なるため別テーブル。
+// 出典: 日本ジョイント SW SCH80(1欄) TB-0101-A/TB-0201-A(90°系)・TB-0401-A(45°)。
+// 「切り寸法」はソケット底面〜底面間のパイプ長のため、そこから両端のC分
+// （ソケットに隠れて溶接代として使えない部分）を差し引いた値が、実際に
+// 溶接ビードが入る「継手のツラ〜ツラ」間の隙間になる。
+const SOCKET_DEPTH_C_90: Record<string, number> = {
+  '15': 12.5,
+  '20': 14.0,
+  '25': 15.5,
+  '32': 16.5,
+  '40': 17.5,
+  '50': 19.5,
+  '65': 25.0,
+  '80': 28.5,
+}
+const SOCKET_DEPTH_C_45: Record<string, number> = {
+  '15': 10.0,
+  '20': 12.7,
+  '25': 13.0,
+  '32': 15.0,
+  '40': 17.5,
+  '50': 17.5,
+  '65': 22.0,
+  '80': 25.0,
+}
+const socketDepthC = (fittingId?: string, size?: string): number => {
+  const n = nominalOf(size)
+  if (n == null) return 0
+  const table = fittingId?.startsWith('elbow45') ? SOCKET_DEPTH_C_45 : SOCKET_DEPTH_C_90
+  return table[String(n)] ?? 0
+}
 
 // 切り寸法の丸め方。継手の取り出し寸法(startAllow/endAllow)には適用せず、
 // 最終の切り寸法(cut)だけに適用する。
@@ -141,6 +176,13 @@ export function computeAllCut(
     // tee_reducing(径違いチーズ)は「メイン管サイズ／枝管サイズ」で実サイズを直接編集する
     // 方式のため、相手径待ちの警告は不要（ノードが分岐として成立していれば常に計算できる）。
 
+    // 差込溶接の「継手のツラ〜ツラ」間の隙間 = 切り寸法(ソケット底面〜底面間)から
+    // 両端のソケット差込み深さCを差し引いたもの。
+    const socketWeldFaceGap =
+      cut != null && isSocketWeldFittingId(e.start.fittingId) && isSocketWeldFittingId(e.end.fittingId)
+        ? round1(cut - socketDepthC(e.start.fittingId, eff?.size) - socketDepthC(e.end.fittingId, eff?.size))
+        : undefined
+
     out[s.id] = {
       center,
       startAllow,
@@ -168,10 +210,11 @@ export function computeAllCut(
           : undefined,
       socketWeldGapWarning:
         status === 'ok' &&
-        cut != null &&
-        cut < SOCKET_WELD_MIN_GAP &&
+        socketWeldFaceGap != null &&
+        socketWeldFaceGap < SOCKET_WELD_MIN_GAP &&
         isSocketWeldFittingId(e.start.fittingId) &&
         isSocketWeldFittingId(e.end.fittingId),
+      socketWeldFaceGap,
     }
   }
   return out
