@@ -443,7 +443,9 @@ export default function App() {
       const cur = prev.find((s) => s.id === selectedId)
       if (!cur) return prev
       const isReducer =
-        cur.fitting === 'reducer_concentric' || cur.fitting === 'reducer_eccentric'
+        cur.fitting === 'reducer_concentric' ||
+        cur.fitting === 'reducer_eccentric' ||
+        cur.fitting === 'reducer_socket'
       const sizeChanged =
         ('size' in patch && patch.size !== cur.size) ||
         ('reducerSize' in patch && patch.reducerSize !== cur.reducerSize)

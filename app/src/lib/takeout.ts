@@ -52,10 +52,18 @@ interface GNode {
 
 const dot = (a: Point, b: Point) => a.x * b.x + a.y * b.y
 const isElbowId = (id?: string) =>
-  id === 'elbow90_short' || id === 'elbow90_long' || id === 'elbow45_long'
-const isTeeId = (id?: string) => id === 'tee_equal' || id === 'tee_reducing'
+  id === 'elbow90_short' ||
+  id === 'elbow90_long' ||
+  id === 'elbow45_long' ||
+  id === 'elbow90_socket' ||
+  id === 'elbow45_socket'
+const isTeeId = (id?: string) =>
+  id === 'tee_equal' ||
+  id === 'tee_reducing' ||
+  id === 'tee_equal_socket' ||
+  id === 'tee_reducing_socket'
 const isReducerId = (id?: string) =>
-  id === 'reducer_concentric' || id === 'reducer_eccentric'
+  id === 'reducer_concentric' || id === 'reducer_eccentric' || id === 'reducer_socket'
 
 function buildGraph(
   segments: Segment[],
@@ -117,21 +125,24 @@ function reducerTakeout(inc: Inc, nb: Inc): { mm: number; id: string } {
   return { mm: isLarge ? 0 : H, id }
 }
 
-// チーズの取り出し寸法（ラン/枝で C・M を出し分け）
+// チーズの取り出し寸法（ラン/枝で C・M を出し分け）。socket=trueなら差込式の寸法を使う。
 function teeTakeout(
   runSize: string | undefined,
   branchSize: string | undefined,
   isRun: boolean,
+  socket: boolean,
 ): { mm: number; id: string } {
   const runN = nominalOf(runSize)
   const brN = nominalOf(branchSize)
   const reducing = runN != null && brN != null && runN !== brN
-  const id = reducing ? 'tee_reducing' : 'tee_equal'
+  const equalId = socket ? 'tee_equal_socket' : 'tee_equal'
+  const reducingId = socket ? 'tee_reducing_socket' : 'tee_reducing'
+  const id = reducing ? reducingId : equalId
   let dim: TeeDim | undefined
   if (reducing) {
-    dim = getFitting('tee_reducing')?.dims[`${runN}_${brN}`] as TeeDim | undefined
+    dim = getFitting(reducingId)?.dims[`${runN}_${brN}`] as TeeDim | undefined
   } else {
-    dim = getFitting('tee_equal')?.dims[String(runN ?? '')] as TeeDim | undefined
+    dim = getFitting(equalId)?.dims[String(runN ?? '')] as TeeDim | undefined
   }
   if (!dim) return { mm: 0, id }
   return { mm: isRun ? dim.run : dim.branch, id }
@@ -204,7 +215,11 @@ function resolveEnd(
     const runSize = runAxisSize(node, effById) ?? inc.size
     const branchInc = others.find((o) => Math.abs(dot(inc.into, o.into)) < 0.9)
     const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
-    const t = teeTakeout(runSize, branchSize, isRun)
+    // このノードのいずれかの脚に差込式チーズの継手が明示されていれば、差込式の寸法を使う
+    const socketTee = node.incs.some(
+      (i) => i.seg.fitting === 'tee_equal_socket' || i.seg.fitting === 'tee_reducing_socket',
+    )
+    const t = teeTakeout(runSize, branchSize, isRun, socketTee)
     let mm = t.mm
     let role: EndRole = isRun ? 'tee-run' : 'tee-branch'
     // 本管(run)アームが本管ヘッダ径より小さい＝チーズ直後にレジューサーで縮径

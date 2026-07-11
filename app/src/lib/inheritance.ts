@@ -38,7 +38,7 @@ export function effectivePipeType(seg: Segment, byId: SegmentMap) {
 }
 
 const isReducerId = (id?: string) =>
-  id === 'reducer_concentric' || id === 'reducer_eccentric'
+  id === 'reducer_concentric' || id === 'reducer_eccentric' || id === 'reducer_socket'
 
 /**
  * そのセグメントが下流(子)へ渡すサイズ。
