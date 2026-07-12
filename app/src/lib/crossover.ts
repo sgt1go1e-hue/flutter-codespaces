@@ -23,56 +23,26 @@ function segmentIntersection(
   return null
 }
 
-// 配管の向きを、アイソメ格子が持つ4方向(0/30/90/150、±180は同一視)のいずれかへ丸める。
-const ANGLE_FAMILIES = [0, 30, 90, 150] as const
-function angleFamily(dx: number, dy: number): number {
-  let deg = (Math.atan2(dy, dx) * 180) / Math.PI
-  deg = ((deg % 180) + 180) % 180
-  let best: number = ANGLE_FAMILIES[0]
-  let bestDiff = Infinity
-  for (const f of ANGLE_FAMILIES) {
-    const diff = Math.min(Math.abs(deg - f), 180 - Math.abs(deg - f))
-    if (diff < bestDiff) {
-      bestDiff = diff
-      best = f
-    }
-  }
-  return best
-}
-
-// 立て管（90°、垂直方向）は現場の作画慣習上、横引き・斜め管（0°/30°/150°）より
-// 手前に見えるため、途切れずに通し線で描く。横引き・斜め管側が交差点で途切れる。
-function frontPriority(seg: Segment): number {
-  return angleFamily(seg.end.x - seg.start.x, seg.end.y - seg.start.y) === 90 ? 1 : 0
-}
-
 /**
  * 「またぎ」表示のために、各セグメント上で線を途切れさせるべき位置
  * （そのセグメント上のパラメータ t, 0〜1）を求める。
  *
  * ルール: データ上つながっていない（端点を共有しない）2線が視覚的に交差する場合、
- * 立て管（垂直方向）を通し線・横引き/斜め管を途切れとする（前後関係が同じ優先度
- * 同士のときのみ、後から作成された方＝配列で後ろにある方を途切れさせる）。
- * これは見た目だけの処理で、接続関係（parentId 等）には影響しない。
+ * 後から作図された方（配列で後ろにある方）を通し線・手前とし、先に作図された方
+ * （既存の主管など）を途切れ・奥とする。配管は必ず「主管を先に描いてから、あとで
+ * 枝管を継ぎ足す」描き方になるため、向き（垂直/斜め等）に関係なく、作図順だけで
+ * 手前/奥が安定して判定できる。これは見た目だけの処理で、接続関係（parentId等）
+ * には影響しない。
  */
 export function computeCrossoverGaps(segments: Segment[]): Record<string, number[]> {
   const gaps: Record<string, number[]> = {}
   for (let i = 0; i < segments.length; i++) {
     for (let j = i + 1; j < segments.length; j++) {
-      const a = segments[i]
+      const a = segments[i] // 先に作図された方 → 途切れさせる
       const b = segments[j]
       const hit = segmentIntersection(a.start, a.end, b.start, b.end)
-      if (!hit) continue
-      const pa = frontPriority(a)
-      const pb = frontPriority(b)
-      // 優先度が高い方（立て管）を通し線に残し、低い方を途切れさせる。
-      // 同優先度なら従来通り後から作成された方(b)を途切れさせる。
-      if (pa > pb) {
-        ;(gaps[b.id] ??= []).push(hit.u)
-      } else if (pb > pa) {
+      if (hit) {
         ;(gaps[a.id] ??= []).push(hit.t)
-      } else {
-        ;(gaps[b.id] ??= []).push(hit.u)
       }
     }
   }
