@@ -179,6 +179,12 @@ export function DrawingCanvas({
 
   // ジェスチャ状態
   const startLocalRef = useRef<Point | null>(null)
+  // ドラッグ判定(MOVE_THRESHOLD)用に、ズーム倍率の影響を受けない画面座標
+  // (toScreenLocal)でも開始点を持つ。startLocalRef(論理座標)だけで判定すると
+  // ズームインしているときほど同じ指の移動量が小さい論理距離になり、短い区間を
+  // 描こうとしただけなのに「動いていない」＝タップ扱いになって、既存線の選択
+  // （寸法入力パネルが開く）に化けてしまう不具合があったための対策。
+  const startScreenRef = useRef<Point | null>(null)
   const movedRef = useRef(false)
   // 同時に触れている指（screen-local座標）。2本以上でピンチ/パンに切り替える。
   const pointersRef = useRef(new Map<number, Point>())
@@ -308,11 +314,13 @@ export function DrawingCanvas({
       // 2本指以上 = ピンチ/パン開始。進行中だった単指の描画開始はキャンセルする。
       gestureActiveRef.current = true
       startLocalRef.current = null
+      startScreenRef.current = null
       setPreview(null)
       beginGesture()
       return
     }
     startLocalRef.current = toLocal(e.clientX, e.clientY)
+    startScreenRef.current = toScreenLocal(e.clientX, e.clientY)
     movedRef.current = false
     setPreview(null)
   }
@@ -349,8 +357,11 @@ export function DrawingCanvas({
     const start = startLocalRef.current
     if (!start) return
     const p = toLocal(e.clientX, e.clientY)
-    if (!movedRef.current && distance(start, p) > MOVE_THRESHOLD) {
-      movedRef.current = true
+    if (!movedRef.current && startScreenRef.current) {
+      const pScreen = toScreenLocal(e.clientX, e.clientY)
+      if (distance(startScreenRef.current, pScreen) > MOVE_THRESHOLD) {
+        movedRef.current = true
+      }
     }
     if (movedRef.current) {
       // グリッド交点間・アイソメ角に拘束したプレビュー
@@ -373,12 +384,14 @@ export function DrawingCanvas({
         gestureRef.current = null
       }
       startLocalRef.current = null
+      startScreenRef.current = null
       setPreview(null)
       return
     }
 
     const start = startLocalRef.current
     startLocalRef.current = null
+    startScreenRef.current = null
 
     if (start && movedRef.current) {
       // ドラッグ = 描画
