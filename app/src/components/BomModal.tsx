@@ -33,6 +33,11 @@ export function BomModal({
   // PDF/印刷レイアウト: 詳細(複数ページ, パイプ1本ごとの明細つき) か
   // 1ページ集約(アイソメ図を縮小・パイプ明細は小計のみ、改ページなし) かを選べる。
   const [compact, setCompact] = useState(false)
+  // 「PDFで見る」は、現場ではすぐに印刷できず「まず画面で確認→LINE等で
+  // 加工場へ送る→印刷」という順番で使うため、押してすぐ印刷ダイアログを
+  // 開くのではなく、まず画面プレビューを表示する。実際の印刷/PDF化は
+  // プレビュー内のボタンから改めて行う。
+  const [previewOpen, setPreviewOpen] = useState(false)
 
   function downloadCsv() {
     // Excel(日本語)で文字化けしないよう BOM 付き UTF-8 で出力
@@ -165,7 +170,7 @@ export function BomModal({
           </button>
         </div>
         <div className="bom-actions">
-          <button className="bom-pdf" onClick={printAsPdf} disabled={empty}>
+          <button className="bom-pdf" onClick={() => setPreviewOpen(true)} disabled={empty}>
             PDFで見る
           </button>
           <button className="bom-csv" onClick={downloadCsv} disabled={empty}>
@@ -181,9 +186,18 @@ export function BomModal({
     {/* 印刷専用レイアウト。position:fixed のモーダル(disclaimer-overlay)の中に
         置くと、印刷時にその祖先のfixed配置(=1ページ分の高さに固定)へ引きずられて
         2ページ目以降が印刷されなくなるため、body直下へ portal で逃がす。
-        画面には出さず、印刷/PDF化(window.print)のときだけ表示する。 */}
+        画面には出さず、画面プレビュー(preview)または印刷/PDF化のときだけ表示する。 */}
     {createPortal(
-      <div className={`bom-print-only${compact ? ' compact' : ''}`}>
+      <div className={`bom-print-only${compact ? ' compact' : ''}${previewOpen ? ' preview' : ''}`}>
+        <div className="preview-toolbar">
+          <button className="preview-print-btn" onClick={printAsPdf}>
+            印刷 / PDFで保存
+          </button>
+          <button className="preview-close-btn" onClick={() => setPreviewOpen(false)}>
+            閉じる
+          </button>
+        </div>
+        <div className="preview-page">
         <h1>配管アイソメ図 材料集計表</h1>
         <p className="print-meta">作成日: {dateStr}</p>
 
@@ -287,6 +301,7 @@ export function BomModal({
             </table>
           </>
         )}
+        </div>
       </div>,
       document.body,
     )}

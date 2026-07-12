@@ -1116,9 +1116,151 @@ body {
   color: #1e1b3a;
 }
 
-/* 印刷専用レイアウト。画面表示では隠しておき、印刷/PDF化のときだけ表示する。 */
+/* 印刷専用レイアウト。画面表示では隠しておき、「PDFで見る」の画面プレビュー
+   または実際の印刷/PDF化のときだけ表示する。内容のスタイル(見出し・表など)は
+   プレビューと印刷で共通のため、@media print の外（常時有効）で定義し、
+   @media print 側は用紙サイズ・表示切り替え・改ページなど印刷固有の設定のみ扱う。 */
 .bom-print-only {
   display: none;
+  background: #fff;
+  color: #111;
+  font-family: sans-serif;
+}
+.bom-print-only h1 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.bom-print-only h2 {
+  font-size: 14px;
+  margin: 18px 0 6px;
+  border-bottom: 1px solid #999;
+  padding-bottom: 2px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+.bom-print-only .print-meta {
+  font-size: 11px;
+  color: #555;
+  margin: 0 0 10px;
+}
+.bom-print-only table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+.bom-print-only thead {
+  display: table-header-group;
+}
+.bom-print-only tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.bom-print-only th,
+.bom-print-only td {
+  border: 1px solid #888;
+  padding: 4px 8px;
+  font-size: 12px;
+  text-align: left;
+}
+.bom-print-only tr.print-subtotal td {
+  font-weight: 700;
+  background: #f0f0f0;
+}
+.bom-print-only .print-iso-wrap {
+  page-break-after: always;
+  break-after: page;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.print-iso-svg {
+  width: 100%;
+  height: 620px;
+  border: 1px solid #999;
+  background: #fff;
+}
+
+/* 1ページ集約モード: アイソメ図を縮小して改ページせずに続け、パイプ明細は
+   1本ごとの切り寸法行を省き小計行のみにし、余白・文字サイズを詰める。 */
+.bom-print-only.compact {
+  padding: 10px;
+}
+.bom-print-only.compact h1 {
+  font-size: 14px;
+  margin: 0 0 2px;
+}
+.bom-print-only.compact h2 {
+  font-size: 11px;
+  margin: 8px 0 3px;
+  padding-bottom: 1px;
+}
+.bom-print-only.compact .print-meta {
+  font-size: 9px;
+  margin: 0 0 6px;
+}
+.bom-print-only.compact th,
+.bom-print-only.compact td {
+  padding: 2px 5px;
+  font-size: 9.5px;
+}
+.bom-print-only.compact table {
+  margin-bottom: 4px;
+}
+.bom-print-only.compact .print-iso-wrap {
+  page-break-after: auto;
+  break-after: auto;
+  margin-bottom: 6px;
+}
+.bom-print-only.compact .print-iso-svg {
+  height: 240px;
+}
+
+/* 画面プレビュー（「PDFで見る」）。印刷ダイアログを介さずまず内容を確認できる
+   ようにし、確認後に上部の「印刷/PDFで保存」ボタンで初めて window.print() を
+   呼ぶ（現場では即印刷できず、まず見る→LINE等で加工場へ送る、の順のため）。 */
+.bom-print-only.preview {
+  display: block;
+  position: fixed;
+  inset: 0;
+  /* 材料集計(BOM)モーダル本体(.disclaimer-overlay, z-index:100)より
+     必ず手前に出す必要があるため、それより高い値にする。 */
+  z-index: 200;
+  overflow-y: auto;
+  background: #0b1220;
+  padding: 16px;
+}
+.preview-toolbar {
+  display: none;
+}
+.bom-print-only.preview .preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto 12px;
+}
+.preview-toolbar button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+}
+.preview-print-btn {
+  background: #38bdf8;
+  color: #04222e;
+}
+.preview-close-btn {
+  background: #334155;
+  color: #e2e8f0;
+}
+.bom-print-only.preview .preview-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  color: #111;
 }
 
 @media print {
@@ -1141,98 +1283,20 @@ body {
   }
   .bom-print-only {
     display: block;
-    position: static;
-    background: #fff;
-    color: #111;
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    overflow: visible !important;
     padding: 16px;
-    font-family: sans-serif;
   }
-  .bom-print-only h1 {
-    font-size: 18px;
-    margin: 0 0 4px;
+  .preview-toolbar {
+    display: none !important;
   }
-  .bom-print-only h2 {
-    font-size: 14px;
-    margin: 18px 0 6px;
-    border-bottom: 1px solid #999;
-    padding-bottom: 2px;
-    break-after: avoid;
-    page-break-after: avoid;
-  }
-  .bom-print-only .print-meta {
-    font-size: 11px;
-    color: #555;
-    margin: 0 0 10px;
-  }
-  .bom-print-only table {
-    width: 100%;
-    border-collapse: collapse;
-    margin-bottom: 8px;
-  }
-  .bom-print-only thead {
-    display: table-header-group;
-  }
-  .bom-print-only tr {
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  .bom-print-only th,
-  .bom-print-only td {
-    border: 1px solid #888;
-    padding: 4px 8px;
-    font-size: 12px;
-    text-align: left;
-  }
-  .bom-print-only tr.print-subtotal td {
-    font-weight: 700;
-    background: #f0f0f0;
-  }
-  .bom-print-only .print-iso-wrap {
-    page-break-after: always;
-    break-after: page;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
-  .print-iso-svg {
-    width: 100%;
-    height: 620px;
-    border: 1px solid #999;
-    background: #fff;
-  }
-
-  /* 1ページ集約モード: アイソメ図を縮小して改ページせずに続け、パイプ明細は
-     1本ごとの切り寸法行を省き小計行のみにし、余白・文字サイズを詰める。 */
-  .bom-print-only.compact {
-    padding: 10px;
-  }
-  .bom-print-only.compact h1 {
-    font-size: 14px;
-    margin: 0 0 2px;
-  }
-  .bom-print-only.compact h2 {
-    font-size: 11px;
-    margin: 8px 0 3px;
-    padding-bottom: 1px;
-  }
-  .bom-print-only.compact .print-meta {
-    font-size: 9px;
-    margin: 0 0 6px;
-  }
-  .bom-print-only.compact th,
-  .bom-print-only.compact td {
-    padding: 2px 5px;
-    font-size: 9.5px;
-  }
-  .bom-print-only.compact table {
-    margin-bottom: 4px;
-  }
-  .bom-print-only.compact .print-iso-wrap {
-    page-break-after: auto;
-    break-after: auto;
-    margin-bottom: 6px;
-  }
-  .bom-print-only.compact .print-iso-svg {
-    height: 240px;
+  .bom-print-only.preview .preview-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    box-shadow: none;
   }
 }
 
