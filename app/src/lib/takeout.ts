@@ -56,14 +56,22 @@ const isElbowId = (id?: string) =>
   id === 'elbow90_long' ||
   id === 'elbow45_long' ||
   id === 'elbow90_socket' ||
-  id === 'elbow45_socket'
+  id === 'elbow45_socket' ||
+  id === 'elbow90_thread' ||
+  id === 'elbow45_thread'
 const isTeeId = (id?: string) =>
   id === 'tee_equal' ||
   id === 'tee_reducing' ||
   id === 'tee_equal_socket' ||
-  id === 'tee_reducing_socket'
+  id === 'tee_reducing_socket' ||
+  id === 'tee_equal_thread' ||
+  id === 'tee_reducing_thread'
 const isReducerId = (id?: string) =>
-  id === 'reducer_concentric' || id === 'reducer_eccentric' || id === 'reducer_socket'
+  id === 'reducer_concentric' ||
+  id === 'reducer_eccentric' ||
+  id === 'reducer_socket' ||
+  id === 'reducer_thread' ||
+  id === 'bushing_thread'
 
 function buildGraph(
   segments: Segment[],
@@ -98,14 +106,15 @@ function buildGraph(
 
 // エルボの継手id。自セグメント／隣接セグメントに明示指定があればそれを使い、
 // どちらも未指定(自動)なら、いずれかの接続方法が「差込（ソケット）」なら差込式、
-// それ以外は突き合わせ溶接(ロング)を既定にする（接続方法を差込に変えても
-// 継手が突き合わせ溶接のままになってしまう不具合の修正）。
+// 「ねじ込み」ならねじ込み式、それ以外は突き合わせ溶接(ロング)を既定にする
+// （接続方法を変えても継手が突き合わせ溶接のままになってしまう不具合の修正）。
 function defaultElbowId(inc: Inc, nb?: Inc): string {
   if (isElbowId(inc.seg.fitting)) return inc.seg.fitting as string
   if (isElbowId(nb?.seg.fitting)) return nb!.seg.fitting as string
-  return inc.seg.connection === 'socket' || nb?.seg.connection === 'socket'
-    ? 'elbow90_socket'
-    : 'elbow90_long'
+  const connection = inc.seg.connection ?? nb?.seg.connection
+  if (connection === 'socket') return 'elbow90_socket'
+  if (connection === 'thread') return 'elbow90_thread'
+  return 'elbow90_long'
 }
 
 // エルボの取り出し寸法（自セグメントのサイズで）
@@ -133,18 +142,30 @@ function reducerTakeout(inc: Inc, nb: Inc): { mm: number; id: string } {
   return { mm: isLarge ? 0 : H, id }
 }
 
-// チーズの取り出し寸法（ラン/枝で C・M を出し分け）。socket=trueなら差込式の寸法を使う。
+// チーズの取り出し寸法（ラン/枝で C・M を出し分け）。connectionKindで
+// 差込式/ねじ込み式/突き合わせ溶接式の寸法を出し分ける。
+type ConnectionKind = 'buttweld' | 'socket' | 'thread'
 function teeTakeout(
   runSize: string | undefined,
   branchSize: string | undefined,
   isRun: boolean,
-  socket: boolean,
+  connectionKind: ConnectionKind,
 ): { mm: number; id: string } {
   const runN = nominalOf(runSize)
   const brN = nominalOf(branchSize)
   const reducing = runN != null && brN != null && runN !== brN
-  const equalId = socket ? 'tee_equal_socket' : 'tee_equal'
-  const reducingId = socket ? 'tee_reducing_socket' : 'tee_reducing'
+  const equalId =
+    connectionKind === 'socket'
+      ? 'tee_equal_socket'
+      : connectionKind === 'thread'
+        ? 'tee_equal_thread'
+        : 'tee_equal'
+  const reducingId =
+    connectionKind === 'socket'
+      ? 'tee_reducing_socket'
+      : connectionKind === 'thread'
+        ? 'tee_reducing_thread'
+        : 'tee_reducing'
   const id = reducing ? reducingId : equalId
   let dim: TeeDim | undefined
   if (reducing) {
@@ -223,15 +244,22 @@ function resolveEnd(
     const runSize = runAxisSize(node, effById) ?? inc.size
     const branchInc = others.find((o) => Math.abs(dot(inc.into, o.into)) < 0.9)
     const branchSize = isRun ? (branchInc?.size ?? inc.size) : inc.size
-    // このノードのいずれかの脚にチーズ継手が明示されていればそれに従う（突き合わせ/差込とも）。
-    // どの脚にも明示指定がなければ、いずれかの脚の接続方法が「差込（ソケット）」なら
-    // 差込式の寸法を使う（接続方法を差込に変えても継手が突き合わせ溶接のままになって
-    // しまう不具合の修正）。
+    // このノードのいずれかの脚にチーズ継手が明示されていればそれに従う（突き合わせ/差込/ねじ込みとも）。
+    // どの脚にも明示指定がなければ、いずれかの脚の接続方法から差込式/ねじ込み式の寸法を選ぶ
+    // （接続方法を変えても継手が突き合わせ溶接のままになってしまう不具合の修正）。
     const explicitTeeId = node.incs.map((i) => i.seg.fitting).find(isTeeId)
-    const socketTee = explicitTeeId
+    const connectionKind: ConnectionKind = explicitTeeId
       ? explicitTeeId.endsWith('_socket')
+        ? 'socket'
+        : explicitTeeId.endsWith('_thread')
+          ? 'thread'
+          : 'buttweld'
       : node.incs.some((i) => i.seg.connection === 'socket')
-    const t = teeTakeout(runSize, branchSize, isRun, socketTee)
+        ? 'socket'
+        : node.incs.some((i) => i.seg.connection === 'thread')
+          ? 'thread'
+          : 'buttweld'
+    const t = teeTakeout(runSize, branchSize, isRun, connectionKind)
     let mm = t.mm
     let role: EndRole = isRun ? 'tee-run' : 'tee-branch'
     // 本管(run)アームが本管ヘッダ径より小さい＝チーズ直後にレジューサーで縮径

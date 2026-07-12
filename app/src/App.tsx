@@ -445,7 +445,9 @@ export default function App() {
       const isReducer =
         cur.fitting === 'reducer_concentric' ||
         cur.fitting === 'reducer_eccentric' ||
-        cur.fitting === 'reducer_socket'
+        cur.fitting === 'reducer_socket' ||
+        cur.fitting === 'reducer_thread' ||
+        cur.fitting === 'bushing_thread'
       const sizeChanged =
         ('size' in patch && patch.size !== cur.size) ||
         ('reducerSize' in patch && patch.reducerSize !== cur.reducerSize)

@@ -38,7 +38,11 @@ export function effectivePipeType(seg: Segment, byId: SegmentMap) {
 }
 
 const isReducerId = (id?: string) =>
-  id === 'reducer_concentric' || id === 'reducer_eccentric' || id === 'reducer_socket'
+  id === 'reducer_concentric' ||
+  id === 'reducer_eccentric' ||
+  id === 'reducer_socket' ||
+  id === 'reducer_thread' ||
+  id === 'bushing_thread'
 
 /**
  * そのセグメントが下流(子)へ渡すサイズ。
@@ -255,10 +259,11 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
     const isBranch = degreeAt(s.start) >= 3 || degreeAt(s.end) >= 3
     const fittingOwn = s.fitting != null && s.fitting !== ''
     let fitting: string
-    // 接続方法が「差込（ソケット）」のとき、継手未指定(自動)の既定値も
-    // 突き合わせ溶接ではなく差込式の継手を選ぶ（接続方法だけ変えても
+    // 接続方法が「差込（ソケット）」「ねじ込み」のとき、継手未指定(自動)の既定値も
+    // 突き合わせ溶接ではなく差込式/ねじ込み式の継手を選ぶ（接続方法だけ変えても
     // 継手が突き合わせ溶接のままになってしまう不具合の修正）。
     const socket = s.connection === 'socket'
+    const thread = s.connection === 'thread'
     if (fittingOwn) {
       fitting = s.fitting as string
     } else if (isBranch) {
@@ -270,12 +275,16 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
       fitting = reducing
         ? socket
           ? 'tee_reducing_socket'
-          : 'tee_reducing'
+          : thread
+            ? 'tee_reducing_thread'
+            : 'tee_reducing'
         : socket
           ? 'tee_equal_socket'
-          : 'tee_equal'
+          : thread
+            ? 'tee_equal_thread'
+            : 'tee_equal'
     } else {
-      fitting = socket ? 'elbow90_socket' : 'elbow90_long'
+      fitting = socket ? 'elbow90_socket' : thread ? 'elbow90_thread' : 'elbow90_long'
     }
     out[s.id] = {
       pipeType: effectivePipeType(s, byId),

@@ -141,13 +141,15 @@ export function SegmentPanel({
   const fittingEmpty = effective
     ? `自動（${getFitting(effective.fitting)?.name ?? effective.fitting}）`
     : '自動'
-  // 接続方法が「差込（ソケット）」なら差込式の継手だけ、それ以外は突き合わせ溶接系
-  // だけを選択肢に出す（差込と突き合わせが混在すると選び間違えやすいため）。
-  const isSocketConn = segment.connection === 'socket'
+  // 接続方法が「差込（ソケット）」なら差込式、「ねじ込み」ならねじ込み式、それ以外は
+  // 突き合わせ溶接系だけを選択肢に出す（種類が混在すると選び間違えやすいため）。
   const visibleFittings = fittings.filter((f) => {
     if (f.id === 'none') return true
     const isSocketFitting = f.source?.includes('socket') ?? false
-    return isSocketConn ? isSocketFitting : !isSocketFitting
+    const isThreadFitting = f.source?.includes('thread') ?? false
+    if (segment.connection === 'socket') return isSocketFitting
+    if (segment.connection === 'thread') return isThreadFitting
+    return !isSocketFitting && !isThreadFitting
   })
 
   function onPipeTypeChange(pipeType: string) {

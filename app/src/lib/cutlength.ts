@@ -170,7 +170,12 @@ export function computeAllCut(
       const small = a != null && b != null ? `${Math.min(a, b)}A` : undefined
       eccentric = { offset, align: s.reducerAlign, alignNeeded: !s.reducerAlign, large, small }
       needsCounterpart = !cp
-    } else if (s.fitting === 'reducer_concentric' || s.fitting === 'reducer_socket') {
+    } else if (
+      s.fitting === 'reducer_concentric' ||
+      s.fitting === 'reducer_socket' ||
+      s.fitting === 'reducer_thread' ||
+      s.fitting === 'bushing_thread'
+    ) {
       needsCounterpart = !(s.reducerSize ?? autoCounterpart)
     }
     // tee_reducing(径違いチーズ)は「メイン管サイズ／枝管サイズ」で実サイズを直接編集する
@@ -205,7 +210,9 @@ export function computeAllCut(
       reducerLargeAtStart:
         s.fitting === 'reducer_concentric' ||
         s.fitting === 'reducer_eccentric' ||
-        s.fitting === 'reducer_socket'
+        s.fitting === 'reducer_socket' ||
+        s.fitting === 'reducer_thread' ||
+        s.fitting === 'bushing_thread'
           ? reducerLargeAtStart(s, segments, effectiveById, s.reducerSize ?? autoCounterpart)
           : undefined,
       socketWeldGapWarning:
