@@ -1,4 +1,4 @@
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { bomToCsv, type Bom } from '../lib/bom'
 import { PrintIsometric } from './PrintIsometric'
@@ -38,6 +38,23 @@ export function BomModal({
   // 開くのではなく、まず画面プレビューを表示する。実際の印刷/PDF化は
   // プレビュー内のボタンから改めて行う。
   const [previewOpen, setPreviewOpen] = useState(false)
+
+  // アプリ全体はキャンバス独自のピンチズームと競合しないよう viewport で
+  // ピンチズームを禁止している(user-scalable=no)が、PDFプレビュー中は
+  // 逆に文字を拡大して確認したいという要望のため、プレビューを開いている
+  // 間だけブラウザ標準のピンチズームを許可し、閉じたら元に戻す。
+  useEffect(() => {
+    if (!previewOpen) return
+    const meta = document.querySelector('meta[name="viewport"]')
+    const original = meta?.getAttribute('content') ?? null
+    meta?.setAttribute(
+      'content',
+      'width=device-width, initial-scale=1.0, maximum-scale=5.0, user-scalable=yes, viewport-fit=cover',
+    )
+    return () => {
+      if (original != null) meta?.setAttribute('content', original)
+    }
+  }, [previewOpen])
 
   function downloadCsv() {
     // Excel(日本語)で文字化けしないよう BOM 付き UTF-8 で出力
