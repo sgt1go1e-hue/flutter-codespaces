@@ -18,7 +18,7 @@ const CROSS_GAP = 9
 function estimateTextWidth(text: string, fontSize: number): number {
   let w = 0
   for (const ch of text) {
-    w += ch.charCodeAt(0) > 0x2e80 ? fontSize : fontSize * 0.62
+    w += ch.charCodeAt(0) > 0x2e80 ? fontSize : fontSize * 1.02
   }
   return w
 }
@@ -48,13 +48,22 @@ function resolveOverlaps(
     let cx = job.cx
     let cy = job.cy
     let attempts = 0
-    while (
-      attempts < 24 &&
-      placed.some((p) => boxesOverlap({ cx, cy, w: job.w, h: job.h }, p))
-    ) {
-      cx += job.pushX * 5
-      cy += job.pushY * 5
+    let hit = placed.find((p) => boxesOverlap({ cx, cy, w: job.w, h: job.h }, p))
+    while (attempts < 24 && hit) {
+      // 自分の既定の押し出し方向(pushX/pushY)だけで進めると、短い区間が
+      // 隣接ノードにぶつかり合っているような密集配置では、ぶつかっている
+      // 相手と同じ向きに動き続けて解消しないことがあった。既定方向に加えて
+      // 実際にぶつかっている相手から遠ざかる向きも合成し、収束しやすくする。
+      const awayX = cx - hit.cx
+      const awayY = cy - hit.cy
+      const awayLen = Math.hypot(awayX, awayY) || 1
+      const dx = job.pushX + (awayX / awayLen) * 1.0
+      const dy = job.pushY + (awayY / awayLen) * 1.0
+      const len = Math.hypot(dx, dy) || 1
+      cx += (dx / len) * 5
+      cy += (dy / len) * 5
       attempts++
+      hit = placed.find((p) => boxesOverlap({ cx, cy, w: job.w, h: job.h }, p))
     }
     placed.push({ cx, cy, w: job.w, h: job.h })
     result.set(job.key, { cx, cy })

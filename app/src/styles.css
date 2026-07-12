@@ -1226,7 +1226,11 @@ body {
   z-index: 200;
   overflow-y: auto;
   background: #0b1220;
-  padding: 16px;
+  /* iPhoneの横向き表示ではノッチ/ホームインジケータが画面の左右・下に
+     食い込むため、閉じる等のボタンがそこに重なって押せなくなっていた。
+     safe-area分を必ず確保する。 */
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
 }
 .preview-toolbar {
   display: none;
