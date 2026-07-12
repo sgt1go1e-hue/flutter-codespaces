@@ -6,6 +6,7 @@ import {
   isometricGrid,
   latticeStep,
   projectOnSegment,
+  samePoint,
   snapEndFromStart,
   snapToEndpoints,
   snapToLattice,
@@ -32,9 +33,13 @@ interface Props {
   inputDisabled: boolean
 }
 
-// 指を動かして「描画」と判定するまでの移動量(px)。これ未満はタップ扱い。
-// タップ（動かさず離す）=選択、ドラッグ（動かす）=描画、と明確に分ける。
-const MOVE_THRESHOLD = 7
+// 「指が動いたかどうか」のごく小さいデッドゾーン(px、画面座標＝ズーム非依存)。
+// snapEndFromStartは指が全く動いていなくても最低1格子分の終点を返してしまう
+// （実際に描画を確定させる呼び出し用の仕様のため）ので、それより手前で、
+// 本当に指がほぼ動いていない(=タップ)ケースをここで弾く。格子スナップ判定
+// 自体はズーム非依存なので、このデッドゾーンも通常のタップのぶれを吸収できる
+// 程度の小さい値で十分（短いキック区間の描画を妨げない）。
+const TAP_DEADZONE_PX = 4
 // タップ位置からセグメントを拾うヒット距離(px)
 const HIT_DIST = 18
 // アイソメグリッドの間隔(px)＝格子スナップの基準。
@@ -179,11 +184,14 @@ export function DrawingCanvas({
 
   // ジェスチャ状態
   const startLocalRef = useRef<Point | null>(null)
-  // ドラッグ判定(MOVE_THRESHOLD)用に、ズーム倍率の影響を受けない画面座標
-  // (toScreenLocal)でも開始点を持つ。startLocalRef(論理座標)だけで判定すると
-  // ズームインしているときほど同じ指の移動量が小さい論理距離になり、短い区間を
-  // 描こうとしただけなのに「動いていない」＝タップ扱いになって、既存線の選択
-  // （寸法入力パネルが開く）に化けてしまう不具合があったための対策。
+  // ドラッグ/タップの判定は「指の移動距離(px)」ではなく「離した位置が、押した
+  // 位置と同じ格子点に吸着するか、別の格子点に吸着するか」で行う。ピクセル距離
+  // 判定だと、ズームインしているときほど同じ指の移動量が小さい論理距離になり、
+  // 短い区間（キック区間等）を描こうとしただけで「動いていない」＝タップ扱いに
+  // なって既存線の選択（寸法入力パネルが開く）に化けてしまっていたため。
+  // snapStartで一度確定させた開始点の格子スナップ結果をここに保持する。
+  const snappedStartRef = useRef<Point | null>(null)
+  // TAP_DEADZONE_PX判定用（画面座標、ズーム非依存）。
   const startScreenRef = useRef<Point | null>(null)
   const movedRef = useRef(false)
   // 同時に触れている指（screen-local座標）。2本以上でピンチ/パンに切り替える。
@@ -314,12 +322,14 @@ export function DrawingCanvas({
       // 2本指以上 = ピンチ/パン開始。進行中だった単指の描画開始はキャンセルする。
       gestureActiveRef.current = true
       startLocalRef.current = null
+      snappedStartRef.current = null
       startScreenRef.current = null
       setPreview(null)
       beginGesture()
       return
     }
     startLocalRef.current = toLocal(e.clientX, e.clientY)
+    snappedStartRef.current = snapStart(startLocalRef.current)
     startScreenRef.current = toScreenLocal(e.clientX, e.clientY)
     movedRef.current = false
     setPreview(null)
@@ -355,19 +365,24 @@ export function DrawingCanvas({
     }
 
     const start = startLocalRef.current
-    if (!start) return
-    const p = toLocal(e.clientX, e.clientY)
-    if (!movedRef.current && startScreenRef.current) {
-      const pScreen = toScreenLocal(e.clientX, e.clientY)
-      if (distance(startScreenRef.current, pScreen) > MOVE_THRESHOLD) {
-        movedRef.current = true
-      }
+    const s = snappedStartRef.current
+    if (!start || !s) return
+    const pScreen = toScreenLocal(e.clientX, e.clientY)
+    if (startScreenRef.current && distance(startScreenRef.current, pScreen) < TAP_DEADZONE_PX) {
+      // ほぼ動いていない(デッドゾーン内)。snapEndFromStartは動いていなくても
+      // 最低1格子分の終点を返してしまうため、ここで先に弾いてタップ扱いにする。
+      movedRef.current = false
+      setPreview(null)
+      return
     }
+    const p = toLocal(e.clientX, e.clientY)
+    const { end } = snapEndFromStart(s, p, GRID_GAP)
+    movedRef.current = !samePoint(s, end)
     if (movedRef.current) {
       // グリッド交点間・アイソメ角に拘束したプレビュー
-      const s = snapStart(start)
-      const { end } = snapEndFromStart(s, p, GRID_GAP)
       setPreview({ start: s, end })
+    } else {
+      setPreview(null)
     }
   }
 
@@ -384,26 +399,36 @@ export function DrawingCanvas({
         gestureRef.current = null
       }
       startLocalRef.current = null
+      snappedStartRef.current = null
       startScreenRef.current = null
       setPreview(null)
       return
     }
 
     const start = startLocalRef.current
+    const s = snappedStartRef.current
+    const startScreen = startScreenRef.current
     startLocalRef.current = null
+    snappedStartRef.current = null
     startScreenRef.current = null
 
-    if (start && movedRef.current) {
-      // ドラッグ = 描画
+    if (start && s) {
+      const pScreen = toScreenLocal(e.clientX, e.clientY)
+      const inDeadzone = startScreen != null && distance(startScreen, pScreen) < TAP_DEADZONE_PX
+      // デッドゾーン内(ほぼ動いていない)ならタップ。それ以外は、離した位置が
+      // 開始点と同じ格子点に吸着するか(タップ)、別の格子点に吸着するか
+      // (ドラッグ=描画)で判定する（pointerup時点の位置で確定判定）。
       const p = toLocal(e.clientX, e.clientY)
-      const s = snapStart(start)
       const { end, angle } = snapEndFromStart(s, p, GRID_GAP)
-      onAddSegment({ start: s, end, angle })
-    } else if (start) {
-      // タップ（動かさず離す）= 線上なら選択、そうでなければ選択解除
-      const seg = hitSegment(start)
-      if (seg) onSelectSegment(seg.id)
-      else onBackgroundTap()
+      if (!inDeadzone && !samePoint(s, end)) {
+        // ドラッグ = 描画
+        onAddSegment({ start: s, end, angle })
+      } else {
+        // タップ（動かさず離す）= 線上なら選択、そうでなければ選択解除
+        const seg = hitSegment(start)
+        if (seg) onSelectSegment(seg.id)
+        else onBackgroundTap()
+      }
     }
     setPreview(null)
   }
