@@ -538,8 +538,13 @@ export function DrawingCanvas({
           nx = -nx
           ny = -ny
         }
-        const cx = pt.x + ox * 20 + nx * 14
-        const cy = pt.y + oy * 20 + ny * 14
+        // 端点(=新しい線を引き始めるタップ位置)にラベルの当たり判定が近すぎると、
+        // 続けて線を引こうとしたタップがラベル選択として拾われてしまう。
+        // 元の位置から格子1マス分さらに離して、近すぎず遠すぎない位置にする。
+        const along = 20 + latticeStep(s.angle, GRID_GAP)
+        const perp = 14
+        const cx = pt.x + ox * along + nx * perp
+        const cy = pt.y + oy * along + ny * perp
         const w = estimateTextWidth(eff.size, 13) + 14
         jobs.push({ key: `term-${s.id}-${at}`, cx, cy, w, h: 26, pushX: nx, pushY: ny })
       }
@@ -588,7 +593,7 @@ export function DrawingCanvas({
       }
     }
     return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles])
-  }, [segments, cutById, effectiveById, crossoverGaps])
+  }, [segments, cutById, effectiveById, crossoverGaps, GRID_GAP])
 
   // フランジ記号を端点に描く。
   // 'double'(両) = 配管に直交する短い2本線、'single'(片) = 1本線（終端エンド）。
@@ -647,10 +652,15 @@ export function DrawingCanvas({
       nx = -nx
       ny = -ny
     }
+    // 端点(=新しい線を引き始めるタップ位置)にラベルの当たり判定が近すぎると、
+    // 続けて線を引こうとしたタップがラベル選択として拾われてしまう。
+    // 元の位置から格子1マス分さらに離して、近すぎず遠すぎない位置にする。
+    const along = 20 + latticeStep(s.angle, GRID_GAP)
+    const perp = 14
     // 重なり回避で押し出された最終位置（無ければ基準位置にフォールバック）
     const resolved = resolvedLabels.get(`term-${s.id}-${at}`)
-    const cx = resolved?.cx ?? pt.x + ox * 20 + nx * 14
-    const cy = resolved?.cy ?? pt.y + oy * 20 + ny * 14
+    const cx = resolved?.cx ?? pt.x + ox * along + nx * perp
+    const cy = resolved?.cy ?? pt.y + oy * along + ny * perp
     // タップでその区間を選択（線が細くても押しやすいよう当たり判定を広めに）
     const onTap = (e: React.PointerEvent) => {
       e.stopPropagation()
