@@ -141,9 +141,9 @@ export function computeBom(
       const runEnds = cl.filter(
         (e) => e.role === 'tee-run' || e.role === 'tee-run-reducer',
       )
-      const branchEnd = cl.find((e) => e.role === 'tee-branch')
+      const branchEnds = cl.filter((e) => e.role === 'tee-branch')
       // 本管(ラン)ヘッダ径 = ラン側の最大径
-      let runSize = branchEnd?.size
+      let runSize = branchEnds[0]?.size
       let runN = -1
       for (const e of runEnds) {
         const n = nominalOf(e.size)
@@ -152,10 +152,16 @@ export function computeBom(
           runSize = e.size
         }
       }
-      const branchN = nominalOf(branchEnd?.size)
-      const reducing = runN >= 0 && branchN != null && runN !== branchN
-      if (reducing) addFit('tee_reducing', pairLabel(runSize, branchEnd?.size))
-      else addFit('tee_equal', `${runSize ?? branchEnd?.size ?? '?'}`)
+      // 同一節点に枝管が複数(度数4以上＝1点から枝が2本以上)ある場合、
+      // 現場では枝ごとに別のチーズとして溶接するため、枝の本数だけ計上する
+      // （以前は cl.find で最初の1本しか見ておらず、2本目以降が漏れていた）。
+      const branchesToCount = branchEnds.length > 0 ? branchEnds : [undefined]
+      for (const branchEnd of branchesToCount) {
+        const branchN = nominalOf(branchEnd?.size)
+        const reducing = runN >= 0 && branchN != null && runN !== branchN
+        if (reducing) addFit('tee_reducing', pairLabel(runSize, branchEnd?.size))
+        else addFit('tee_equal', `${runSize ?? branchEnd?.size ?? '?'}`)
+      }
       // ツキ合わせのレジューサー（縮径したラン側 = tee-run-reducer 端ごとに1個）
       for (const e of cl) {
         if (e.role === 'tee-run-reducer')
