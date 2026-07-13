@@ -31,6 +31,10 @@ interface Props {
   cutById: Record<string, CutResult>
   /** パーツドラッグ中など、キャンバス入力を一時無効化する */
   inputDisabled: boolean
+  /** 表示の拡大縮小・平行移動（ピンチズーム）。パーツパレットのドロップ位置
+      判定(App側)でも同じ変換が要るため、状態を親へ持ち上げて共有する。 */
+  view: { scale: number; tx: number; ty: number }
+  onViewChange: (view: { scale: number; tx: number; ty: number }) => void
 }
 
 // 「指が動いたかどうか」のごく小さいデッドゾーン(px、画面座標＝ズーム非依存)。
@@ -180,6 +184,8 @@ export function DrawingCanvas({
   crossoverGaps,
   cutById,
   inputDisabled,
+  view,
+  onViewChange,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
@@ -188,8 +194,6 @@ export function DrawingCanvas({
   const [size, setSize] = useState({ w: 0, h: 0 })
   // 画面幅に応じた格子間隔（スマホは詰め、iPad/デスクトップは従来どおり）
   const GRID_GAP = useMemo(() => gridGapForWidth(size.w), [size.w])
-  // 表示の拡大縮小・平行移動（ピンチズーム）。論理座標 -> 画面座標 = *scale + (tx,ty)
-  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 })
 
   // ジェスチャ状態
   const startLocalRef = useRef<Point | null>(null)
@@ -364,7 +368,7 @@ export function DrawingCanvas({
         // tx,ty を解く（つまんだ場所を中心にズーム＋2本指パンを同時に実現）。
         const logicalX = (g.startMidScreen.x - g.startTx) / g.startScale
         const logicalY = (g.startMidScreen.y - g.startTy) / g.startScale
-        setView({
+        onViewChange({
           scale: newScale,
           tx: mid.x - logicalX * newScale,
           ty: mid.y - logicalY * newScale,

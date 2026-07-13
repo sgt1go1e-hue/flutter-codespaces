@@ -231,6 +231,11 @@ export default function App() {
     x: number
     y: number
   } | null>(null)
+  // キャンバスの表示変換（ピンチズーム・パン）。パーツをドロップした位置を
+  // 論理座標へ変換する際、キャンバス側と同じ変換を使う必要があるためここで保持する
+  // （以前はキャンバス内部だけの状態だったため、ズーム/パン後にドロップ位置の
+  // 判定がずれてフランジ・レジューサーが置けなくなる不具合があった）。
+  const [view, setView] = useState({ scale: 1, tx: 0, ty: 0 })
 
   const stageRef = useRef<HTMLElement>(null)
 
@@ -310,6 +315,7 @@ export default function App() {
     setDrawingId(makeDrawingId())
     setSegments([])
     setSelectedId(null)
+    setView({ scale: 1, tx: 0, ty: 0 })
     setScreen('drawing')
   }
 
@@ -318,6 +324,7 @@ export default function App() {
     setDrawingId(id)
     setSegments(loadDrawingSegments(id))
     setSelectedId(null)
+    setView({ scale: 1, tx: 0, ty: 0 })
     setScreen('drawing')
   }
 
@@ -537,7 +544,12 @@ export default function App() {
   function dropPart(partId: string, clientX: number, clientY: number) {
     const rect = stageRef.current?.getBoundingClientRect()
     if (!rect) return
-    const p = { x: clientX - rect.left, y: clientY - rect.top }
+    // キャンバスがピンチズーム・パンされていると、画面座標をそのまま論理座標として
+    // 使うとずれてしまう（キャンバス内部の <g transform> と同じ逆変換が必要）。
+    const p = {
+      x: (clientX - rect.left - view.tx) / view.scale,
+      y: (clientY - rect.top - view.ty) / view.scale,
+    }
     let best: Segment | null = null
     let bestDist = DROP_HIT
     for (const s of segments) {
@@ -683,6 +695,8 @@ export default function App() {
           crossoverGaps={crossoverGaps}
           cutById={cutById}
           inputDisabled={partDrag !== null}
+          view={view}
+          onViewChange={setView}
         />
 
         {/* ドラッグ中のパーツ ghost */}
