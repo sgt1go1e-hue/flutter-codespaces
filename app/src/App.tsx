@@ -192,6 +192,15 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 「作図設定」バーの開閉（寸法入力とは独立。既定は畳んだ状態で割り込まない）
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // 表示テーマ（暗い/明るい）。屋外の日差しの下では暗い画面が見づらいため、
+  // 端末ごとに好みを覚えておいて切り替えられるようにする。
+  const [theme, setTheme] = useLocalStorage<'dark' | 'light'>(
+    'piping-iso:theme',
+    'dark',
+  )
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme
+  }, [theme])
   // 免責事項への同意記録（版＋同意日時を端末に保存）
   const [consent, setConsent] = useLocalStorage<{
     version?: number
@@ -650,6 +659,12 @@ export default function App() {
               集計・拾い出し
             </button>
             <button onClick={() => setReviewDisclaimer(true)}>免責</button>
+            <button
+              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+              title="屋外の明るい場所では「明るい画面」が見やすくなります"
+            >
+              {theme === 'dark' ? '☀️ 明るい画面' : '🌙 暗い画面'}
+            </button>
           </div>
           <span className="tools-scroll-hint" aria-hidden="true">
             ›

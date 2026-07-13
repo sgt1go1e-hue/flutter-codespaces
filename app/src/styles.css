@@ -1,9 +1,80 @@
 :root {
   --bg: #0f172a;
   --panel: #1e293b;
+  --panel-2: #263346;
+  --field-bg: #0b1220;
+  --border: #334155;
+  --border-soft: #1f2b3d;
   --text: #e2e8f0;
   --hint: #94a3b8;
+  --hint-2: #64748b;
   --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --accent-on: #04222e;
+  --overlay: rgba(2, 6, 23, 0.82);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --shadow-strong: rgba(0, 0, 0, 0.6);
+  --grid-line: rgba(148, 163, 184, 0.14);
+  --scrollbar-thumb: rgba(226, 232, 240, 0.75);
+  --danger: #f87171;
+
+  /* キャンバス上の配管線・端点マーカー色（屋外の直射日光下でも見分けられるよう
+     ライトテーマでは彩度を保ったまま濃くする） */
+  --seg-selected: #f59e0b;
+  --seg-resolved: #38bdf8;
+  --seg-unresolved: #64748b;
+  --seg-dot: #94a3b8;
+  --seg-preview: #22c55e;
+  --reducer-fill: rgba(56, 189, 248, 0.25);
+
+  /* 寸法・呼び径ラベル色。キャンバス(SVG)と常設パネルの「切り寸」表示の両方で使う。 */
+  --label-outline: var(--bg);
+  --label-main: #cbd5e1;
+  --label-muted: #64748b;
+  --label-sub: #94a3b8;
+  --label-cut: #34d399;
+  --label-zero: #fbbf24;
+  --label-over: #f87171;
+  --label-tight: #fb923c;
+  --label-terminus: #fbbf24;
+  --label-elbow45: #f472b6;
+}
+
+/* 屋外の明るい場所でも見やすいライトテーマ。トップバーの切替ボタンで選べる。 */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --panel: #e2e8f0;
+  --panel-2: #cbd5e1;
+  --field-bg: #ffffff;
+  --border: #cbd5e1;
+  --border-soft: #e2e8f0;
+  --text: #0f172a;
+  --hint: #64748b;
+  --hint-2: #475569;
+  --accent: #0284c7;
+  --overlay: rgba(15, 23, 42, 0.35);
+  --shadow: rgba(15, 23, 42, 0.16);
+  --shadow-strong: rgba(15, 23, 42, 0.22);
+  --grid-line: rgba(51, 65, 85, 0.2);
+  --scrollbar-thumb: rgba(51, 65, 85, 0.45);
+  --danger: #dc2626;
+
+  --seg-selected: #d97706;
+  --seg-resolved: #0369a1;
+  --seg-unresolved: #475569;
+  --seg-dot: #475569;
+  --seg-preview: #16a34a;
+  --reducer-fill: rgba(2, 132, 199, 0.18);
+
+  --label-main: #1e293b;
+  --label-muted: #475569;
+  --label-sub: #475569;
+  --label-cut: #059669;
+  --label-zero: #b45309;
+  --label-over: #dc2626;
+  --label-tight: #c2410c;
+  --label-terminus: #b45309;
+  --label-elbow45: #be185d;
 }
 
 * {
@@ -97,7 +168,7 @@ body {
   justify-content: center;
   gap: 2px;
   background: var(--panel);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px 16px;
   min-height: 50px;
@@ -107,7 +178,7 @@ body {
 }
 
 .launcher-item:active {
-  background: #263346;
+  background: var(--panel-2);
 }
 
 .launcher-item-date {
@@ -124,8 +195,8 @@ body {
 
 .launcher-action {
   flex-shrink: 0;
-  background: #1e293b;
-  border: 1px solid #334155;
+  background: var(--panel);
+  border: 1px solid var(--border);
   border-radius: 10px;
   color: var(--hint);
   font-size: 12.5px;
@@ -134,12 +205,12 @@ body {
 }
 
 .launcher-action.danger {
-  color: #f87171;
+  color: var(--danger);
   border-color: #7f1d1d;
 }
 
 .launcher-action:active {
-  background: #263346;
+  background: var(--panel-2);
 }
 
 .topbar {
@@ -171,9 +242,9 @@ body {
   gap: 8px;
   overflow-x: auto;
   -webkit-overflow-scrolling: touch;
-  /* スクロールバーを白っぽく・見やすく（Firefox / Android Chrome等） */
+  /* スクロールバーを見やすく（Firefox / Android Chrome等） */
   scrollbar-width: thin;
-  scrollbar-color: rgba(226, 232, 240, 0.7) transparent;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
 }
 
 .tools::-webkit-scrollbar {
@@ -185,12 +256,12 @@ body {
 }
 
 .tools::-webkit-scrollbar-thumb {
-  background: rgba(226, 232, 240, 0.75);
+  background: var(--scrollbar-thumb);
   border-radius: 4px;
 }
 
 .tools button {
-  background: #334155;
+  background: var(--border);
   color: var(--text);
   border: none;
   border-radius: 8px;
@@ -282,7 +353,7 @@ body {
 
 /* アイソメグリッド線（薄いグレーで常時表示のガイド） */
 .iso-grid line {
-  stroke: rgba(148, 163, 184, 0.14);
+  stroke: var(--grid-line);
   stroke-width: 1;
 }
 
@@ -319,15 +390,15 @@ body {
 }
 
 .field-note {
-  color: #64748b;
+  color: var(--hint-2);
   font-size: 12px;
 }
 
 .field select {
   appearance: none;
-  background: #0b1220;
+  background: var(--field-bg);
   color: var(--text);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 15px;
@@ -336,9 +407,9 @@ body {
 }
 
 .num-input {
-  background: #0b1220;
+  background: var(--field-bg);
   color: var(--text);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 12px 14px;
   font-size: 15px;
@@ -348,23 +419,23 @@ body {
 
 /* セグメント上のサイズ表示ラベル */
 .seg-label {
-  fill: #cbd5e1;
+  fill: var(--label-main);
   font-size: 12px;
   font-weight: 600;
   paint-order: stroke;
-  stroke: #0f172a;
+  stroke: var(--label-outline);
   stroke-width: 3px;
 }
 
 /* 継承（仮適用）中のサイズラベルは控えめに表示 */
 .seg-label.inherited {
-  fill: #64748b;
+  fill: var(--label-muted);
   font-weight: 500;
 }
 
 /* 末端（フリー端）の呼び径ラベル。配管サイズを端に明示（手書き流） */
 .seg-label.terminus {
-  fill: #fbbf24;
+  fill: var(--label-terminus);
   font-size: 13px;
   font-weight: 800;
   stroke-width: 3.5px;
@@ -372,11 +443,11 @@ body {
 
 /* 寸法2段表記（セグメント下側） */
 .dim-center {
-  fill: #94a3b8; /* 上段: 芯々寸法（控えめ） */
+  fill: var(--label-sub); /* 上段: 芯々寸法（控えめ） */
   font-size: 10.5px;
   font-weight: 600;
   paint-order: stroke;
-  stroke: #0f172a;
+  stroke: var(--label-outline);
   stroke-width: 3px;
 }
 
@@ -390,60 +461,60 @@ body {
   fill: none;
   font-size: 12.5px;
   font-weight: 800;
-  stroke: #0f172a;
+  stroke: var(--label-outline);
   stroke-width: 3.5px;
 }
 
 .dim-cut {
-  fill: #34d399; /* 下段: 切り寸（強調・現場で使う数値） */
+  fill: var(--label-cut); /* 下段: 切り寸（強調・現場で使う数値） */
   font-size: 12.5px;
   font-weight: 800;
   text-decoration: underline;
 }
 
 .dim-cut.zero {
-  fill: #fbbf24;
+  fill: var(--label-zero);
   font-size: 10.5px;
   text-decoration: none;
   paint-order: stroke;
-  stroke: #0f172a;
+  stroke: var(--label-outline);
   stroke-width: 3.5px;
 }
 
 .dim-cut.over {
-  fill: #f87171;
+  fill: var(--label-over);
   font-size: 11px;
   text-decoration: none;
   paint-order: stroke;
-  stroke: #0f172a;
+  stroke: var(--label-outline);
   stroke-width: 3.5px;
 }
 
 .dim-cut.tight {
-  fill: #fb923c;
+  fill: var(--label-tight);
 }
 
 /* レジューサー記号（三角形） */
 .reducer-mark {
-  fill: rgba(56, 189, 248, 0.25);
-  stroke: #e2e8f0;
+  fill: var(--reducer-fill);
+  stroke: var(--text);
   stroke-width: 2;
   stroke-linejoin: round;
 }
 
 /* 45°エルボ使用箇所のマーク（90°エルボと区別できるよう明示） */
 .elbow45-mark {
-  fill: #f472b6;
+  fill: var(--label-elbow45);
   font-size: 11px;
   font-weight: 800;
   paint-order: stroke;
-  stroke: #0f172a;
+  stroke: var(--label-outline);
   stroke-width: 3px;
 }
 
 /* フランジ記号（配管に直交する2本線） */
 .flange-mark {
-  stroke: #e2e8f0;
+  stroke: var(--text);
   stroke-width: 2.5;
   stroke-linecap: round;
 }
@@ -451,7 +522,7 @@ body {
 /* --- 常設 属性パネル（画面下部） --- */
 .attr-panel {
   background: var(--panel);
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--border);
 }
 
 .panel-header {
@@ -480,9 +551,9 @@ body {
   z-index: 15;
   width: auto;
   max-width: calc(100% - 20px);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+  box-shadow: 0 8px 24px var(--shadow);
   overflow: hidden;
 }
 
@@ -519,8 +590,8 @@ body {
 }
 
 .panel-summary b {
-  background: #0b1220;
-  border: 1px solid #334155;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
   border-radius: 6px;
   padding: 3px 8px;
   font-weight: 700;
@@ -559,7 +630,7 @@ body {
 /* パネルを閉じる固定ボタン。ヘッダーは常に画面上部に表示されるため、
    キーボード表示中でも狙いやすい大きな当たり判定を確保する。 */
 .panel-close {
-  background: #334155;
+  background: var(--border);
   color: var(--text);
   border: none;
   border-radius: 8px;
@@ -582,7 +653,7 @@ body {
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
   padding: 4px 14px 12px;
-  border-top: 1px solid #1f2b3d;
+  border-top: 1px solid var(--border-soft);
 }
 
 .panel-hint {
@@ -618,9 +689,9 @@ body {
 
 .round-toggle button {
   flex: 1;
-  background: #0b1220;
+  background: var(--field-bg);
   color: var(--hint);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 10px;
   font-size: 14px;
@@ -667,25 +738,25 @@ body {
   padding: 0 4px;
   font-size: 18px;
   font-weight: 700;
-  color: #34d399;
+  color: var(--label-cut);
 }
 
 .cut-field .cut-value.zero {
-  color: #fbbf24;
+  color: var(--label-zero);
   font-size: 14px;
 }
 
 .cut-field .cut-value.over {
-  color: #f87171;
+  color: var(--label-over);
   font-size: 14px;
 }
 
 .cut-field .cut-value.tight {
-  color: #fb923c;
+  color: var(--label-tight);
 }
 
 .cut-warn.danger {
-  color: #f87171;
+  color: var(--label-over);
   font-weight: 700;
 }
 
@@ -708,7 +779,7 @@ body {
 }
 
 .cut-warn {
-  color: #fbbf24;
+  color: var(--label-zero);
   font-size: 13px;
   margin: 8px 2px 0;
   line-height: 1.6;
@@ -762,8 +833,8 @@ body {
 .ecc-box {
   margin-top: 10px;
   padding: 10px 12px;
-  background: #0b1220;
-  border: 1px solid #334155;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 
@@ -773,7 +844,7 @@ body {
 }
 
 .ecc-line b {
-  color: #38bdf8;
+  color: var(--accent);
   font-size: 17px;
 }
 
@@ -810,8 +881,8 @@ body {
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
-  background: #111c30;
-  border-top: 1px solid #1f2b3d;
+  background: var(--panel);
+  border-top: 1px solid var(--border-soft);
 }
 
 .palette-title {
@@ -831,9 +902,9 @@ body {
   display: flex;
   align-items: center;
   gap: 8px;
-  background: #1e293b;
+  background: var(--panel);
   color: var(--text);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 8px 12px;
   min-height: 44px;
@@ -863,7 +934,7 @@ body {
 }
 
 .palette-hint {
-  color: #64748b;
+  color: var(--hint-2);
   font-size: 11px;
   white-space: nowrap;
 }
@@ -873,7 +944,7 @@ body {
   position: fixed;
   inset: 0;
   z-index: 100;
-  background: rgba(2, 6, 23, 0.82);
+  background: var(--overlay);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -889,10 +960,10 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--panel);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 20px 50px var(--shadow-strong);
 }
 
 .disclaimer-header {
@@ -900,7 +971,7 @@ body {
   padding: 16px;
   font-size: 17px;
   font-weight: 700;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--border);
 }
 
 .disclaimer-body {
@@ -910,7 +981,7 @@ body {
   padding: 16px;
   font-size: 14px;
   line-height: 1.8;
-  color: #cbd5e1;
+  color: var(--text);
 }
 
 .disclaimer-body p {
@@ -925,7 +996,7 @@ body {
 .disclaimer-actions {
   flex-shrink: 0;
   padding: 14px 16px;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--border);
 }
 
 .disclaimer-agree,
@@ -949,7 +1020,7 @@ body {
 }
 
 .disclaimer-close {
-  background: #334155;
+  background: var(--border);
   color: var(--text);
 }
 
@@ -961,10 +1032,10 @@ body {
   display: flex;
   flex-direction: column;
   background: var(--panel);
-  border: 1px solid #334155;
+  border: 1px solid var(--border);
   border-radius: 16px;
   overflow: hidden;
-  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.6);
+  box-shadow: 0 20px 50px var(--shadow-strong);
 }
 
 .bom-body {
@@ -988,8 +1059,8 @@ body {
 .pipe-group {
   margin: 8px 0 12px;
   padding: 10px 12px;
-  background: #0b1220;
-  border: 1px solid #334155;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 
@@ -1037,7 +1108,7 @@ body {
 .bom-table th,
 .bom-table td {
   padding: 8px 10px;
-  border-bottom: 1px solid #334155;
+  border-bottom: 1px solid var(--border);
   text-align: left;
 }
 
@@ -1062,7 +1133,7 @@ body {
   flex-wrap: wrap;
   gap: 10px;
   padding: 14px 16px;
-  border-top: 1px solid #334155;
+  border-top: 1px solid var(--border);
 }
 
 .bom-actions button {
@@ -1100,8 +1171,8 @@ body {
 
 .pdf-mode-btn {
   flex: 1;
-  border: 1px solid #334155;
-  background: #0b1220;
+  border: 1px solid var(--border);
+  background: var(--field-bg);
   color: var(--hint);
   border-radius: 8px;
   padding: 8px;
@@ -1339,8 +1410,8 @@ body {
     display: flex;
     flex-direction: column;
     border-top: none;
-    border-left: 1px solid #334155;
-    box-shadow: -8px 0 24px rgba(0, 0, 0, 0.5);
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px var(--shadow);
     padding-top: env(safe-area-inset-top);
     padding-right: env(safe-area-inset-right);
     padding-bottom: env(safe-area-inset-bottom);

@@ -791,8 +791,12 @@ export function DrawingCanvas({
         const selected = s.id === selectedId
         const eff = effectiveById[s.id]
         const resolved = eff?.resolved ?? false
-        // 色: 選択=橙 / 属性確定=水色 / 未確定=グレー
-        const stroke = selected ? '#f59e0b' : resolved ? '#38bdf8' : '#64748b'
+        // 色: 選択=橙 / 属性確定=水色 / 未確定=グレー（ライト/ダークテーマで色を出し分け）
+        const stroke = selected
+          ? 'var(--seg-selected)'
+          : resolved
+            ? 'var(--seg-resolved)'
+            : 'var(--seg-unresolved)'
         const dashed = !resolved && !selected
         const pieces = breakLine(
           s.start,
@@ -815,8 +819,8 @@ export function DrawingCanvas({
                 strokeDasharray={dashed ? '6 5' : undefined}
               />
             ))}
-            <circle cx={s.start.x} cy={s.start.y} r={4} fill="#94a3b8" />
-            <circle cx={s.end.x} cy={s.end.y} r={4} fill="#94a3b8" />
+            <circle cx={s.start.x} cy={s.start.y} r={4} fill="var(--seg-dot)" />
+            <circle cx={s.end.x} cy={s.end.y} r={4} fill="var(--seg-dot)" />
             {s.startFlange && flangeMarker(s, 'start', s.startFlange)}
             {s.endFlange && flangeMarker(s, 'end', s.endFlange)}
             {/* レジューサーのシンボル（同心=二等辺 / 偏心=直角三角形） */}
@@ -938,7 +942,7 @@ export function DrawingCanvas({
           y1={preview.start.y}
           x2={preview.end.x}
           y2={preview.end.y}
-          stroke="#22c55e"
+          stroke="var(--seg-preview)"
           strokeWidth={3}
           strokeDasharray="8 6"
           strokeLinecap="round"
