@@ -52,6 +52,16 @@ export interface CutResult {
   socketWeldGapWarning: boolean
   /** 差込溶接継手同士のツラ〜ツラ間の隙間(mm)。socketWeldGapWarning判定の元値（表示用）。 */
   socketWeldFaceGap?: number
+  /**
+   * ねじ込み継手同士を直結していて、切り寸法がメーカーの最短ニップル（丸ニップル）
+   * 寸法(THREAD_MIN_NIPPLE)を下回っている＝現実的にねじ切り加工できない長さ。
+   * status='ok'（切り寸>0）のときのみ意味を持つ。
+   */
+  threadTooShortForPipe: boolean
+  /** 切り寸法が最短ニップル寸法に近い(15mm以内)。丸ニップルの使用を提案する目安。 */
+  threadNearMinNipple: boolean
+  /** 判定に使った最短ニップル(丸ニップル)寸法(mm、表示用)。 */
+  threadMinNippleLength?: number
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -64,6 +74,26 @@ const round1 = (x: number) => Math.round(x * 10) / 10
 const SOCKET_WELD_MIN_GAP = 50
 
 const isSocketWeldFittingId = (id?: string) => !!id && id.endsWith('_socket')
+
+// ねじ込み継手同士の間に入る直管は、短すぎるとパイプレンチが掛けられず現場で
+// ねじ切り加工できない。メーカーが出している最短の既製ニップル（丸ニップル）の
+// 全長を下回ったら「加工不可能」と判定する（現場実測に基づく指定値）。
+// 近接(+15mm以内)の場合は、無理に現物合わせのパイプを作らず既製の丸ニップルを
+// 使う方が現実的なため、その旨を表示する目安として使う。
+const THREAD_MIN_NIPPLE: Record<string, number> = {
+  '15': 34,
+  '20': 38,
+  '25': 42,
+  '32': 50,
+  '40': 50,
+  '50': 58,
+  '65': 70,
+  '80': 78,
+  '100': 90,
+}
+const THREAD_NEAR_MIN_MARGIN = 15
+
+const isThreadFittingId = (id?: string) => !!id && id.endsWith('_thread')
 
 // 差込み深さ C(参考値, mm)。呼び径ごと。90°エルボ／チーズ(ラン・枝とも)は共通の
 // ソケット深さ、45°エルボはソケット形状が異なるため別テーブル。
@@ -188,6 +218,20 @@ export function computeAllCut(
         ? round1(cut - socketDepthC(e.start.fittingId, eff?.size) - socketDepthC(e.end.fittingId, eff?.size))
         : undefined
 
+    // ねじ込み継手同士を直結している区間の切り寸法が、既製の最短ニップル(丸ニップル)
+    // 寸法を下回っていないか（=現場でねじ切り加工できる最短の長さか）を判定する。
+    const threadMinNippleLength =
+      isThreadFittingId(e.start.fittingId) && isThreadFittingId(e.end.fittingId)
+        ? THREAD_MIN_NIPPLE[String(nominalOf(eff?.size) ?? '')]
+        : undefined
+    const threadTooShortForPipe =
+      status === 'ok' && threadMinNippleLength != null && cut! < threadMinNippleLength
+    const threadNearMinNipple =
+      status === 'ok' &&
+      threadMinNippleLength != null &&
+      cut! >= threadMinNippleLength &&
+      cut! <= threadMinNippleLength + THREAD_NEAR_MIN_MARGIN
+
     out[s.id] = {
       center,
       startAllow,
@@ -222,6 +266,9 @@ export function computeAllCut(
         isSocketWeldFittingId(e.start.fittingId) &&
         isSocketWeldFittingId(e.end.fittingId),
       socketWeldFaceGap,
+      threadTooShortForPipe,
+      threadNearMinNipple,
+      threadMinNippleLength,
     }
   }
   return out

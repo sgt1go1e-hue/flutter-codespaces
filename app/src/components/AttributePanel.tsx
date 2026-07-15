@@ -252,17 +252,19 @@ export function SegmentPanel({
               )}
             </span>
             <div
-              className={`cut-value${cut?.status === 'over' ? ' over' : ''}${cut?.status === 'zero' ? ' zero' : ''}${cut?.socketWeldGapWarning ? ' tight' : ''}`}
+              className={`cut-value${cut?.status === 'over' || cut?.threadTooShortForPipe ? ' over' : ''}${cut?.status === 'zero' ? ' zero' : ''}${cut?.socketWeldGapWarning || cut?.threadNearMinNipple ? ' tight' : ''}`}
             >
               {cut?.needsCounterpart
                 ? '要相手径'
-                : cut?.status === 'ok'
-                  ? `${cut.cut} mm`
-                  : cut?.status === 'zero'
-                    ? 'パイプ0mm（継手直結）'
-                    : cut?.status === 'over'
-                      ? '継手が収まりません'
-                      : '—'}
+                : cut?.threadTooShortForPipe
+                  ? '加工不可能（丸ニップル使用）'
+                  : cut?.status === 'ok'
+                    ? `${cut.cut} mm`
+                    : cut?.status === 'zero'
+                      ? 'パイプ0mm（継手直結）'
+                      : cut?.status === 'over'
+                        ? '継手が収まりません'
+                        : '—'}
             </div>
           </div>
 
@@ -275,6 +277,25 @@ export function SegmentPanel({
                 差込（ソケット）溶接の継手同士が近いようです（継手のツラ〜ツラ 約
                 {cut.socketWeldFaceGap}mm）。
                 溶接代の一般的な目安は50mm以上です（現場慣習に基づく参考値・推奨です）。
+              </p>
+            </div>
+          )}
+
+          {/* ねじ込み継手同士の間の切り寸法が、メーカーの最短ニップル(丸ニップル)寸法を
+              下回っている（加工不可能）、または近い（丸ニップル使用を推奨）場合の案内。 */}
+          {cut?.threadTooShortForPipe && (
+            <div className="socket-gap-warn">
+              <p>
+                この長さ（{cut.cut}mm）は現場でねじ切り加工できません。最短の丸ニップル（
+                {cut.threadMinNippleLength}mm）を使用してください。
+              </p>
+            </div>
+          )}
+          {!cut?.threadTooShortForPipe && cut?.threadNearMinNipple && (
+            <div className="socket-gap-warn">
+              <p>
+                切り寸法が最短の丸ニップル寸法（{cut.threadMinNippleLength}mm）に近いようです。
+                現物合わせで加工するより、最短の丸ニップルを使う方が確実です。
               </p>
             </div>
           )}
