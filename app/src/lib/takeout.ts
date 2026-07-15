@@ -15,6 +15,7 @@ const NODE_EPS = 1
 // （inheritance.ts 側からも sizeのみのマップで安全に呼べるようにするため）。
 export interface SizeInfo {
   size?: string
+  pipeType?: string
 }
 
 export type EndRole =
@@ -43,6 +44,7 @@ interface Inc {
   /** セグメント本体→ノードへ向かう単位ベクトル */
   into: Point
   size?: string
+  pipeType?: string
 }
 interface GNode {
   p: Point
@@ -58,7 +60,9 @@ const isElbowId = (id?: string) =>
   id === 'elbow90_socket' ||
   id === 'elbow45_socket' ||
   id === 'elbow90_thread' ||
-  id === 'elbow45_thread'
+  id === 'elbow45_thread' ||
+  id === 'elbow90_vp' ||
+  id === 'elbow45_vp'
 const isTeeId = (id?: string) =>
   id === 'tee_equal' ||
   id === 'tee_reducing' ||
@@ -92,7 +96,13 @@ function buildGraph(
       const other = end === 'start' ? s.end : s.start
       const len = distance(p, other) || 1
       const into = { x: (p.x - other.x) / len, y: (p.y - other.y) / len }
-      findOrAdd(p).incs.push({ seg: s, end, into, size: effById[s.id]?.size })
+      findOrAdd(p).incs.push({
+        seg: s,
+        end,
+        into,
+        size: effById[s.id]?.size,
+        pipeType: effById[s.id]?.pipeType,
+      })
     }
   }
   for (const n of nodes) {
@@ -105,12 +115,15 @@ function buildGraph(
 }
 
 // エルボの継手id。自セグメント／隣接セグメントに明示指定があればそれを使い、
-// どちらも未指定(自動)なら、いずれかの接続方法が「差込（ソケット）」なら差込式、
-// 「ねじ込み」ならねじ込み式、それ以外は突き合わせ溶接(ロング)を既定にする
-// （接続方法を変えても継手が突き合わせ溶接のままになってしまう不具合の修正）。
+// どちらも未指定(自動)なら、管種が塩ビ(VP)ならVP用の継手、いずれかの接続方法が
+// 「差込（ソケット）」なら差込式、「ねじ込み」ならねじ込み式、それ以外は
+// 突き合わせ溶接(ロング)を既定にする（接続方法を変えても継手が突き合わせ溶接の
+// ままになってしまう不具合の修正）。塩ビは接続方法(差込のみ)を選ばせる必要が
+// ないため、管種で先に判定する。
 function defaultElbowId(inc: Inc, nb?: Inc): string {
   if (isElbowId(inc.seg.fitting)) return inc.seg.fitting as string
   if (isElbowId(nb?.seg.fitting)) return nb!.seg.fitting as string
+  if (inc.pipeType === 'vp' || nb?.pipeType === 'vp') return 'elbow90_vp'
   const connection = inc.seg.connection ?? nb?.seg.connection
   if (connection === 'socket') return 'elbow90_socket'
   if (connection === 'thread') return 'elbow90_thread'

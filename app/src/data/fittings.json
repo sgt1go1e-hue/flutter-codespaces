@@ -1102,6 +1102,42 @@
         "100_65": { "H": 1, "od1": null, "od2": null },
         "100_80": { "H": 0, "od1": null, "od2": null }
       }
+    },
+    {
+      "id": "elbow90_vp",
+      "name": "90°エルボ（塩ビ）",
+      "short": "EL90(VP)",
+      "calc": "centerMinus",
+      "source": "sekisui_eslon_dv_vp",
+      "drawingNo": "D-VP-006",
+      "dims": {
+        "30": 22,
+        "40": 27,
+        "50": 33,
+        "65": 42,
+        "75": 48,
+        "100": 62,
+        "125": 75,
+        "150": 88
+      }
+    },
+    {
+      "id": "elbow45_vp",
+      "name": "45°エルボ（塩ビ）",
+      "short": "EL45(VP)",
+      "calc": "centerMinus",
+      "source": "sekisui_eslon_dv_vp",
+      "drawingNo": "D-VP-005",
+      "dims": {
+        "30": 12,
+        "40": 14,
+        "50": 18,
+        "65": 22,
+        "75": 25,
+        "100": 30,
+        "125": 38,
+        "150": 44
+      }
     }
   ]
 }

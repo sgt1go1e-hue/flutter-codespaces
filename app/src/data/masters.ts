@@ -72,6 +72,7 @@ export function connectionLabelForSource(source?: string | null): string {
   if (!source) return '—'
   if (source.includes('buttweld')) return '溶接'
   if (source.includes('thread')) return 'ねじ込み'
+  if (source.includes('vp')) return '接着（差込）'
   if (source.includes('socket')) return '差込（ソケット）'
   return '—'
 }

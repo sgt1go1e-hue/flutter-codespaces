@@ -264,6 +264,8 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
     // 継手が突き合わせ溶接のままになってしまう不具合の修正）。
     const socket = s.connection === 'socket'
     const thread = s.connection === 'thread'
+    // 塩ビ(VP)は接続方法を差込のみで固定し、選ばせる必要がないため管種で判定する。
+    const vp = effectivePipeType(s, byId) === 'vp'
     if (fittingOwn) {
       fitting = s.fitting as string
     } else if (isBranch) {
@@ -284,7 +286,13 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
             ? 'tee_equal_thread'
             : 'tee_equal'
     } else {
-      fitting = socket ? 'elbow90_socket' : thread ? 'elbow90_thread' : 'elbow90_long'
+      fitting = vp
+        ? 'elbow90_vp'
+        : socket
+          ? 'elbow90_socket'
+          : thread
+            ? 'elbow90_thread'
+            : 'elbow90_long'
     }
     out[s.id] = {
       pipeType: effectivePipeType(s, byId),

@@ -143,8 +143,12 @@ export function SegmentPanel({
     : '自動'
   // 接続方法が「差込（ソケット）」なら差込式、「ねじ込み」ならねじ込み式、それ以外は
   // 突き合わせ溶接系だけを選択肢に出す（種類が混在すると選び間違えやすいため）。
+  // 塩ビ(VP)は管種で専用継手に絞り込む（接続方法は差込のみで選ばせる必要がない）。
   const visibleFittings = fittings.filter((f) => {
     if (f.id === 'none') return true
+    const isVpFitting = f.source?.includes('vp') ?? false
+    if (effective?.pipeType === 'vp') return isVpFitting
+    if (isVpFitting) return false
     const isSocketFitting = f.source?.includes('socket') ?? false
     const isThreadFitting = f.source?.includes('thread') ?? false
     if (segment.connection === 'socket') return isSocketFitting
