@@ -1421,4 +1421,38 @@ body {
     flex: 1;
     max-height: none;
   }
+
+  /* パーツパレットも、横向きの低い高さでは通常サイズのままだと画面下に
+     大きく張り出して図面を隠し、主役のように見えてしまっていた。
+     チップ自体は小さくしすぎるとタップしづらくなるため、タップ領域は
+     残しつつ、外側の余白・文字・アイコンを詰めて縦幅を抑える。 */
+  .palette {
+    padding: 3px 8px;
+    gap: 6px;
+  }
+
+  .palette-title {
+    font-size: 10px;
+  }
+
+  .palette-items {
+    gap: 5px;
+  }
+
+  .palette-chip {
+    padding: 4px 8px;
+    min-height: 34px;
+    gap: 5px;
+    font-size: 11.5px;
+  }
+
+  .chip-icon {
+    min-width: 26px;
+    height: 18px;
+    font-size: 9px;
+  }
+
+  .palette-hint {
+    font-size: 9px;
+  }
 }
