@@ -277,16 +277,24 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
       const branchN = nomA(tee?.branchSize)
       const reducing = mainN != null && branchN != null && mainN !== branchN
       fitting = reducing
-        ? socket
-          ? 'tee_reducing_socket'
-          : thread
-            ? 'tee_reducing_thread'
-            : 'tee_reducing'
-        : socket
-          ? 'tee_equal_socket'
-          : thread
-            ? 'tee_equal_thread'
-            : 'tee_equal'
+        ? vp
+          ? s.vpSeries === 'ts'
+            ? 'tee_reducing_vp_ts'
+            : 'tee_reducing_vp_dv'
+          : socket
+            ? 'tee_reducing_socket'
+            : thread
+              ? 'tee_reducing_thread'
+              : 'tee_reducing'
+        : vp
+          ? s.vpSeries === 'ts'
+            ? 'tee_equal_vp_ts'
+            : 'tee_equal_vp_dv'
+          : socket
+            ? 'tee_equal_socket'
+            : thread
+              ? 'tee_equal_thread'
+              : 'tee_equal'
     } else {
       fitting = vp
         ? s.vpSeries === 'ts'

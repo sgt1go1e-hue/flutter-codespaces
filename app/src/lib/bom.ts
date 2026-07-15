@@ -159,8 +159,16 @@ export function computeBom(
       for (const branchEnd of branchesToCount) {
         const branchN = nominalOf(branchEnd?.size)
         const reducing = runN >= 0 && branchN != null && runN !== branchN
-        if (reducing) addFit('tee_reducing', pairLabel(runSize, branchEnd?.size))
-        else addFit('tee_equal', `${runSize ?? branchEnd?.size ?? '?'}`)
+        // 差込/ねじ込み/塩ビ(DV・TS)等、実際に使われた継手id（takeout.ts側で
+        // 接続方法/管種から解決済み）をそのまま使う。以前はここで
+        // 'tee_reducing'/'tee_equal' に固定していたため、差込・ねじ込み・
+        // 塩ビ継手でもBOM上は突き合わせ溶接の品名のまま表示される不具合があった。
+        const fittingId =
+          branchEnd?.fittingId ??
+          runEnds[0]?.fittingId ??
+          (reducing ? 'tee_reducing' : 'tee_equal')
+        if (reducing) addFit(fittingId, pairLabel(runSize, branchEnd?.size))
+        else addFit(fittingId, `${runSize ?? branchEnd?.size ?? '?'}`)
       }
       // ツキ合わせのレジューサー（縮径したラン側 = tee-run-reducer 端ごとに1個）
       for (const e of cl) {

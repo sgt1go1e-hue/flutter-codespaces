@@ -73,7 +73,11 @@ const isTeeId = (id?: string) =>
   id === 'tee_equal_socket' ||
   id === 'tee_reducing_socket' ||
   id === 'tee_equal_thread' ||
-  id === 'tee_reducing_thread'
+  id === 'tee_reducing_thread' ||
+  id === 'tee_equal_vp_dv' ||
+  id === 'tee_reducing_vp_dv' ||
+  id === 'tee_equal_vp_ts' ||
+  id === 'tee_reducing_vp_ts'
 const isReducerId = (id?: string) =>
   id === 'reducer_concentric' ||
   id === 'reducer_eccentric' ||
@@ -164,8 +168,8 @@ function reducerTakeout(inc: Inc, nb: Inc): { mm: number; id: string } {
 }
 
 // チーズの取り出し寸法（ラン/枝で C・M を出し分け）。connectionKindで
-// 差込式/ねじ込み式/突き合わせ溶接式の寸法を出し分ける。
-type ConnectionKind = 'buttweld' | 'socket' | 'thread'
+// 差込式/ねじ込み式/突き合わせ溶接式/塩ビ(DV・TS)の寸法を出し分ける。
+type ConnectionKind = 'buttweld' | 'socket' | 'thread' | 'vp_dv' | 'vp_ts'
 function teeTakeout(
   runSize: string | undefined,
   branchSize: string | undefined,
@@ -180,13 +184,21 @@ function teeTakeout(
       ? 'tee_equal_socket'
       : connectionKind === 'thread'
         ? 'tee_equal_thread'
-        : 'tee_equal'
+        : connectionKind === 'vp_dv'
+          ? 'tee_equal_vp_dv'
+          : connectionKind === 'vp_ts'
+            ? 'tee_equal_vp_ts'
+            : 'tee_equal'
   const reducingId =
     connectionKind === 'socket'
       ? 'tee_reducing_socket'
       : connectionKind === 'thread'
         ? 'tee_reducing_thread'
-        : 'tee_reducing'
+        : connectionKind === 'vp_dv'
+          ? 'tee_reducing_vp_dv'
+          : connectionKind === 'vp_ts'
+            ? 'tee_reducing_vp_ts'
+            : 'tee_reducing'
   const id = reducing ? reducingId : equalId
   let dim: TeeDim | undefined
   if (reducing) {
@@ -274,12 +286,20 @@ function resolveEnd(
         ? 'socket'
         : explicitTeeId.endsWith('_thread')
           ? 'thread'
-          : 'buttweld'
-      : node.incs.some((i) => i.seg.connection === 'socket')
-        ? 'socket'
-        : node.incs.some((i) => i.seg.connection === 'thread')
-          ? 'thread'
-          : 'buttweld'
+          : explicitTeeId.endsWith('_vp_dv')
+            ? 'vp_dv'
+            : explicitTeeId.endsWith('_vp_ts')
+              ? 'vp_ts'
+              : 'buttweld'
+      : node.incs.some((i) => i.pipeType === 'vp')
+        ? node.incs.some((i) => i.vpSeries === 'ts')
+          ? 'vp_ts'
+          : 'vp_dv'
+        : node.incs.some((i) => i.seg.connection === 'socket')
+          ? 'socket'
+          : node.incs.some((i) => i.seg.connection === 'thread')
+            ? 'thread'
+            : 'buttweld'
     const t = teeTakeout(runSize, branchSize, isRun, connectionKind)
     let mm = t.mm
     let role: EndRole = isRun ? 'tee-run' : 'tee-branch'

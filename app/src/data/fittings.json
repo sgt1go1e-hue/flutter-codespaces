@@ -1138,6 +1138,107 @@
         "125": 38,
         "150": 44
       }
+    },
+    {
+      "id": "elbow90_vp_ts",
+      "name": "90°エルボ（塩ビ・TS継手）",
+      "short": "EL90(VP-TS)",
+      "calc": "centerMinus",
+      "source": "kubotakemix_ts_vp",
+      "drawingNo": "5012-01-00",
+      "dims": {
+        "13": 10,
+        "16": 13,
+        "20": 15,
+        "25": 18,
+        "30": 21,
+        "40": 27,
+        "50": 33,
+        "65": 49,
+        "75": 56,
+        "100": 69
+      }
+    },
+    {
+      "id": "elbow45_vp_ts",
+      "name": "45°エルボ（塩ビ・TS継手）",
+      "short": "EL45(VP-TS)",
+      "calc": "centerMinus",
+      "source": "kubotakemix_ts_vp",
+      "drawingNo": "5012-02-00",
+      "dims": {
+        "13": 7,
+        "16": 8,
+        "20": 9,
+        "25": 11,
+        "30": 12,
+        "40": 14,
+        "50": 17,
+        "65": 30,
+        "75": 33,
+        "100": 38
+      }
+    },
+    {
+      "id": "tee_equal_vp_ts",
+      "name": "チーズ（同径・塩ビ・TS継手）",
+      "short": "TEE(VP-TS)",
+      "calc": "centerMinus",
+      "source": "kubotakemix_ts_vp",
+      "drawingNo": "5013-01-00",
+      "dims": {
+        "13": { "run": 10, "branch": 10 },
+        "16": { "run": 13, "branch": 13 },
+        "20": { "run": 15, "branch": 15 },
+        "25": { "run": 18, "branch": 18 },
+        "30": { "run": 21, "branch": 21 },
+        "40": { "run": 27, "branch": 27 },
+        "50": { "run": 33, "branch": 33 },
+        "65": { "run": 49, "branch": 49 },
+        "75": { "run": 56, "branch": 56 },
+        "100": { "run": 68, "branch": 68 },
+        "150": { "run": 98, "branch": 98 }
+      }
+    },
+    {
+      "id": "tee_reducing_vp_ts",
+      "name": "チーズ（径違い・塩ビ・TS継手）",
+      "short": "TEE(VP-TS,R)",
+      "calc": "centerMinus",
+      "source": "kubotakemix_ts_vp",
+      "drawingNo": "5013-01-00",
+      "dims": {
+        "16_13": { "run": 12, "branch": 11 },
+        "20_13": { "run": 14, "branch": 11 },
+        "20_16": { "run": 15, "branch": 13 },
+        "25_13": { "run": 17, "branch": 11 },
+        "25_16": { "run": 18, "branch": 13 },
+        "25_20": { "run": 18, "branch": 15 },
+        "30_13": { "run": 20, "branch": 11 },
+        "30_16": { "run": 21, "branch": 13 },
+        "30_20": { "run": 21, "branch": 15 },
+        "30_25": { "run": 21, "branch": 18 },
+        "40_13": { "run": 26, "branch": 11 },
+        "40_16": { "run": 27, "branch": 13 },
+        "40_20": { "run": 27, "branch": 15 },
+        "40_25": { "run": 27, "branch": 18 },
+        "40_30": { "run": 27, "branch": 21 },
+        "50_13": { "run": 32, "branch": 11 },
+        "50_16": { "run": 34, "branch": 16 },
+        "50_20": { "run": 33, "branch": 15 },
+        "50_25": { "run": 33, "branch": 18 },
+        "50_30": { "run": 33, "branch": 21 },
+        "50_40": { "run": 33, "branch": 27 },
+        "65_50": { "run": 41, "branch": 40 },
+        "75_25": { "run": 48, "branch": 29 },
+        "75_40": { "run": 47, "branch": 36 },
+        "75_50": { "run": 47, "branch": 41 },
+        "75_65": { "run": 56, "branch": 49 },
+        "100_50": { "run": 59, "branch": 41 },
+        "100_75": { "run": 68, "branch": 56 },
+        "150_75": { "run": 94, "branch": 63 },
+        "150_100": { "run": 98, "branch": 76 }
+      }
     }
   ]
 }

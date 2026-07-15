@@ -147,9 +147,12 @@ export function SegmentPanel({
   // 塩ビ(VP)は管種で専用継手に絞り込む（接続方法は差込のみで選ばせる必要がない）。
   const visibleFittings = fittings.filter((f) => {
     if (f.id === 'none') return true
-    const isVpFitting = f.source?.includes('vp') ?? false
-    if (effective?.pipeType === 'vp') return isVpFitting
-    if (isVpFitting) return false
+    const isVpDvFitting = f.id.endsWith('_vp_dv')
+    const isVpTsFitting = f.id.endsWith('_vp_ts')
+    if (effective?.pipeType === 'vp') {
+      return segment.vpSeries === 'ts' ? isVpTsFitting : isVpDvFitting
+    }
+    if (isVpDvFitting || isVpTsFitting) return false
     const isSocketFitting = f.source?.includes('socket') ?? false
     const isThreadFitting = f.source?.includes('thread') ?? false
     if (segment.connection === 'socket') return isSocketFitting
