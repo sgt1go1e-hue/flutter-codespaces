@@ -38,10 +38,10 @@ export const pipeTypes = pipesJson.pipeTypes as PipeType[]
 export const sizeList = pipesJson.sizeList as SizeInfo[]
 export const fittings = fittingsJson.fittings as Fitting[]
 
-/** 呼び径コード("25A")→ A呼称の数値(25)。VP等でAが無ければ null */
+/** 呼び径コード("25A"或いは塩ビの"VP25")→ 呼称の数値(25)。 */
 export function nominalOf(sizeCode?: string): number | null {
   if (!sizeCode) return null
-  const m = /^(\d+)A$/.exec(sizeCode)
+  const m = /^(\d+)A$/.exec(sizeCode) ?? /^VP(\d+)$/.exec(sizeCode)
   return m ? Number(m[1]) : null
 }
 

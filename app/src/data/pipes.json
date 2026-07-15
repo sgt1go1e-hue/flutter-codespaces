@@ -23,7 +23,7 @@
       "id": "vp",
       "name": "硬質塩化ビニル管 VP",
       "short": "VP",
-      "sizes": ["VP13", "VP16", "VP20", "VP25", "VP30", "VP40", "VP50", "VP65", "VP75", "VP100"]
+      "sizes": ["VP13", "VP16", "VP20", "VP25", "VP30", "VP40", "VP50", "VP65", "VP75", "VP100", "VP125", "VP150"]
     }
   ],
   "sizeList": [
@@ -51,6 +51,8 @@
     { "code": "VP50", "label": "VP50", "od": 60.0 },
     { "code": "VP65", "label": "VP65", "od": 76.0 },
     { "code": "VP75", "label": "VP75", "od": 89.0 },
-    { "code": "VP100", "label": "VP100", "od": 114.0 }
+    { "code": "VP100", "label": "VP100", "od": 114.0 },
+    { "code": "VP125", "label": "VP125", "od": 140.0 },
+    { "code": "VP150", "label": "VP150", "od": 165.0 }
   ]
 }
