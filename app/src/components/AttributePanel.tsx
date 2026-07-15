@@ -464,6 +464,16 @@ export function SegmentPanel({
               ))}
             </select>
           </label>
+
+          {/* 角ニップルは個体差・材質でねじ込み量が変わり芯々を一定に算出できない
+              ため、本アプリでは扱わない旨を接続方法=ねじ込み選択時に明示する。 */}
+          {segment.connection === 'thread' && (
+            <div className="socket-gap-warn">
+              <p>
+                角ニップルは個体差・材質（白ネジ/SUS等）によりねじ込み量が変わるため、本アプリでは芯々寸法の算出対象に含めていません。使用箇所は現場での実寸に基づいて調整してください。
+              </p>
+            </div>
+          )}
         </div>
 
         {/* レジューサー / 径違いチーズ: 相手径・合わせ面 */}
@@ -693,6 +703,16 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
                 ))}
               </select>
             </label>
+
+            {/* 角ニップルは個体差・材質でねじ込み量が変わり芯々を一定に算出できない
+                ため、本アプリでは扱わない旨を接続方法=ねじ込み選択時に明示する。 */}
+            {defaults.connection === 'thread' && (
+              <div className="socket-gap-warn">
+                <p>
+                  角ニップルは個体差・材質（白ネジ/SUS等）によりねじ込み量が変わるため、本アプリでは芯々寸法の算出対象に含めていません。使用箇所は現場での実寸に基づいて調整してください。
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
