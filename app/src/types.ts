@@ -39,6 +39,11 @@ export interface Segment {
   /** 接続方法（connections の id）。例: フランジ接合 'flange' */
   connection?: string
   /**
+   * 塩ビ(VP)の継手シリーズ。'dv'=DV継手（排水用・勾配考慮が必要）/
+   * 'ts'=TS継手（給水用）。管種がVPのときのみ意味を持つ。
+   */
+  vpSeries?: 'dv' | 'ts'
+  /**
    * 始点側 / 終点側のフランジ。
    * 'double'（両フランジ・途中挿入の接続面）/ 'single'（片フランジ・ルート終端のエンド用）。
    * 両フランジは配置時に前後セグメントへ分割され、その接合ノードの両側に付く。

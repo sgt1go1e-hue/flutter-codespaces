@@ -16,6 +16,7 @@ const NODE_EPS = 1
 export interface SizeInfo {
   size?: string
   pipeType?: string
+  vpSeries?: 'dv' | 'ts'
 }
 
 export type EndRole =
@@ -45,6 +46,7 @@ interface Inc {
   into: Point
   size?: string
   pipeType?: string
+  vpSeries?: 'dv' | 'ts'
 }
 interface GNode {
   p: Point
@@ -61,8 +63,10 @@ const isElbowId = (id?: string) =>
   id === 'elbow45_socket' ||
   id === 'elbow90_thread' ||
   id === 'elbow45_thread' ||
-  id === 'elbow90_vp' ||
-  id === 'elbow45_vp'
+  id === 'elbow90_vp_dv' ||
+  id === 'elbow45_vp_dv' ||
+  id === 'elbow90_vp_ts' ||
+  id === 'elbow45_vp_ts'
 const isTeeId = (id?: string) =>
   id === 'tee_equal' ||
   id === 'tee_reducing' ||
@@ -102,6 +106,7 @@ function buildGraph(
         into,
         size: effById[s.id]?.size,
         pipeType: effById[s.id]?.pipeType,
+        vpSeries: effById[s.id]?.vpSeries,
       })
     }
   }
@@ -123,7 +128,10 @@ function buildGraph(
 function defaultElbowId(inc: Inc, nb?: Inc): string {
   if (isElbowId(inc.seg.fitting)) return inc.seg.fitting as string
   if (isElbowId(nb?.seg.fitting)) return nb!.seg.fitting as string
-  if (inc.pipeType === 'vp' || nb?.pipeType === 'vp') return 'elbow90_vp'
+  if (inc.pipeType === 'vp' || nb?.pipeType === 'vp') {
+    const series = inc.vpSeries ?? nb?.vpSeries ?? 'dv'
+    return series === 'ts' ? 'elbow90_vp_ts' : 'elbow90_vp_dv'
+  }
   const connection = inc.seg.connection ?? nb?.seg.connection
   if (connection === 'socket') return 'elbow90_socket'
   if (connection === 'thread') return 'elbow90_thread'

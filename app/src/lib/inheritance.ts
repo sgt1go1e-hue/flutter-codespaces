@@ -92,6 +92,8 @@ export function inheritedSize(seg: Segment, byId: SegmentMap) {
 export interface Effective {
   pipeType?: string
   size?: string
+  /** 塩ビ(VP)の継手タイプ(DV/TS)。takeout.tsの自動継手選択でも参照するため保持する。 */
+  vpSeries?: 'dv' | 'ts'
   /** サイズが自分自身で明示設定されているか（false は継承 or 未設定） */
   sizeOwn: boolean
   /** 実効サイズが（自分 or 継承で）決まっているか */
@@ -287,7 +289,9 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
             : 'tee_equal'
     } else {
       fitting = vp
-        ? 'elbow90_vp'
+        ? s.vpSeries === 'ts'
+          ? 'elbow90_vp_ts'
+          : 'elbow90_vp_dv'
         : socket
           ? 'elbow90_socket'
           : thread
@@ -296,6 +300,7 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
     }
     out[s.id] = {
       pipeType: effectivePipeType(s, byId),
+      vpSeries: s.vpSeries,
       size,
       sizeOwn: s.size != null && s.size !== '',
       resolved: size != null && size !== '',

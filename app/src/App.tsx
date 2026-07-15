@@ -216,6 +216,8 @@ export default function App() {
     pipeType?: string
     size?: string
     connection?: string
+    /** 塩ビ(VP)の継手タイプ(DV/TS)。管種がVP以外のときは無視される。 */
+    vpSeries?: 'dv' | 'ts'
     /** 切り寸法の丸め方（既定=四捨五入）。継手寸法には適用しない。 */
     roundMode?: 'round' | 'floor'
     /** フランジの引きしろ(mm)。フランジが付いた端に共通で適用。 */
@@ -432,6 +434,8 @@ export default function App() {
     const applied: Segment = { ...seg, id: makeId(), parentId }
     // 接続方法は継承対象外なので、全ての新規線に初期設定を適用
     if (defaults.connection) applied.connection = defaults.connection
+    // 塩ビの継手タイプ(DV/TS)も接続方法と同様、継承対象外で毎回適用
+    if (defaults.vpSeries) applied.vpSeries = defaults.vpSeries
     // 管種・サイズはルート(接続元なし)にのみ付与。続きの線は上流から継承。
     if (!parentId) {
       if (defaults.pipeType) applied.pipeType = defaults.pipeType

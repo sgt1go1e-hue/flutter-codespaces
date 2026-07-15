@@ -19,6 +19,7 @@ export interface DrawDefaults {
   pipeType?: string
   size?: string
   connection?: string
+  vpSeries?: 'dv' | 'ts'
 }
 
 function roleLabel(role: string): string {
@@ -427,6 +428,24 @@ export function SegmentPanel({
             </select>
           </label>
 
+          {/* 塩ビ(VP)のみ: DV継手(排水・勾配考慮が必要)/TS継手(給水)で継手寸法が
+              異なるため、どちらのシリーズかを選ぶ。接続方法は差込のみで固定。 */}
+          {effective?.pipeType === 'vp' && (
+            <label className="field">
+              <span className="field-label">継手タイプ</span>
+              <select
+                value={segment.vpSeries ?? ''}
+                onChange={(e) =>
+                  onChange({ vpSeries: (e.target.value || undefined) as 'dv' | 'ts' | undefined })
+                }
+              >
+                <option value="">未設定（自動でDV継手）</option>
+                <option value="dv">DV継手（排水）</option>
+                <option value="ts">TS継手（給水）</option>
+              </select>
+            </label>
+          )}
+
           {/* 分岐(チーズ)接続時: もう一方(メイン管 or 枝管)のサイズもここで直接編集できる。
               「サイズ」と「相手径」のような曖昧な関係をやめ、メイン管/枝管という
               実務の呼び方で対になるサイズを直接編集する方式にした。 */}
@@ -728,6 +747,24 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
                 ))}
               </select>
             </label>
+
+            {/* 塩ビ(VP)のみ: DV継手(排水・勾配考慮が必要)/TS継手(給水)で継手寸法が
+                異なるため、どちらのシリーズかを選ぶ。接続方法は差込のみで固定。 */}
+            {defaults.pipeType === 'vp' && (
+              <label className="field">
+                <span className="field-label">継手タイプ</span>
+                <select
+                  value={defaults.vpSeries ?? ''}
+                  onChange={(e) =>
+                    onChange({ vpSeries: (e.target.value || undefined) as 'dv' | 'ts' | undefined })
+                  }
+                >
+                  <option value="">未設定（自動でDV継手）</option>
+                  <option value="dv">DV継手（排水）</option>
+                  <option value="ts">TS継手（給水）</option>
+                </select>
+              </label>
+            )}
 
             {/* 角ニップルは個体差・材質でねじ込み量が変わり芯々を一定に算出できない
                 ため、本アプリでは扱わない旨を接続方法=ねじ込み選択時に明示する。 */}
