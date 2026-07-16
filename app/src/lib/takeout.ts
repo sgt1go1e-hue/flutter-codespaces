@@ -148,35 +148,53 @@ function defaultElbowId(inc: Inc, nb?: Inc): string {
   return 'elbow90_long'
 }
 
+// エルボの取り出し寸法を、継手idとサイズから直接求める（自動判定を経由しない）。
+// 作図画面(グラフから自動判定したidで呼ぶ)とクイック計算(明示選択したidで呼ぶ)の
+// 両方から使う共通ロジック。
+export function elbowTakeoutById(fittingId: string, size?: string): number {
+  const nomKey = String(nominalOf(size) ?? '')
+  const raw = getFitting(fittingId)?.dims[nomKey]
+  return typeof raw === 'number' ? raw : 0
+}
+
 // エルボの取り出し寸法（自セグメントのサイズで）
 function elbowTakeout(inc: Inc, nb?: Inc): number {
-  const nomKey = String(nominalOf(inc.size) ?? '')
-  const id = defaultElbowId(inc, nb)
-  const raw = getFitting(id)?.dims[nomKey]
-  return typeof raw === 'number' ? raw : 0
+  return elbowTakeoutById(defaultElbowId(inc, nb), inc.size)
+}
+
+// レジューサーの取り出し寸法（大径側=0/小径側=全長H。face基準）を、継手id・
+// 自分のサイズ・相手径から直接求める共通ロジック。
+export function reducerTakeoutById(
+  fittingId: string,
+  size?: string,
+  counterpartSize?: string,
+): number {
+  const a = nominalOf(size)
+  const b = nominalOf(counterpartSize)
+  if (a == null || b == null) return 0
+  const key = reducerKey(size, counterpartSize)
+  const dim = key ? (getFitting(fittingId)?.dims[key] as ReducerDim | undefined) : undefined
+  const H = dim?.H ?? 0
+  const isLarge = a >= b
+  return isLarge ? 0 : H
 }
 
 // レジューサーの取り出し寸法（大径側=0/小径側=全長H。face 基準）
 function reducerTakeout(inc: Inc, nb: Inc): { mm: number; id: string } {
-  const a = nominalOf(inc.size)
-  const b = nominalOf(nb.size)
   const id = isReducerId(inc.seg.fitting)
     ? (inc.seg.fitting as string)
     : isReducerId(nb.seg.fitting)
       ? (nb.seg.fitting as string)
       : 'reducer_concentric'
-  if (a == null || b == null) return { mm: 0, id }
-  const key = reducerKey(inc.size, nb.size)
-  const dim = key ? (getFitting(id)?.dims[key] as ReducerDim | undefined) : undefined
-  const H = dim?.H ?? 0
-  const isLarge = a >= b
-  return { mm: isLarge ? 0 : H, id }
+  return { mm: reducerTakeoutById(id, inc.size, nb.size), id }
 }
 
 // チーズの取り出し寸法（ラン/枝で C・M を出し分け）。connectionKindで
 // 差込式/ねじ込み式/突き合わせ溶接式/塩ビ(DV・TS)の寸法を出し分ける。
-type ConnectionKind = 'buttweld' | 'socket' | 'thread' | 'vp_dv' | 'vp_ts'
-function teeTakeout(
+// サイズ・接続種別を直接渡す純粋関数のため、作図画面(グラフから判定した値で呼ぶ)と
+// クイック計算(明示選択した値で呼ぶ)の両方からそのまま使える。
+export type ConnectionKind = 'buttweld' | 'socket' | 'thread' | 'vp_dv' | 'vp_ts'
+export function teeTakeout(
   runSize: string | undefined,
   branchSize: string | undefined,
   isRun: boolean,

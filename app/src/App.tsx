@@ -5,6 +5,7 @@ import { PartsPalette } from './components/PartsPalette'
 import { DisclaimerModal } from './components/DisclaimerModal'
 import { BomModal } from './components/BomModal'
 import { DrawingLauncher } from './components/DrawingLauncher'
+import { QuickCalc } from './components/QuickCalc'
 import { computeBom } from './lib/bom'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
@@ -183,7 +184,7 @@ function markSingleFlange(
 export default function App() {
   // 起動時は必ず「新規作成／過去の図面」を選ぶ画面から始める。
   // 図面は名前を付けず自動保存され、複数を切り替えて管理できる。
-  const [screen, setScreen] = useState<'launcher' | 'drawing'>('launcher')
+  const [screen, setScreen] = useState<'launcher' | 'drawing' | 'quickcalc'>('launcher')
   const [drawingIndex, setDrawingIndex] = useState<DrawingMeta[]>(() =>
     migrateLegacyDrawing(),
   )
@@ -332,6 +333,15 @@ export default function App() {
 
   function goToLauncher() {
     setScreen('launcher')
+  }
+
+  function openQuickCalc() {
+    setScreen('quickcalc')
+  }
+
+  // クイック計算を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
+  function closeQuickCalc() {
+    setScreen(drawingId ? 'drawing' : 'launcher')
   }
 
   function renameDrawing(id: string, currentName: string) {
@@ -650,8 +660,11 @@ export default function App() {
           onOpen={openDrawing}
           onRename={renameDrawing}
           onDelete={deleteDrawing}
+          onQuickCalc={openQuickCalc}
         />
       )}
+
+      {screen === 'quickcalc' && <QuickCalc onClose={closeQuickCalc} />}
 
       {screen === 'drawing' && (
         <>
@@ -661,6 +674,7 @@ export default function App() {
           <div className="tools" ref={toolsRef}>
             <button onClick={createNewDrawing}>新規作成</button>
             <button onClick={goToLauncher}>過去の図面</button>
+            <button onClick={openQuickCalc}>🧮 クイック計算</button>
             <button onClick={undo} disabled={history.length === 0}>
               元に戻す
             </button>

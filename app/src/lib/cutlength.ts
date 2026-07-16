@@ -280,6 +280,26 @@ const applyRound = (x: number, mode: RoundMode) =>
   mode === 'floor' ? Math.floor(x) : Math.round(x)
 
 /**
+ * 寸法(center)と両端の取り出し寸法から切り寸法を求める共通の計算式。
+ * 作図画面(computeAllCut、区間ごと)とクイック計算(quickCalc、単発)の両方から
+ * 同じ関数を呼ぶことで、計算式の重複実装・ズレを防ぐ。
+ */
+export function computeCutFromAllowances(
+  center: number | undefined,
+  startAllow: number,
+  endAllow: number,
+  roundMode: RoundMode,
+): { rawCut?: number; cut?: number; status: CutResult['status'] } {
+  const hasCenter = center != null && !Number.isNaN(center)
+  const rawCut = hasCenter ? round1(center! - startAllow - endAllow) : undefined
+  // 切り寸法だけ丸め（継手の取り出し寸法は小数のまま）。0未満は0にクランプ。
+  const cut = rawCut != null ? applyRound(Math.max(0, rawCut), roundMode) : undefined
+  const status: CutResult['status'] =
+    rawCut == null ? 'none' : rawCut < -0.5 ? 'over' : rawCut <= 0.5 ? 'zero' : 'ok'
+  return { rawCut, cut, status }
+}
+
+/**
  * 全セグメントの切断（加工）寸法を、端ごと（per-end）に計算する。
  * 各端の取り出し寸法は、その端のノードの役割（エルボ/チーズ/レジューサー/直管/フリー端）と
  * そのセグメント自身の実効サイズから、takeout.ts のノードグラフで求める。
@@ -307,19 +327,12 @@ export function computeAllCut(
     const startAllow = round1(e.start.mm) + (s.startFlange ? flangeDeduct : 0)
     const endAllow = round1(e.end.mm) + (s.endFlange ? flangeDeduct : 0)
     const center = s.centerLength
-    const hasCenter = center != null && !Number.isNaN(center)
-    const rawCut = hasCenter ? round1(center! - startAllow - endAllow) : undefined
-    // 切り寸法だけ丸め（継手の取り出し寸法は小数のまま）。0未満は0にクランプ。
-    const cut =
-      rawCut != null ? applyRound(Math.max(0, rawCut), roundMode) : undefined
-    const status: CutResult['status'] =
-      rawCut == null
-        ? 'none'
-        : rawCut < -0.5
-          ? 'over'
-          : rawCut <= 0.5
-            ? 'zero'
-            : 'ok'
+    const { rawCut, cut, status } = computeCutFromAllowances(
+      center,
+      startAllow,
+      endAllow,
+      roundMode,
+    )
     const startConnected = e.start.role !== 'free'
     const endConnected = e.end.role !== 'free'
     const mode: '芯々' | '芯先' =

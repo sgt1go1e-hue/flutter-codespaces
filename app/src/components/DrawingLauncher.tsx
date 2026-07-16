@@ -6,6 +6,7 @@ interface Props {
   onOpen: (id: string) => void
   onRename: (id: string, currentName: string) => void
   onDelete: (id: string) => void
+  onQuickCalc: () => void
 }
 
 function formatDateTime(ms: number): string {
@@ -21,13 +22,23 @@ function formatDateTime(ms: number): string {
 // アプリを開いた直後、および図面画面から「過去の図面」で戻ってきたときに表示する
 // 起点画面。名前を付けずに自動保存された過去の図面から選ぶか、新規作成する。
 // 一覧の各項目は名前変更・削除もできる。
-export function DrawingLauncher({ drawings, onCreate, onOpen, onRename, onDelete }: Props) {
+export function DrawingLauncher({
+  drawings,
+  onCreate,
+  onOpen,
+  onRename,
+  onDelete,
+  onQuickCalc,
+}: Props) {
   const sorted = [...drawings].sort((a, b) => b.updatedAt - a.updatedAt)
   return (
     <div className="launcher">
       <div className="launcher-title">配管アイソメ図</div>
       <button className="launcher-new" onClick={onCreate}>
         ＋ 新規作成
+      </button>
+      <button className="launcher-quickcalc" onClick={onQuickCalc}>
+        🧮 クイック計算（芯引き）
       </button>
 
       {sorted.length > 0 && (
