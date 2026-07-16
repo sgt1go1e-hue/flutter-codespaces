@@ -36,14 +36,12 @@ const END_KIND_OPTIONS: { value: QuickFittingKind; label: string }[] = [
   { value: 'elbow90_long', label: '90°エルボ（ロング）' },
   { value: 'elbow90_short', label: '90°エルボ（ショート）' },
   { value: 'elbow45', label: '45°エルボ' },
-  { value: 'tee', label: 'チーズ（ラン）' },
-  { value: 'reducer_concentric', label: '同心レジューサー' },
-  { value: 'reducer_eccentric', label: '偏心レジューサー' },
+  { value: 'tee', label: 'チーズ（メイン側）' },
+  { value: 'tee_branch', label: 'チーズ（枝側）' },
   { value: 'flange', label: 'フランジ' },
 ]
 
-const needsCounterpart = (k: QuickFittingKind) =>
-  k === 'tee' || k === 'reducer_concentric' || k === 'reducer_eccentric'
+const needsCounterpart = (k: QuickFittingKind) => k === 'tee' || k === 'tee_branch'
 
 function defaultEnd(): QuickEndInput {
   return { kind: 'free', basis: 'center' }
@@ -247,27 +245,6 @@ export function QuickCalc({ onClose }: Props) {
       </header>
 
       <div className="qc-body">
-        <div
-          className={`qc-result${result.status === 'over' || result.error ? ' over' : ''}${result.status === 'zero' ? ' zero' : ''}`}
-        >
-          {result.error ? (
-            <div className="qc-result-error">{result.error}</div>
-          ) : result.status === 'zero' ? (
-            <div className="qc-result-value zero">パイプ0mm（継手直結）</div>
-          ) : displayCut != null ? (
-            <>
-              <div className="qc-result-label">切り寸法</div>
-              <div className="qc-result-value">{displayCut} mm</div>
-            </>
-          ) : (
-            <div className="qc-result-placeholder">サイズと全体寸法を入力してください</div>
-          )}
-          <div className="qc-result-sub">
-            <span>控え s1: {result.startAllow} mm</span>
-            <span>控え s2: {result.endAllow} mm</span>
-          </div>
-        </div>
-
         <div className="panel-grid qc-config">
           <label className="field">
             <span className="field-label">管種</span>
@@ -333,25 +310,6 @@ export function QuickCalc({ onClose }: Props) {
           )}
         </div>
 
-        <div className="qc-ends">
-          <EndFittingEditor
-            label="左端"
-            end={left}
-            onChange={updateLeft}
-            sizes={sizes}
-            ownSize={size}
-            isFree={left.kind === 'free'}
-          />
-          <EndFittingEditor
-            label="右端"
-            end={right}
-            onChange={updateRight}
-            sizes={sizes}
-            ownSize={size}
-            isFree={right.kind === 'free'}
-          />
-        </div>
-
         <div className="field">
           <span className="field-label">切り寸法の丸め</span>
           <div className="round-toggle">
@@ -376,6 +334,46 @@ export function QuickCalc({ onClose }: Props) {
             <button className={rawMode ? 'active' : ''} onClick={() => setRawMode(true)}>
               そのまま
             </button>
+          </div>
+        </div>
+
+        <div className="qc-ends">
+          <EndFittingEditor
+            label="左端"
+            end={left}
+            onChange={updateLeft}
+            sizes={sizes}
+            ownSize={size}
+            isFree={left.kind === 'free'}
+          />
+          <EndFittingEditor
+            label="右端"
+            end={right}
+            onChange={updateRight}
+            sizes={sizes}
+            ownSize={size}
+            isFree={right.kind === 'free'}
+          />
+        </div>
+
+        <div
+          className={`qc-result${result.status === 'over' || result.error ? ' over' : ''}${result.status === 'zero' ? ' zero' : ''}`}
+        >
+          {result.error ? (
+            <div className="qc-result-error">{result.error}</div>
+          ) : result.status === 'zero' ? (
+            <div className="qc-result-value zero">パイプ0mm（継手直結）</div>
+          ) : displayCut != null ? (
+            <>
+              <div className="qc-result-label">切り寸法</div>
+              <div className="qc-result-value">{displayCut} mm</div>
+            </>
+          ) : (
+            <div className="qc-result-placeholder">サイズと全体寸法を入力してください</div>
+          )}
+          <div className="qc-result-sub">
+            <span>控え s1: {result.startAllow} mm</span>
+            <span>控え s2: {result.endAllow} mm</span>
           </div>
         </div>
 

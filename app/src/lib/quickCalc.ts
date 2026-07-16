@@ -4,7 +4,7 @@
 // 新規のデータ定義・計算式の重複実装はしない。
 import type { RoundMode } from './cutlength'
 import { computeCutFromAllowances } from './cutlength'
-import { elbowTakeoutById, reducerTakeoutById, teeTakeout, type ConnectionKind } from './takeout'
+import { elbowTakeoutById, teeTakeout, type ConnectionKind } from './takeout'
 
 export type QuickFittingKind =
   | 'free'
@@ -12,13 +12,12 @@ export type QuickFittingKind =
   | 'elbow90_short'
   | 'elbow45'
   | 'tee'
-  | 'reducer_concentric'
-  | 'reducer_eccentric'
+  | 'tee_branch'
   | 'flange'
 
 export interface QuickEndInput {
   kind: QuickFittingKind
-  /** レジューサー/チーズで必要な相手径（呼び径コード） */
+  /** チーズで必要な相手径（メイン側/枝側の呼び径コード） */
   counterpartSize?: string
   /** フランジの引きしろ(mm)。フランジ選択時のみ使用（既存の作図画面と同じ手入力値） */
   flangeAllow?: number
@@ -79,16 +78,6 @@ function elbowFittingId(
   return kind === 'elbow90_short' ? 'elbow90_short' : 'elbow90_long'
 }
 
-function reducerFittingId(
-  kind: 'reducer_concentric' | 'reducer_eccentric',
-  ck: ConnectionKind,
-): string {
-  if (kind === 'reducer_eccentric') return 'reducer_eccentric'
-  if (ck === 'socket') return 'reducer_socket'
-  if (ck === 'thread') return 'reducer_thread'
-  return 'reducer_concentric'
-}
-
 /** 1端の取り出し寸法(mm)と、参照した継手idを求める。 */
 export function quickEndAllowance(
   end: QuickEndInput,
@@ -110,10 +99,9 @@ export function quickEndAllowance(
       const t = teeTakeout(size, end.counterpartSize ?? size, true, ck)
       return { mm: t.mm, fittingId: t.id }
     }
-    case 'reducer_concentric':
-    case 'reducer_eccentric': {
-      const id = reducerFittingId(end.kind, ck)
-      return { mm: reducerTakeoutById(id, size, end.counterpartSize), fittingId: id }
+    case 'tee_branch': {
+      const t = teeTakeout(end.counterpartSize ?? size, size, false, ck)
+      return { mm: t.mm, fittingId: t.id }
     }
     case 'flange':
       return { mm: end.flangeAllow ?? 0 }
