@@ -155,11 +155,13 @@ export function PrintIsometric({
         c.status === 'ok'
           ? c.threadTooShortForPipe
             ? '加工不可能（丸ニップル使用）'
-            : `切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}`
+            : c.vpTsTooShortForPipe
+              ? '加工不可能（差込み代不足）'
+              : `切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}`
           : c.status === 'zero'
             ? 'パイプ0（継手直結）'
             : '継手不足'
-      const fs2 = c.status === 'ok' && !c.threadTooShortForPipe ? 12.5 : 11
+      const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
       const w =
         Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
       const len = distance(s.start, s.end) || 1
@@ -502,7 +504,7 @@ export function PrintIsometric({
                   <text className="dim-center" x={cx} y={y1} textAnchor="middle">
                     {c.mode} {c.center}
                   </text>
-                  {c.status === 'ok' && !c.threadTooShortForPipe && (
+                  {c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe && (
                     <text
                       className={`dim-cut${c.socketWeldGapWarning || c.threadNearMinNipple ? ' tight' : ''}`}
                       x={cx}
@@ -517,6 +519,11 @@ export function PrintIsometric({
                   {c.status === 'ok' && c.threadTooShortForPipe && (
                     <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
                       加工不可能（丸ニップル使用）
+                    </text>
+                  )}
+                  {c.status === 'ok' && c.vpTsTooShortForPipe && (
+                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
+                      加工不可能（差込み代不足）
                     </text>
                   )}
                   {c.status === 'zero' && (

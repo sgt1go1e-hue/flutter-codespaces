@@ -484,11 +484,13 @@ export function DrawingCanvas({
         c.status === 'ok'
           ? c.threadTooShortForPipe
             ? '加工不可能（丸ニップル使用）'
-            : `切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}`
+            : c.vpTsTooShortForPipe
+              ? '加工不可能（差込み代不足）'
+              : `切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}`
           : c.status === 'zero'
             ? 'パイプ0（継手直結）'
             : '継手不足'
-      const fs2 = c.status === 'ok' && !c.threadTooShortForPipe ? 12.5 : 11
+      const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
       const w =
         Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
       // 押し出す向きはセグメントに対して垂直な向きに固定する（セグメントの向き
@@ -909,7 +911,7 @@ export function DrawingCanvas({
                   <text className="dim-center" x={cx} y={y1} textAnchor="middle">
                     {c.mode} {c.center}
                   </text>
-                  {c.status === 'ok' && !c.threadTooShortForPipe && (
+                  {c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe && (
                     <>
                       {/* 縁取り(読みやすさ用)は下線を含めない別レイヤーで描く。
                           同じテキストに縁取り(stroke)と下線(text-decoration)を
@@ -938,6 +940,11 @@ export function DrawingCanvas({
                   {c.status === 'ok' && c.threadTooShortForPipe && (
                     <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
                       加工不可能（丸ニップル使用）
+                    </text>
+                  )}
+                  {c.status === 'ok' && c.vpTsTooShortForPipe && (
+                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
+                      加工不可能（差込み代不足）
                     </text>
                   )}
                   {c.status === 'zero' && (

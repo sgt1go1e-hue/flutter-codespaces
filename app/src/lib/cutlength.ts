@@ -62,6 +62,14 @@ export interface CutResult {
   threadNearMinNipple: boolean
   /** 判定に使った最短ニップル(丸ニップル)寸法(mm、表示用)。 */
   threadMinNippleLength?: number
+  /**
+   * 塩ビ(VP)TS継手のエルボ同士を直結していて、切り寸法が両端の差込み深さの
+   * 合計(=直結できる最短の直管長)を下回っている＝差込接着が届かず施工できない。
+   * status='ok'（切り寸>0）のときのみ意味を持つ。
+   */
+  vpTsTooShortForPipe: boolean
+  /** 判定に使った最短直管長(mm、表示用)。 */
+  vpTsMinPipeLength?: number
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -94,6 +102,27 @@ const THREAD_MIN_NIPPLE: Record<string, number> = {
 const THREAD_NEAR_MIN_MARGIN = 15
 
 const isThreadFittingId = (id?: string) => !!id && id.endsWith('_thread')
+
+// 塩ビ(VP)TS継手は差込接着のため、ねじ込みと違い突き合わせができない。
+// 2つのTS継手（エルボ）を直結する直管は、両端それぞれのソケットに届くだけの
+// 長さが最低限必要で、その長さ(ソケット差込み深さℓ)はカタログのH(継手中心〜
+// 差込み口の参考寸法)−Z(取り出し寸法)がちょうど一致することを確認済み
+// （90°/45°とも同じ値）。同一区間は両端とも同じ呼び径なので、最短直管長は
+// ℓを2倍した値になる。
+const TS_VP_ELBOW_SOCKET_DEPTH: Record<string, number> = {
+  '13': 26,
+  '16': 30,
+  '20': 35,
+  '25': 40,
+  '30': 44,
+  '40': 55,
+  '50': 63,
+  '65': 61,
+  '75': 64,
+  '100': 84,
+}
+
+const isVpTsElbowId = (id?: string) => id === 'elbow90_vp_ts' || id === 'elbow45_vp_ts'
 
 // 差込み深さ C(参考値, mm)。呼び径ごと。90°エルボ／チーズ(ラン・枝とも)は共通の
 // ソケット深さ、45°エルボはソケット形状が異なるため別テーブル。
@@ -232,6 +261,15 @@ export function computeAllCut(
       cut! >= threadMinNippleLength &&
       cut! <= threadMinNippleLength + THREAD_NEAR_MIN_MARGIN
 
+    // 塩ビ(VP)TS継手のエルボ同士を直結している区間の最短直管長(両端の差込み
+    // 深さの合計)。区間内は同じ呼び径なので、両端とも同じℓを使う。
+    const vpTsMinPipeLength =
+      isVpTsElbowId(e.start.fittingId) && isVpTsElbowId(e.end.fittingId)
+        ? (TS_VP_ELBOW_SOCKET_DEPTH[String(nominalOf(eff?.size) ?? '')] ?? 0) * 2
+        : undefined
+    const vpTsTooShortForPipe =
+      status === 'ok' && vpTsMinPipeLength != null && cut! < vpTsMinPipeLength
+
     out[s.id] = {
       center,
       startAllow,
@@ -269,6 +307,8 @@ export function computeAllCut(
       threadTooShortForPipe,
       threadNearMinNipple,
       threadMinNippleLength,
+      vpTsTooShortForPipe,
+      vpTsMinPipeLength,
     }
   }
   return out

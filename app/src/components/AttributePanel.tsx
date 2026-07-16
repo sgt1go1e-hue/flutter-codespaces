@@ -260,19 +260,21 @@ export function SegmentPanel({
               )}
             </span>
             <div
-              className={`cut-value${cut?.status === 'over' || cut?.threadTooShortForPipe ? ' over' : ''}${cut?.status === 'zero' ? ' zero' : ''}${cut?.socketWeldGapWarning || cut?.threadNearMinNipple ? ' tight' : ''}`}
+              className={`cut-value${cut?.status === 'over' || cut?.threadTooShortForPipe || cut?.vpTsTooShortForPipe ? ' over' : ''}${cut?.status === 'zero' ? ' zero' : ''}${cut?.socketWeldGapWarning || cut?.threadNearMinNipple ? ' tight' : ''}`}
             >
               {cut?.needsCounterpart
                 ? '要相手径'
                 : cut?.threadTooShortForPipe
                   ? '加工不可能（丸ニップル使用）'
-                  : cut?.status === 'ok'
-                    ? `${cut.cut} mm`
-                    : cut?.status === 'zero'
-                      ? 'パイプ0mm（継手直結）'
-                      : cut?.status === 'over'
-                        ? '継手が収まりません'
-                        : '—'}
+                  : cut?.vpTsTooShortForPipe
+                    ? '加工不可能（差込み代不足）'
+                    : cut?.status === 'ok'
+                      ? `${cut.cut} mm`
+                      : cut?.status === 'zero'
+                        ? 'パイプ0mm（継手直結）'
+                        : cut?.status === 'over'
+                          ? '継手が収まりません'
+                          : '—'}
             </div>
           </div>
 
@@ -304,6 +306,18 @@ export function SegmentPanel({
               <p>
                 切り寸法が最短の丸ニップル寸法（{cut.threadMinNippleLength}mm）に近いようです。
                 現物合わせで加工するより、最短の丸ニップルを使う方が確実です。
+              </p>
+            </div>
+          )}
+
+          {/* 塩ビ(VP)TS継手のエルボ同士を直結する区間で、切り寸法が両端の差込み深さの
+              合計（＝直結できる最短の直管長）を下回っている場合の警告。差込接着は
+              ねじ込みと違い突き合わせができないため、両ソケットに届く長さが必須。 */}
+          {cut?.vpTsTooShortForPipe && (
+            <div className="socket-gap-warn">
+              <p>
+                この長さ（{cut.cut}mm）では両側のソケットに届かず施工できません。最短の直管長は
+                {cut.vpTsMinPipeLength}mmです。
               </p>
             </div>
           )}
