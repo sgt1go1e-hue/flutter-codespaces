@@ -390,9 +390,9 @@ export function QuickCalc({ onClose }: Props) {
           <KeyButton label="8" onClick={() => pressDigit('8')} gridColumn="2" gridRow="1" />
           <KeyButton label="9" onClick={() => pressDigit('9')} gridColumn="3" gridRow="1" />
           <KeyButton
-            label="＋"
+            label="±"
             variant="op"
-            onClick={() => pressOp('+')}
+            onClick={() => setCalc((s) => calcPressSign(s))}
             gridColumn="4"
             gridRow="1"
           />
@@ -401,9 +401,9 @@ export function QuickCalc({ onClose }: Props) {
           <KeyButton label="5" onClick={() => pressDigit('5')} gridColumn="2" gridRow="2" />
           <KeyButton label="6" onClick={() => pressDigit('6')} gridColumn="3" gridRow="2" />
           <KeyButton
-            label="－"
+            label="＋"
             variant="op"
-            onClick={() => pressOp('-')}
+            onClick={() => pressOp('+')}
             gridColumn="4"
             gridRow="2"
           />
@@ -412,9 +412,9 @@ export function QuickCalc({ onClose }: Props) {
           <KeyButton label="2" onClick={() => pressDigit('2')} gridColumn="2" gridRow="3" />
           <KeyButton label="3" onClick={() => pressDigit('3')} gridColumn="3" gridRow="3" />
           <KeyButton
-            label="±"
+            label="－"
             variant="op"
-            onClick={() => setCalc((s) => calcPressSign(s))}
+            onClick={() => pressOp('-')}
             gridColumn="4"
             gridRow="3"
           />
