@@ -37,6 +37,12 @@ export interface EndResult {
   fittingId?: string
   /** elbow-reducer のとき、突き合わせレジューサーの相手径（BOM表示用） */
   reducerCounterpart?: string
+  /**
+   * tee-run/tee-branch のとき、もう一方（run側ならbranch側、branch側ならrun側）の
+   * 実サイズ。塩ビ(VP)継手の最短直管長判定など、組み合わせごとに差込み深さが
+   * 異なる場合の参照に使う。
+   */
+  teeCounterpart?: string
 }
 
 interface Inc {
@@ -313,7 +319,12 @@ function resolveEnd(
         role = 'tee-run-reducer'
       }
     }
-    return { role, mm, fittingId: t.id }
+    return {
+      role,
+      mm,
+      fittingId: t.id,
+      teeCounterpart: isRun ? branchSize : runSize,
+    }
   }
 
   // 次数2：端点隣接1本

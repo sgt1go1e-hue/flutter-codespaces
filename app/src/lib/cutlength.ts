@@ -123,6 +123,122 @@ const TS_VP_ELBOW_SOCKET_DEPTH: Record<string, number> = {
 }
 
 const isVpTsElbowId = (id?: string) => id === 'elbow90_vp_ts' || id === 'elbow45_vp_ts'
+const isVpTsTeeId = (id?: string) => id === 'tee_equal_vp_ts' || id === 'tee_reducing_vp_ts'
+
+// TSチーズはラン側/枝側で差込み深さが異なり、しかも組み合わせ(ラン径_枝径)
+// ごとに値が変わる（同径どうしでもエルボと同じ値になるとは限らない）ため、
+// カタログのH(ラン全長)−Z2(ラン取り出し)・I(枝全長)−Z1(枝取り出し)を
+// 組み合わせキーごとに計算した値をそのまま使う。
+const TS_VP_TEE_RUN_DEPTH: Record<string, number> = {
+  '13_13': 26,
+  '16_13': 29,
+  '16_16': 30,
+  '20_13': 32,
+  '20_16': 33,
+  '20_20': 35,
+  '25_13': 34,
+  '25_16': 35,
+  '25_20': 37,
+  '25_25': 40,
+  '30_13': 35,
+  '30_16': 36,
+  '30_20': 38,
+  '30_25': 41,
+  '30_30': 44,
+  '40_13': 40,
+  '40_16': 41,
+  '40_20': 43,
+  '40_25': 46,
+  '40_30': 49,
+  '40_40': 55,
+  '50_13': 42,
+  '50_16': 42,
+  '50_20': 43,
+  '50_25': 48,
+  '50_30': 51,
+  '50_40': 57,
+  '50_50': 63,
+  '65_50': 60,
+  '65_65': 61,
+  '75_25': 45,
+  '75_40': 53,
+  '75_50': 58,
+  '75_65': 57,
+  '75_75': 64,
+  '100_50': 66,
+  '100_75': 72,
+  '100_100': 84,
+  '150_75': 101,
+  '150_100': 110,
+  '150_150': 132,
+}
+const TS_VP_TEE_BRANCH_DEPTH: Record<string, number> = {
+  '13_13': 26,
+  '16_13': 27,
+  '16_16': 30,
+  '20_13': 29,
+  '20_16': 32,
+  '20_20': 35,
+  '25_13': 32,
+  '25_16': 35,
+  '25_20': 38,
+  '25_25': 40,
+  '30_13': 35,
+  '30_16': 38,
+  '30_20': 41,
+  '30_25': 43,
+  '30_30': 44,
+  '40_13': 41,
+  '40_16': 44,
+  '40_20': 47,
+  '40_25': 49,
+  '40_30': 50,
+  '40_40': 55,
+  '50_13': 47,
+  '50_16': 47,
+  '50_20': 53,
+  '50_25': 55,
+  '50_30': 56,
+  '50_40': 61,
+  '50_50': 63,
+  '65_50': 64,
+  '65_65': 61,
+  '75_25': 59,
+  '75_40': 66,
+  '75_50': 69,
+  '75_65': 68,
+  '75_75': 64,
+  '100_50': 81,
+  '100_75': 76,
+  '100_100': 84,
+  '150_75': 95,
+  '150_100': 106,
+  '150_150': 132,
+}
+
+// 塩ビ(VP)TS継手の差込み深さℓ(mm)を、継手idと自分側のサイズ・役割から求める。
+// エルボは呼び径のみで決まるが、チーズはラン/枝の組み合わせ（相手側のサイズ）
+// によって値が変わるため teeCounterpart（もう一方の実サイズ）も必要。
+function tsVpSocketDepth(
+  fittingId: string | undefined,
+  size: string | undefined,
+  role: EndRole,
+  teeCounterpart: string | undefined,
+): number | undefined {
+  const n = nominalOf(size)
+  if (n == null) return undefined
+  if (isVpTsElbowId(fittingId)) return TS_VP_ELBOW_SOCKET_DEPTH[String(n)]
+  if (isVpTsTeeId(fittingId)) {
+    const cn = nominalOf(teeCounterpart)
+    if (cn == null) return undefined
+    const isRun = role === 'tee-run' || role === 'tee-run-reducer'
+    const runN = isRun ? n : cn
+    const branchN = isRun ? cn : n
+    const key = `${runN}_${branchN}`
+    return (isRun ? TS_VP_TEE_RUN_DEPTH : TS_VP_TEE_BRANCH_DEPTH)[key]
+  }
+  return undefined
+}
 
 // 差込み深さ C(参考値, mm)。呼び径ごと。90°エルボ／チーズ(ラン・枝とも)は共通の
 // ソケット深さ、45°エルボはソケット形状が異なるため別テーブル。
@@ -261,11 +377,23 @@ export function computeAllCut(
       cut! >= threadMinNippleLength &&
       cut! <= threadMinNippleLength + THREAD_NEAR_MIN_MARGIN
 
-    // 塩ビ(VP)TS継手のエルボ同士を直結している区間の最短直管長(両端の差込み
-    // 深さの合計)。区間内は同じ呼び径なので、両端とも同じℓを使う。
+    // 塩ビ(VP)TS継手(エルボ/チーズ)同士を直結している区間の最短直管長
+    // (両端それぞれの差込み深さの合計)。
+    const vpTsStartDepth = tsVpSocketDepth(
+      e.start.fittingId,
+      eff?.size,
+      e.start.role,
+      e.start.teeCounterpart,
+    )
+    const vpTsEndDepth = tsVpSocketDepth(
+      e.end.fittingId,
+      eff?.size,
+      e.end.role,
+      e.end.teeCounterpart,
+    )
     const vpTsMinPipeLength =
-      isVpTsElbowId(e.start.fittingId) && isVpTsElbowId(e.end.fittingId)
-        ? (TS_VP_ELBOW_SOCKET_DEPTH[String(nominalOf(eff?.size) ?? '')] ?? 0) * 2
+      vpTsStartDepth != null && vpTsEndDepth != null
+        ? vpTsStartDepth + vpTsEndDepth
         : undefined
     const vpTsTooShortForPipe =
       status === 'ok' && vpTsMinPipeLength != null && cut! < vpTsMinPipeLength

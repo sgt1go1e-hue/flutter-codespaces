@@ -1,6 +1,7 @@
 import type { Point, Segment } from '../types'
 import { distanceToSegment, samePoint } from './isometric'
 import { findTeeContext } from './takeout'
+import { nominalOf } from '../data/masters'
 
 export type SegmentMap = Record<string, Segment>
 
@@ -56,8 +57,8 @@ function outputSize(
 ): string | undefined {
   const base = effectiveSizeInner(seg, byId, seen)
   if (base && isReducerId(seg.fitting) && seg.reducerSize) {
-    const a = nomA(base)
-    const b = nomA(seg.reducerSize)
+    const a = nominalOf(base)
+    const b = nominalOf(seg.reducerSize)
     if (a != null && b != null) return a <= b ? base : seg.reducerSize
   }
   return base
@@ -139,11 +140,6 @@ export function reducerCounterpart(
   return undefined
 }
 
-const nomA = (code?: string): number | null => {
-  const m = /^(\d+)A$/.exec(code ?? '')
-  return m ? Number(m[1]) : null
-}
-
 /**
  * レジューサーの「大径側が始点(start)側か」を判定する。
  * 上流(大径)→下流(小径)の向きをシンボル描画に使う。
@@ -155,12 +151,12 @@ export function reducerLargeAtStart(
   effectiveById: Record<string, { size?: string }>,
   counterpartSize?: string,
 ): boolean {
-  const segN = nomA(effectiveById[seg.id]?.size)
+  const segN = nominalOf(effectiveById[seg.id]?.size)
   let cpEnd: 'start' | 'end' | undefined
   let cpN: number | null = null
   for (const n of segments) {
     if (n.id === seg.id) continue
-    const nn = nomA(effectiveById[n.id]?.size)
+    const nn = nominalOf(effectiveById[n.id]?.size)
     if (nn == null || nn === segN) continue
     if (samePoint(n.start, seg.start) || samePoint(n.end, seg.start) ||
         distanceToSegment(seg.start, n.start, n.end) < 1.5) {
@@ -173,7 +169,7 @@ export function reducerLargeAtStart(
   }
   if (segN == null || cpN == null || !cpEnd) {
     // 幾何が取れない場合は手動相手径から推定（不明なら大径を始点側に）
-    const mn = nomA(counterpartSize)
+    const mn = nominalOf(counterpartSize)
     if (segN != null && mn != null) return mn < segN
     return true
   }
@@ -273,8 +269,8 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
     } else if (isBranch) {
       // メイン管／枝管の実サイズが異なれば「径違いチーズ」、同じなら「同径チーズ」を自動選択。
       const tee = findTeeContext(segments, sizeById, s.id)
-      const mainN = nomA(tee?.mainSize)
-      const branchN = nomA(tee?.branchSize)
+      const mainN = nominalOf(tee?.mainSize)
+      const branchN = nominalOf(tee?.branchSize)
       const reducing = mainN != null && branchN != null && mainN !== branchN
       fitting = reducing
         ? vp
