@@ -164,6 +164,15 @@ export function PrintIsometric({
         jobs.push({ key: `term-${s.id}-${at}`, cx, cy, w, h: 26, pushX: nx, pushY: ny })
       }
     }
+    // 排水勾配の「勾配1/N」マーク（区間中点のやや下）。他のラベルや
+    // 互いどうしとも重ならないよう、同じジョブ列に混ぜて解決する。
+    for (const s of segments) {
+      if (s.slopeDenom == null) continue
+      const mx = (s.start.x + s.end.x) / 2
+      const my = (s.start.y + s.end.y) / 2
+      const w = estimateTextWidth(`勾配1/${s.slopeDenom}`, 11) + 6
+      jobs.push({ key: `slope-${s.id}`, cx: mx, cy: my + 16, w, h: 18, pushX: 0, pushY: 1 })
+    }
     // データ上つながっていない線どうしが視覚的に交差する箇所は、複数のラベルの
     // 既定位置（セグメント中点付近）が同じ場所に集まりやすく、重なって読めなく
     // なりやすい。交差点そのものを避けたい固定領域として扱う。
@@ -328,6 +337,20 @@ export function PrintIsometric({
     )
   }
 
+  // 排水勾配(1/N)を設定した区間に「勾配1/N」マークを表示する
+  function slopeMark(s: Segment, denom: number) {
+    const mx = (s.start.x + s.end.x) / 2
+    const my = (s.start.y + s.end.y) / 2
+    const resolved = resolvedLabels.get(`slope-${s.id}`)
+    const cx = resolved?.cx ?? mx
+    const cy = resolved?.cy ?? my + 16
+    return (
+      <text className="slope-mark" x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+        勾配1/{denom}
+      </text>
+    )
+  }
+
   function reducerSymbol(
     s: Segment,
     kind: 'concentric' | 'eccentric',
@@ -413,6 +436,7 @@ export function PrintIsometric({
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               eff?.fitting === 'elbow45_long' &&
               elbow45Mark(s, 'end')}
+            {s.slopeDenom != null && slopeMark(s, s.slopeDenom)}
             {eff?.showSizeLabel &&
               eff.size &&
               cutById[s.id]?.startConnected &&

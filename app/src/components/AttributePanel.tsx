@@ -14,6 +14,7 @@ import {
   getConnectionMethod,
   connectionMethods,
 } from '../data/masters'
+import { isSlopeEligible, SLOPE_DENOM_OPTIONS } from '../lib/slope'
 
 export interface DrawDefaults {
   pipeType?: string
@@ -278,6 +279,15 @@ export function SegmentPanel({
             </div>
           </div>
 
+          {/* 下流に隣接する排水勾配区間があり、その高低差が芯々寸法から差し引かれている場合の案内。 */}
+          {!!cut?.slopeAdjust && (
+            <div className="socket-gap-warn">
+              <p>
+                下流の勾配区間で生じる高低差ぶん、切り寸法を{cut.slopeAdjust}mm短くしています。
+              </p>
+            </div>
+          )}
+
           {/* 差込（ソケット）溶接同士を直結していて、継手のツラ（差込み口の開口面）
               同士の隙間が目安未満のときの警告。突き合わせ溶接と違い、ソケット部の
               隅肉溶接同士が近すぎると溶接ビードが干渉し施工できないため。 */}
@@ -462,6 +472,35 @@ export function SegmentPanel({
               </select>
             </label>
           )}
+
+          {/* SGP管またはVP+DV継手の排水・ドレン配管のみ: 勾配(1/N)を設定できる。
+              縦区間(90°/270°)自体は勾配を持たない（設定は水平寄りの区間側で行い、
+              その高低差は自動で上流の縦区間の寸法から差し引かれる）。 */}
+          {isSlopeEligible(effective?.pipeType, segment.vpSeries ?? effective?.vpSeries) &&
+            segment.angle !== 90 &&
+            segment.angle !== 270 && (
+              <label className="field">
+                <span className="field-label">
+                  勾配
+                  <span className="field-note">排水・ドレン配管で必要な場合のみ</span>
+                </span>
+                <select
+                  value={segment.slopeDenom ?? ''}
+                  onChange={(e) =>
+                    onChange({
+                      slopeDenom: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                >
+                  <option value="">なし</option>
+                  {SLOPE_DENOM_OPTIONS.map((d) => (
+                    <option key={d} value={d}>
+                      1/{d}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
 
           {/* 分岐(チーズ)接続時: もう一方(メイン管 or 枝管)のサイズもここで直接編集できる。
               「サイズ」と「相手径」のような曖昧な関係をやめ、メイン管/枝管という

@@ -524,6 +524,16 @@ body {
   stroke-width: 3px;
 }
 
+/* 排水勾配(1/N)を設定した区間のマーク */
+.slope-mark {
+  fill: var(--label-elbow45);
+  font-size: 11px;
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: 3px;
+}
+
 /* フランジ記号（配管に直交する2本線） */
 .flange-mark {
   stroke: var(--text);

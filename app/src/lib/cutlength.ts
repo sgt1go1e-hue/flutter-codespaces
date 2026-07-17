@@ -3,6 +3,7 @@ import type { Effective } from './inheritance'
 import { reducerCounterpart, reducerLargeAtStart } from './inheritance'
 import { computeEnds, type EndRole } from './takeout'
 import { getFitting, nominalOf, reducerKey, type ReducerDim } from '../data/masters'
+import { computeChainedSlopeDrop } from './slope'
 
 export interface EccentricInfo {
   offset?: number
@@ -70,6 +71,12 @@ export interface CutResult {
   vpTsTooShortForPipe: boolean
   /** 判定に使った最短直管長(mm、表示用)。 */
   vpTsMinPipeLength?: number
+  /**
+   * 縦区間(90°/270°)で、下流に隣接する排水勾配区間により差し引かれた
+   * 高低差の合計(mm)。0またはundefinedなら勾配による調整なし。
+   * center(入力した芯々寸法)からこの分を引いた値で切り寸法を計算している。
+   */
+  slopeAdjust?: number
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -317,6 +324,7 @@ export function computeAllCut(
   gasketMm = 0,
 ): Record<string, CutResult> {
   const ends = computeEnds(segments, effectiveById)
+  const slopeDrops = computeChainedSlopeDrop(segments, effectiveById)
   const out: Record<string, CutResult> = {}
 
   for (const s of segments) {
@@ -326,9 +334,16 @@ export function computeAllCut(
     const flangeDeduct = flangeAllow + gasketMm
     const startAllow = round1(e.start.mm) + (s.startFlange ? flangeDeduct : 0)
     const endAllow = round1(e.end.mm) + (s.endFlange ? flangeDeduct : 0)
+    // 縦区間(90°/270°)は、下流に隣接する排水勾配区間で生じる高低差の合計を
+    // 切り寸法の計算にだけ差し引く（勾配で下がった分、縦区間はその分短くなる）。
+    // 表示上の「芯々」は引き続きユーザーが入力した値のまま見せる。
+    const isVertical = s.angle === 90 || s.angle === 270
+    const slopeAdjust =
+      isVertical ? round1(slopeDrops[s.id].start + slopeDrops[s.id].end) : 0
     const center = s.centerLength
+    const adjustedCenter = center != null ? center - slopeAdjust : undefined
     const { rawCut, cut, status } = computeCutFromAllowances(
-      center,
+      adjustedCenter,
       startAllow,
       endAllow,
       roundMode,
@@ -450,6 +465,7 @@ export function computeAllCut(
       threadMinNippleLength,
       vpTsTooShortForPipe,
       vpTsMinPipeLength,
+      slopeAdjust: slopeAdjust || undefined,
     }
   }
   return out

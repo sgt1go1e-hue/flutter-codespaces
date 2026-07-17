@@ -470,7 +470,16 @@ export function DrawingCanvas({
         pushY: perpY,
       })
     }
-    // 3) 末端の呼び径ラベル（寸法表記を避ける向きへ、必要ならさらに押し出す）
+    // 3) 排水勾配の「勾配1/N」マーク（区間中点のやや下）。他のラベルや
+    //    互いどうしとも重ならないよう、同じジョブ列に混ぜて解決する。
+    for (const s of segments) {
+      if (s.slopeDenom == null) continue
+      const mx = (s.start.x + s.end.x) / 2
+      const my = (s.start.y + s.end.y) / 2
+      const w = estimateTextWidth(`勾配1/${s.slopeDenom}`, 11) + 6
+      jobs.push({ key: `slope-${s.id}`, cx: mx, cy: my + 16, w, h: 18, pushX: 0, pushY: 1 })
+    }
+    // 4) 末端の呼び径ラベル（寸法表記を避ける向きへ、必要ならさらに押し出す）
     for (const s of segments) {
       const eff = effectiveById[s.id]
       const c = cutById[s.id]
@@ -687,6 +696,22 @@ export function DrawingCanvas({
     )
   }
 
+  // 排水勾配(1/N)を設定した区間に「1/100」等のマークを表示する
+  // （区間の中点、線の少し下側が基準位置。重なり回避で押し出された
+  // 最終位置があればそちらを使う）。
+  function slopeMark(s: Segment, denom: number) {
+    const mx = (s.start.x + s.end.x) / 2
+    const my = (s.start.y + s.end.y) / 2
+    const resolved = resolvedLabels.get(`slope-${s.id}`)
+    const cx = resolved?.cx ?? mx
+    const cy = resolved?.cy ?? my + 16
+    return (
+      <text className="slope-mark" x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+        勾配1/{denom}
+      </text>
+    )
+  }
+
   // レジューサーのシンボル。
   // 同心=二等辺三角形（大径=底辺→小径=頂点）、偏心=直角三角形（斜辺の向きが Top/Bottom 連動）。
   // 常に「上流(大径)側=底辺・下流(小径)側=頂点」。ルート向きが変わっても維持。
@@ -809,6 +834,8 @@ export function DrawingCanvas({
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               eff?.fitting === 'elbow45_long' &&
               elbow45Mark(s, 'end')}
+            {/* 排水勾配を設定した区間には「勾配1/N」を線の中点に表示する */}
+            {s.slopeDenom != null && slopeMark(s, s.slopeDenom)}
             {/* 中間の径変化のみ、線上に1箇所表示（両端フリーでない内部区間だけ。
                 フリー端がある区間は末端ラベルで表示するので重複させない）。 */}
             {eff?.showSizeLabel &&
