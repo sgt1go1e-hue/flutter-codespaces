@@ -37,6 +37,7 @@ import {
 import { getPart } from './data/parts'
 import { sizesForPipeType, nextReducerSize } from './data/masters'
 import type { Segment } from './types'
+import { computeElevationChecks } from './lib/elevationCheck'
 
 // パーツをドロップしたとき、対象セグメントを拾うヒット距離(px)
 const DROP_HIT = 28
@@ -417,6 +418,8 @@ export default function App() {
     () => detectElbowClashes(segments, cutById),
     [segments, cutById],
   )
+  // 基準高さ(スタート/ゴール)を入力したフリー端どうしの高低差チェック
+  const elevationChecks = useMemo(() => computeElevationChecks(segments), [segments])
   const selectedClash = useMemo(
     () => (selectedId ? elbowClashes.find((c) => c.midSegId === selectedId) : undefined),
     [elbowClashes, selectedId],
@@ -748,6 +751,9 @@ export default function App() {
           onApplyElbowClash={() => selectedClash && applyElbowClash(selectedClash)}
           teeContext={teeContext}
           onSetTeeSize={setSizeForSegments}
+          elevationChecks={elevationChecks.filter(
+            (c) => c.fromSegId === selected.id || c.toSegId === selected.id,
+          )}
           roundMode={defaults.roundMode ?? 'round'}
           onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}
           flangeAllow={defaults.flangeAllow ?? 0}

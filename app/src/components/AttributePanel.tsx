@@ -15,6 +15,7 @@ import {
   connectionMethods,
 } from '../data/masters'
 import { isSlopeEligible, SLOPE_DENOM_OPTIONS } from '../lib/slope'
+import type { ElevationCheckResult } from '../lib/elevationCheck'
 
 export interface DrawDefaults {
   pipeType?: string
@@ -62,6 +63,8 @@ interface SegmentPanelProps {
   teeContext?: TeeContext
   /** メイン管／枝管サイズの直接編集（対象セグメントid配列とサイズを渡す） */
   onSetTeeSize: (segmentIds: string[], size: string | undefined) => void
+  /** このセグメントのフリー端に設定した基準高さが関わる、高低差の整合チェック結果 */
+  elevationChecks?: ElevationCheckResult[]
   /** 切り寸法の丸め方（全体設定・既定=四捨五入） */
   roundMode: 'round' | 'floor'
   onRoundModeChange: (mode: 'round' | 'floor') => void
@@ -88,6 +91,7 @@ export function SegmentPanel({
   onApplyElbowClash,
   teeContext,
   onSetTeeSize,
+  elevationChecks,
   roundMode,
   onRoundModeChange,
   flangeAllow,
@@ -286,6 +290,71 @@ export function SegmentPanel({
                 下流の勾配区間で生じる高低差ぶん、切り寸法を{cut.slopeAdjust}mm短くしています。
               </p>
             </div>
+          )}
+
+          {/* フリー端(未接続の端)には、配管ルートのスタート/ゴールの基準高さを
+              入力できる。二段階に分けて配管を落としても、この2点の高さだけは
+              絶対に変えられないという制約の検算用の指標。 */}
+          {cut && (!cut.startConnected || !cut.endConnected) && (
+            <div className="field round-field elevation-field">
+              <span className="field-label">
+                基準高さ(mm)
+                <span className="field-note">フリー端のみ・任意の基準面からの相対値</span>
+              </span>
+              <div className="elevation-inputs">
+                {!cut.startConnected && (
+                  <label>
+                    <span className="field-note">始点側</span>
+                    <input
+                      className="num-input"
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="例: 2500"
+                      value={segment.startRefElevation ?? ''}
+                      onChange={(e) =>
+                        onChange({
+                          startRefElevation:
+                            e.target.value === '' ? undefined : Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                )}
+                {!cut.endConnected && (
+                  <label>
+                    <span className="field-note">終点側</span>
+                    <input
+                      className="num-input"
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="例: 2450"
+                      value={segment.endRefElevation ?? ''}
+                      onChange={(e) =>
+                        onChange({
+                          endRefElevation:
+                            e.target.value === '' ? undefined : Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* 基準高さを入力した2点間で、実際のルート(縦区間+勾配)から計算した
+              高低差が入力値と一致しない場合の警告。差分のみ表示し、自動調整はしない。 */}
+          {elevationChecks?.map((c, i) =>
+            c.diff !== 0 ? (
+              <div className="socket-gap-warn" key={i}>
+                <p>
+                  基準高さと実際のルートの高低差が一致しません（入力値どうしの差:
+                  {c.expectedDelta}mm / ルートから計算した高低差: {c.actualDelta}mm
+                  ／ 差分: {c.diff > 0 ? '+' : ''}
+                  {c.diff}mm）。
+                </p>
+              </div>
+            ) : null,
           )}
 
           {/* 差込（ソケット）溶接同士を直結していて、継手のツラ（差込み口の開口面）

@@ -753,6 +753,18 @@ body {
   width: 100px;
 }
 
+.elevation-inputs {
+  display: flex;
+  gap: 10px;
+}
+
+.elevation-inputs label {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
 .cut-field .cut-value {
   display: flex;
   align-items: center;
