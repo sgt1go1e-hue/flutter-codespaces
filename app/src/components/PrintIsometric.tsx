@@ -4,6 +4,12 @@ import { distance } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
+import {
+  estimateTextWidth,
+  resolveOverlaps,
+  type LabelBox,
+  type LabelJob,
+} from '../lib/labelLayout'
 
 interface Props {
   segments: Segment[]
@@ -13,63 +19,6 @@ interface Props {
 }
 
 const CROSS_GAP = 9
-
-// --- ラベル重なり回避（DrawingCanvas と同じロジック。画面表示に依存しないので複製） ---
-function estimateTextWidth(text: string, fontSize: number): number {
-  let w = 0
-  for (const ch of text) {
-    w += ch.charCodeAt(0) > 0x2e80 ? fontSize : fontSize * 1.02
-  }
-  return w
-}
-interface LabelBox {
-  cx: number
-  cy: number
-  w: number
-  h: number
-}
-function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
-  return (
-    Math.abs(a.cx - b.cx) * 2 < a.w + b.w && Math.abs(a.cy - b.cy) * 2 < a.h + b.h
-  )
-}
-interface LabelJob extends LabelBox {
-  key: string
-  pushX: number
-  pushY: number
-}
-function resolveOverlaps(
-  jobs: LabelJob[],
-  obstacles: LabelBox[] = [],
-): Map<string, { cx: number; cy: number }> {
-  const placed: LabelBox[] = [...obstacles]
-  const result = new Map<string, { cx: number; cy: number }>()
-  for (const job of jobs) {
-    let cx = job.cx
-    let cy = job.cy
-    let attempts = 0
-    let hit = placed.find((p) => boxesOverlap({ cx, cy, w: job.w, h: job.h }, p))
-    while (attempts < 24 && hit) {
-      // 自分の既定の押し出し方向(pushX/pushY)だけで進めると、短い区間が
-      // 隣接ノードにぶつかり合っているような密集配置では、ぶつかっている
-      // 相手と同じ向きに動き続けて解消しないことがあった。既定方向に加えて
-      // 実際にぶつかっている相手から遠ざかる向きも合成し、収束しやすくする。
-      const awayX = cx - hit.cx
-      const awayY = cy - hit.cy
-      const awayLen = Math.hypot(awayX, awayY) || 1
-      const dx = job.pushX + (awayX / awayLen) * 1.0
-      const dy = job.pushY + (awayY / awayLen) * 1.0
-      const len = Math.hypot(dx, dy) || 1
-      cx += (dx / len) * 5
-      cy += (dy / len) * 5
-      attempts++
-      hit = placed.find((p) => boxesOverlap({ cx, cy, w: job.w, h: job.h }, p))
-    }
-    placed.push({ cx, cy, w: job.w, h: job.h })
-    result.set(job.key, { cx, cy })
-  }
-  return result
-}
 
 // アイソメ図上に実際に表示される「45°」マークの位置を全て求める
 // （描画条件と同じ: 継手が elbow45_long のセグメント自身のエルボ端）。

@@ -14,6 +14,12 @@ import {
 import { breakLine } from '../lib/crossover'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
+import {
+  estimateTextWidth,
+  resolveOverlaps,
+  type LabelBox,
+  type LabelJob,
+} from '../lib/labelLayout'
 
 interface Props {
   segments: Segment[]
@@ -63,69 +69,6 @@ const START_SNAP = 18
 // ピンチズームの拡大率の範囲
 const MIN_SCALE = 0.5
 const MAX_SCALE = 3
-
-// --- ラベル（末端の呼び径・寸法2段表記）の重なり回避 ---
-// 実測せずに簡易的な文字幅を見積もる（全角=1em、半角=0.62em として概算）。
-function estimateTextWidth(text: string, fontSize: number): number {
-  let w = 0
-  for (const ch of text) {
-    w += ch.charCodeAt(0) > 0x2e80 ? fontSize : fontSize * 1.02
-  }
-  return w
-}
-interface LabelBox {
-  cx: number
-  cy: number
-  w: number
-  h: number
-}
-function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
-  return (
-    Math.abs(a.cx - b.cx) * 2 < a.w + b.w && Math.abs(a.cy - b.cy) * 2 < a.h + b.h
-  )
-}
-interface LabelJob extends LabelBox {
-  key: string
-  /** 重なった場合に押し出す向き（単位ベクトル寄り） */
-  pushX: number
-  pushY: number
-}
-// 重なったラベルを、それぞれの推奨方向へ少しずつ押し出して重なりを減らす
-// （完全な重なり0を保証するものではないが、密集時のかぶりを大幅に軽減する）。
-// obstacles（線どうしの交差点など、動かせない固定の避けたい領域）を渡すと、
-// それらとも重ならないよう先に確保しておく。
-function resolveOverlaps(
-  jobs: LabelJob[],
-  obstacles: LabelBox[] = [],
-): Map<string, { cx: number; cy: number }> {
-  const placed: LabelBox[] = [...obstacles]
-  const result = new Map<string, { cx: number; cy: number }>()
-  for (const job of jobs) {
-    let cx = job.cx
-    let cy = job.cy
-    let attempts = 0
-    let hit = placed.find((p) => boxesOverlap({ cx, cy, w: job.w, h: job.h }, p))
-    while (attempts < 24 && hit) {
-      // 自分の既定の押し出し方向(pushX/pushY)だけで進めると、短い区間が
-      // 隣接ノードにぶつかり合っているような密集配置では、ぶつかっている
-      // 相手と同じ向きに動き続けて解消しないことがあった。既定方向に加えて
-      // 実際にぶつかっている相手から遠ざかる向きも合成し、収束しやすくする。
-      const awayX = cx - hit.cx
-      const awayY = cy - hit.cy
-      const awayLen = Math.hypot(awayX, awayY) || 1
-      const dx = job.pushX + (awayX / awayLen) * 1.0
-      const dy = job.pushY + (awayY / awayLen) * 1.0
-      const len = Math.hypot(dx, dy) || 1
-      cx += (dx / len) * 5
-      cy += (dy / len) * 5
-      attempts++
-      hit = placed.find((p) => boxesOverlap({ cx, cy, w: job.w, h: job.h }, p))
-    }
-    placed.push({ cx, cy, w: job.w, h: job.h })
-    result.set(job.key, { cx, cy })
-  }
-  return result
-}
 
 // アイソメ図上に実際に表示される「45°」マークの位置を全て求める
 // （DrawingCanvasの描画条件と同じ: 継手が elbow45_long のセグメント自身の
