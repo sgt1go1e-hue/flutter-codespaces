@@ -548,27 +548,38 @@ export function SegmentPanel({
           {isSlopeEligible(effective?.pipeType, segment.vpSeries ?? effective?.vpSeries) &&
             segment.angle !== 90 &&
             segment.angle !== 270 && (
-              <label className="field">
-                <span className="field-label">
-                  勾配
-                  <span className="field-note">排水・ドレン配管で必要な場合のみ</span>
-                </span>
-                <select
-                  value={segment.slopeDenom ?? ''}
-                  onChange={(e) =>
-                    onChange({
-                      slopeDenom: e.target.value === '' ? undefined : Number(e.target.value),
-                    })
-                  }
-                >
-                  <option value="">なし</option>
-                  {SLOPE_DENOM_OPTIONS.map((d) => (
-                    <option key={d} value={d}>
-                      1/{d}
-                    </option>
-                  ))}
-                </select>
-              </label>
+              <>
+                <label className="field round-field">
+                  <span className="field-label">
+                    勾配
+                    <span className="field-note">横引き管は必ず設定してください</span>
+                  </span>
+                  <select
+                    value={segment.slopeDenom ?? ''}
+                    onChange={(e) =>
+                      onChange({
+                        slopeDenom: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                  >
+                    <option value="">なし</option>
+                    {SLOPE_DENOM_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        1/{d}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {!segment.slopeDenom && (
+                  <div className="field round-field">
+                    <div className="socket-gap-warn">
+                      <p>
+                        排水・ドレン配管の横引き管には勾配が必須です。勾配が未設定のままです。
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
           {/* 分岐(チーズ)接続時: もう一方(メイン管 or 枝管)のサイズもここで直接編集できる。
