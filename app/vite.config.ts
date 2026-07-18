@@ -2,10 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 // PWA化 (manifest / service worker) はフェーズ5で追加予定。
-export default defineConfig(({ command }) => ({
+export default defineConfig(({ command, mode }) => ({
   // GitHub Pages(プロジェクトページ)は /flutter-codespaces/ 配下に公開されるため、
   // 本番ビルドだけ base を合わせる。開発サーバー(dev)は '/' のまま。
-  base: command === 'build' ? '/flutter-codespaces/' : '/',
+  // ベータ版(mode=beta)は同じPagesサイトの /beta/ サブパスに置くため base を変える
+  // （新しいリポジトリを作らず、既存のPages出力先のサブパスとして公開するため）。
+  base:
+    command === 'build'
+      ? mode === 'beta'
+        ? '/flutter-codespaces/beta/'
+        : '/flutter-codespaces/'
+      : '/',
   plugins: [react()],
   server: {
     host: true, // 0.0.0.0 で待受（Codespaces のポート転送から到達可能に）

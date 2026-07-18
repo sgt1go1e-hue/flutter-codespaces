@@ -8,7 +8,7 @@
     "predev": "node scripts/free-vite.mjs",
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
-    "build:beta": "tsc --noEmit && vite build --mode beta",
+    "build:beta": "tsc --noEmit && vite build --mode beta --outDir dist-beta",
     "preview": "vite preview"
   },
   "dependencies": {

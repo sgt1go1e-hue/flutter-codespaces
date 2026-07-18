@@ -35,6 +35,15 @@ jobs:
       - name: Build
         working-directory: app
         run: npm run build
+      # ベータ版(合言葉ロック付き)を同じPagesサイトの /beta/ サブパスとして
+      # 一緒に配信する。永久版のURL・ビルドには影響しない別ビルド。
+      - name: Build (beta)
+        working-directory: app
+        run: npm run build:beta
+      - name: Merge beta build into beta/ subpath
+        run: |
+          mkdir -p app/dist/beta
+          cp -r app/dist-beta/. app/dist/beta/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
