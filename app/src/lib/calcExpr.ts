@@ -64,12 +64,6 @@ export function calcPressDigit(state: CalcState, digit: string): CalcState {
   return pushDigit(state, digit)
 }
 
-export function calcPressDoubleZero(state: CalcState): CalcState {
-  if (state.error) return state
-  if (state.current === '' || state.current === '0') return pushDigit(state, '0')
-  return pushDigit(state, '00')
-}
-
 export function calcPressDot(state: CalcState): CalcState {
   if (state.error) return state
   if (state.current.includes('.')) return state

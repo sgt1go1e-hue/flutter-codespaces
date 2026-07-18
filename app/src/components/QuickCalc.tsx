@@ -17,7 +17,6 @@ import {
   calcCurrentTotal,
   calcStateFromValue,
   calcPressDigit,
-  calcPressDoubleZero,
   calcPressDot,
   calcPressOp,
   calcPressSign,
@@ -419,11 +418,10 @@ export function QuickCalc({ onClose }: Props) {
             gridRow="3"
           />
 
-          <KeyButton label="0" onClick={() => pressDigit('0')} gridColumn="1" gridRow="4" />
           <KeyButton
-            label="00"
-            onClick={() => setCalc((s) => calcPressDoubleZero(s))}
-            gridColumn="2"
+            label="0"
+            onClick={() => pressDigit('0')}
+            gridColumn="1 / span 2"
             gridRow="4"
           />
           <KeyButton
