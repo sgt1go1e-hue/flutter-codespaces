@@ -1636,6 +1636,10 @@ body {
   min-height: 56px;
   font-size: 20px;
   font-weight: 700;
+  /* キーパッドはスクロール可能な.qc-body内にあるため、touch-actionを
+     指定しないとブラウザが「タップかスクロール開始か」の判定に数百ms
+     かけてしまい、反応が遅く感じる原因になる。タップとして即確定させる。 */
+  touch-action: manipulation;
 }
 
 .qc-key:active {
