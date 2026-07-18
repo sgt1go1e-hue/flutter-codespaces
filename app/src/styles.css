@@ -1681,6 +1681,76 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* --- ベータ期間ロック（合言葉入力・期限切れ画面） --- */
+.beta-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.beta-card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 20px;
+  box-shadow: 0 20px 50px var(--shadow-strong);
+}
+
+.beta-title {
+  font-size: 19px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.beta-body {
+  color: var(--hint);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0;
+  text-align: center;
+}
+
+.beta-input {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  text-align: center;
+}
+
+.beta-error {
+  color: var(--label-over);
+  font-size: 13px;
+  text-align: center;
+  margin: 0;
+}
+
+.beta-primary {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  min-height: 52px;
+}
+
+.beta-primary:active {
+  filter: brightness(0.9);
+}
+
 @media (min-width: 700px) {
   .qc-body {
     max-width: 640px;
