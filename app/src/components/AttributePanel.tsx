@@ -177,6 +177,12 @@ export function SegmentPanel({
     onChange(patch)
   }
 
+  // 管種・サイズは「分岐や口径変更があるときだけ重要」なため、継承のまま(既定)は
+  // 控えめに、この区間で個別に上書きしているときだけ強調表示する。既存の
+  // pipeEmpty/sizeEmpty と同じ segment.pipeType/segment.size の判定を流用するのみで、
+  // 新しい継承ロジックは追加しない。
+  const pipeSizeOverridden = segment.pipeType != null || segment.size != null
+
   return (
     <section className="attr-panel open">
       <div className="panel-header static">
@@ -194,6 +200,154 @@ export function SegmentPanel({
         </button>
       </div>
       <div className="panel-body">
+        {/* ① 継手・分岐タイプ選択（最重要・スクロール不要で見える最上部） */}
+        <div className="panel-grid">
+          <label className="field">
+            <span className="field-label">継手</span>
+            <select
+              value={segment.fitting ?? ''}
+              onChange={(e) => onChange({ fitting: e.target.value || undefined })}
+            >
+              <option value="">{fittingEmpty}</option>
+              {visibleFittings.map((f) => (
+                <option key={f.id} value={f.id}>
+                  {f.name}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          {/* 分岐(チーズ)接続時: もう一方(メイン管 or 枝管)のサイズもここで直接編集できる。
+              「サイズ」と「相手径」のような曖昧な関係をやめ、メイン管/枝管という
+              実務の呼び方で対になるサイズを直接編集する方式にした。 */}
+          {teeContext && (
+            <label className="field">
+              <span className="field-label">
+                {teeContext.selectedIsMain ? '枝管サイズ' : 'メイン管サイズ'}
+              </span>
+              <select
+                value={
+                  (teeContext.selectedIsMain
+                    ? teeContext.branchSize
+                    : teeContext.mainSize) ?? ''
+                }
+                onChange={(e) => {
+                  const ids = teeContext.selectedIsMain
+                    ? teeContext.branchSegId
+                      ? [teeContext.branchSegId]
+                      : []
+                    : teeContext.mainSegIds
+                  onSetTeeSize(ids, e.target.value || undefined)
+                }}
+              >
+                <option value="">未設定</option>
+                {sizes.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
+        </div>
+
+        {/* レジューサー / 径違いチーズ: 相手径・合わせ面 */}
+        {needsCounterpart && (
+          <div className="panel-grid reducer-grid">
+            <label className="field">
+              <span className="field-label">
+                相手径
+                <span className="field-note">隣接から自動判定</span>
+              </span>
+              <select
+                value={segment.reducerSize ?? ''}
+                onChange={(e) => onChange({ reducerSize: e.target.value || undefined })}
+              >
+                <option value="">
+                  {cut?.autoCounterpart ? `自動（${cut.autoCounterpart}）` : '— 選択 —'}
+                </option>
+                {sizes.map((s) => (
+                  <option key={s.code} value={s.code}>
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {effFittingId === 'reducer_eccentric' && (
+              <label className="field">
+                <span className="field-label">合わせ面（必須）</span>
+                <select
+                  value={segment.reducerAlign ?? ''}
+                  onChange={(e) =>
+                    onChange({
+                      reducerAlign: (e.target.value || undefined) as
+                        | 'top'
+                        | 'bottom'
+                        | undefined,
+                    })
+                  }
+                >
+                  <option value="">— 選択 —</option>
+                  <option value="top">上面合わせ（TOP）</option>
+                  <option value="bottom">下面合わせ（BOTTOM）</option>
+                </select>
+              </label>
+            )}
+          </div>
+        )}
+
+        {/* レジューサーの面間寸法(H)がマスタ(reducerLengths.ts)に無い組み合わせのとき、
+            0にフォールバックさせず手入力を促す。入力するとその値がHとして使われ、
+            以後この区間の切り寸法計算に反映される。 */}
+        {cut?.needsReducerLength && (
+          <div className="field round-field">
+            <div className="socket-gap-warn">
+              <p>
+                このサイズ組み合わせのレジューサー面間寸法(H)がマスタにありません。面間寸法を入力してください。
+              </p>
+            </div>
+            <label className="field">
+              <span className="field-label">面間寸法 H(mm) 手入力</span>
+              <input
+                className="num-input"
+                type="number"
+                inputMode="decimal"
+                placeholder="例: 101.6"
+                value={segment.reducerLengthOverride ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    reducerLengthOverride:
+                      e.target.value === '' ? undefined : Number(e.target.value),
+                  })
+                }
+              />
+            </label>
+          </div>
+        )}
+
+        {/* 偏心レジューサーの芯ズレ表示 */}
+        {cut?.eccentric && !cut.needsCounterpart && (
+          <div className="ecc-box">
+            {cut.eccentric.alignNeeded ? (
+              <p className="cut-warn">合わせ面（上面／下面）を選択してください。</p>
+            ) : cut.eccentric.offset != null ? (
+              <>
+                <div className="ecc-line">
+                  芯ズレ: <b>{cut.eccentric.offset} mm</b>（
+                  {cut.eccentric.align === 'top' ? '上面合わせ' : '下面合わせ'}）
+                </div>
+                <p className="ecc-note">
+                  レジューサー基準面から {cut.eccentric.offset}mm{' '}
+                  {cut.eccentric.align === 'top' ? '下' : '上'}に芯がズレています（
+                  {cut.eccentric.large}→{cut.eccentric.small}）。下流の立上り／立下り
+                  高さ確認の参考にしてください（図の見た目は変わりません）。
+                </p>
+              </>
+            ) : null}
+          </div>
+        )}
+
+        {/* ② 寸法入力 */}
         <div className="panel-grid">
           {(() => {
             const dimField = (
@@ -290,35 +444,6 @@ export function SegmentPanel({
             </div>
           </div>
 
-          {/* レジューサーの面間寸法(H)がマスタ(reducerLengths.ts)に無い組み合わせのとき、
-              0にフォールバックさせず手入力を促す。入力するとその値がHとして使われ、
-              以後この区間の切り寸法計算に反映される。 */}
-          {cut?.needsReducerLength && (
-            <div className="field round-field">
-              <div className="socket-gap-warn">
-                <p>
-                  このサイズ組み合わせのレジューサー面間寸法(H)がマスタにありません。面間寸法を入力してください。
-                </p>
-              </div>
-              <label className="field">
-                <span className="field-label">面間寸法 H(mm) 手入力</span>
-                <input
-                  className="num-input"
-                  type="number"
-                  inputMode="decimal"
-                  placeholder="例: 101.6"
-                  value={segment.reducerLengthOverride ?? ''}
-                  onChange={(e) =>
-                    onChange({
-                      reducerLengthOverride:
-                        e.target.value === '' ? undefined : Number(e.target.value),
-                    })
-                  }
-                />
-              </label>
-            </div>
-          )}
-
           {/* 下流に隣接する排水勾配区間があり、その高低差が芯々寸法から差し引かれている場合の案内。 */}
           {!!cut?.slopeAdjust && (
             <div className="socket-gap-warn">
@@ -326,71 +451,6 @@ export function SegmentPanel({
                 下流の勾配区間で生じる高低差ぶん、切り寸法を{cut.slopeAdjust}mm短くしています。
               </p>
             </div>
-          )}
-
-          {/* フリー端(未接続の端)には、配管ルートのスタート/ゴールの基準高さを
-              入力できる。二段階に分けて配管を落としても、この2点の高さだけは
-              絶対に変えられないという制約の検算用の指標。 */}
-          {cut && (!cut.startConnected || !cut.endConnected) && (
-            <div className="field round-field elevation-field">
-              <span className="field-label">
-                基準高さ(mm)
-                <span className="field-note">フリー端のみ・任意の基準面からの相対値</span>
-              </span>
-              <div className="elevation-inputs">
-                {!cut.startConnected && (
-                  <label>
-                    <span className="field-note">始点側</span>
-                    <input
-                      className="num-input"
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="例: 2500"
-                      value={segment.startRefElevation ?? ''}
-                      onChange={(e) =>
-                        onChange({
-                          startRefElevation:
-                            e.target.value === '' ? undefined : Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                )}
-                {!cut.endConnected && (
-                  <label>
-                    <span className="field-note">終点側</span>
-                    <input
-                      className="num-input"
-                      type="number"
-                      inputMode="numeric"
-                      placeholder="例: 2450"
-                      value={segment.endRefElevation ?? ''}
-                      onChange={(e) =>
-                        onChange({
-                          endRefElevation:
-                            e.target.value === '' ? undefined : Number(e.target.value),
-                        })
-                      }
-                    />
-                  </label>
-                )}
-              </div>
-            </div>
-          )}
-
-          {/* 基準高さを入力した2点間で、実際のルート(縦区間+勾配)から計算した
-              高低差が入力値と一致しない場合の警告。差分のみ表示し、自動調整はしない。 */}
-          {elevationChecks?.map((c, i) =>
-            c.diff !== 0 ? (
-              <div className="socket-gap-warn" key={i}>
-                <p>
-                  基準高さと実際のルートの高低差が一致しません（入力値どうしの差:
-                  {c.expectedDelta}mm / ルートから計算した高低差: {c.actualDelta}mm
-                  ／ 差分: {c.diff > 0 ? '+' : ''}
-                  {c.diff}mm）。
-                </p>
-              </div>
-            ) : null,
           )}
 
           {/* 差込（ソケット）溶接同士を直結していて、継手のツラ（差込み口の開口面）
@@ -437,8 +497,7 @@ export function SegmentPanel({
             </div>
           )}
 
-          {/* エルボtoエルボの間隔不足の提案は、スクロールしないと気づけない下部の
-              詳細情報より先に、寸法入力のすぐ下（目に入りやすい位置）に出す。 */}
+          {/* エルボtoエルボの間隔不足の提案は、切り寸法のすぐ下（目に入りやすい位置）に出す。 */}
           {cut?.status === 'over' && elbowClash && onApplyElbowClash && (
             <div className="elbow-clash-suggest">
               <p>
@@ -451,85 +510,191 @@ export function SegmentPanel({
               </button>
             </div>
           )}
+        </div>
 
-          {/* 切り寸法の丸め（全体設定）。継手の取り出し寸法には適用しない。 */}
-          <div className="field round-field">
-            <span className="field-label">切り寸法の丸め</span>
-            <div className="round-toggle">
-              <button
-                type="button"
-                className={roundMode === 'round' ? 'active' : ''}
-                onClick={() => onRoundModeChange('round')}
-              >
-                四捨五入
-              </button>
-              <button
-                type="button"
-                className={roundMode === 'floor' ? 'active' : ''}
-                onClick={() => onRoundModeChange('floor')}
-              >
-                切り捨て
-              </button>
-            </div>
-          </div>
+        {cut?.status === 'over' && (
+          <p className="cut-warn danger">
+            継手が収まりません（芯々寸法が不足）。芯々寸法を大きくするか継手を見直してください。
+          </p>
+        )}
+        {cut?.status === 'zero' && (
+          <p className="cut-hint">
+            パイプ長さ0mm（継手同士が直結）。BOM のパイプ材にはカウントされません。
+          </p>
+        )}
+        {cut?.needsCounterpart && (
+          <p className="cut-warn">相手径を選択すると加工寸法を計算します。</p>
+        )}
 
-          {/* フランジ引きしろ（フランジが付いた端があるときだけ表示・全フランジ共通）。
-              溶接フランジ等は引きしろが任意のため手入力する。 */}
-          {(segment.startFlange || segment.endFlange) && (
-            <label className="field round-field">
-              <span className="field-label">
-                フランジ引きしろ(mm)
-                <span className="field-note">全フランジ共通</span>
-              </span>
-              <input
-                className="num-input"
-                type="number"
-                inputMode="numeric"
-                min={0}
-                placeholder="例: 0"
-                value={flangeAllow || ''}
-                onChange={(e) =>
-                  onFlangeAllowChange(
-                    e.target.value === '' ? 0 : Number(e.target.value),
-                  )
-                }
-              />
-            </label>
-          )}
+        {/* ④ 接続方法 */}
+        <div className="panel-grid">
+          <label className="field">
+            <span className="field-label">接続方法</span>
+            <select
+              value={segment.connection ?? ''}
+              onChange={(e) => onChange({ connection: e.target.value || undefined })}
+            >
+              <option value="">未設定</option>
+              {connectionMethods.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name}
+                </option>
+              ))}
+            </select>
+          </label>
 
-          {/* パッキン(ガスケット)。フランジ面間に必ず入る。加味する場合、厚みを切り寸から差し引く。
-              片フランジ・両フランジとも同様。全フランジ共通設定。 */}
-          {(segment.startFlange || segment.endFlange) && (
-            <div className="field round-field">
-              <label className="gasket-check">
-                <input
-                  type="checkbox"
-                  checked={gasketOn}
-                  onChange={(e) =>
-                    onGasketChange(e.target.checked, gasketMm || 3)
-                  }
-                />
-                <span>パッキン厚を加味する</span>
-              </label>
-              {gasketOn && (
-                <div className="gasket-thick">
-                  <span className="field-note">パッキン厚(mm)</span>
+          {/* SGP管またはVP+DV継手の排水・ドレン配管のみ: 勾配(1/N)を設定できる。
+              管種・サイズと同じ継承パターン: 個別に選ばなければ配管設定(ベース)の
+              値を継承する(「継承（1/100）」のように表示)。縦区間(90°/270°)自体は
+              勾配を持たない（設定は水平寄りの区間側で行い、その高低差は自動で
+              上流の縦区間の寸法から差し引かれる）。接続方法に準じる施工設定として
+              ここに置く。 */}
+          {isSlopeEligible(effective?.pipeType, segment.vpSeries ?? effective?.vpSeries) &&
+            segment.angle !== 90 &&
+            segment.angle !== 270 && (
+              <>
+                <label className="field round-field">
+                  <span className="field-label">
+                    勾配
+                    <span className="field-note">横引き管は必ず設定してください</span>
+                  </span>
                   <select
-                    className="num-input"
-                    value={gasketMm || 3}
-                    onChange={(e) => onGasketChange(true, Number(e.target.value))}
+                    value={segment.slopeDenom ?? ''}
+                    onChange={(e) =>
+                      onChange({
+                        slopeDenom: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
                   >
-                    {[1, 2, 3, 4, 5, 6].map((t) => (
-                      <option key={t} value={t}>
-                        {t}
+                    <option value="">
+                      {baseSlopeDenom ? `継承（1/${baseSlopeDenom}）` : 'なし'}
+                    </option>
+                    {SLOPE_DENOM_OPTIONS.map((d) => (
+                      <option key={d} value={d}>
+                        1/{d}
                       </option>
                     ))}
                   </select>
-                </div>
+                </label>
+                {effectiveSlopeDenom(segment, baseSlopeDenom) == null && (
+                  <div className="field round-field">
+                    <div className="socket-gap-warn">
+                      <p>
+                        排水・ドレン配管の横引き管には勾配が必須です。勾配が未設定のままです。
+                      </p>
+                    </div>
+                  </div>
+                )}
+              </>
+            )}
+        </div>
+
+        {/* 角ニップルは個体差・材質でねじ込み量が変わり芯々を一定に算出できない
+            ため、本アプリでは扱わない旨を接続方法=ねじ込み選択時に明示する。 */}
+        {segment.connection === 'thread' && (
+          <div className="socket-gap-warn">
+            <p>
+              角ニップルは個体差・材質（白ネジ/SUS等）によりねじ込み量が変わるため、本アプリでは芯々寸法の算出対象に含めていません。使用箇所は現場での実寸に基づいて調整してください。
+            </p>
+          </div>
+        )}
+
+        {/* ⑤ 控え寸法の内訳 */}
+        {cut && !cut.needsCounterpart && (
+          <div className="end-breakdown">
+            <div className="end-row">
+              <span>始点側（{roleLabel(cut.startRole)}）</span>
+              <span>
+                {cut.startAllow > 0
+                  ? `− ${cut.startAllow} mm`
+                  : cut.startConnected
+                    ? '差引なし'
+                    : '芯出し基準'}
+              </span>
+            </div>
+            <div className="end-row">
+              <span>終点側（{roleLabel(cut.endRole)}）</span>
+              <span>
+                {cut.endAllow > 0
+                  ? `− ${cut.endAllow} mm`
+                  : cut.endConnected
+                    ? '差引なし'
+                    : '芯出し基準'}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {/* フリー端(未接続の端)には、配管ルートのスタート/ゴールの基準高さを
+            入力できる。二段階に分けて配管を落としても、この2点の高さだけは
+            絶対に変えられないという制約の検算用の指標。控え寸法の内訳と同じく
+            「寸法の裏付け」情報のためここに置く。 */}
+        {cut && (!cut.startConnected || !cut.endConnected) && (
+          <div className="field round-field elevation-field">
+            <span className="field-label">
+              基準高さ(mm)
+              <span className="field-note">フリー端のみ・任意の基準面からの相対値</span>
+            </span>
+            <div className="elevation-inputs">
+              {!cut.startConnected && (
+                <label>
+                  <span className="field-note">始点側</span>
+                  <input
+                    className="num-input"
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="例: 2500"
+                    value={segment.startRefElevation ?? ''}
+                    onChange={(e) =>
+                      onChange({
+                        startRefElevation:
+                          e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
+              )}
+              {!cut.endConnected && (
+                <label>
+                  <span className="field-note">終点側</span>
+                  <input
+                    className="num-input"
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="例: 2450"
+                    value={segment.endRefElevation ?? ''}
+                    onChange={(e) =>
+                      onChange({
+                        endRefElevation:
+                          e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
               )}
             </div>
-          )}
+          </div>
+        )}
 
+        {/* 基準高さを入力した2点間で、実際のルート(縦区間+勾配)から計算した
+            高低差が入力値と一致しない場合の警告。差分のみ表示し、自動調整はしない。 */}
+        {elevationChecks?.map((c, i) =>
+          c.diff !== 0 ? (
+            <div className="socket-gap-warn" key={i}>
+              <p>
+                基準高さと実際のルートの高低差が一致しません（入力値どうしの差:
+                {c.expectedDelta}mm / ルートから計算した高低差: {c.actualDelta}mm
+                ／ 差分: {c.diff > 0 ? '+' : ''}
+                {c.diff}mm）。
+              </p>
+            </div>
+          ) : null,
+        )}
+
+        {/* ⑥ 管種・サイズ。分岐や口径変更があるときだけ重要なため、継承のままなら
+            控えめに、この区間で個別に上書きしているときだけ枠色とバッジで強調する。 */}
+        <div className={`panel-grid pipe-size-group${pipeSizeOverridden ? ' overridden' : ''}`}>
+          {pipeSizeOverridden && <span className="pipe-size-badge">個別変更あり</span>}
           <label className="field">
             <span className="field-label">管種</span>
             <select value={segment.pipeType ?? ''} onChange={(e) => onPipeTypeChange(e.target.value)}>
@@ -577,230 +742,63 @@ export function SegmentPanel({
               </select>
             </label>
           )}
+        </div>
 
-          {/* SGP管またはVP+DV継手の排水・ドレン配管のみ: 勾配(1/N)を設定できる。
-              管種・サイズと同じ継承パターン: 個別に選ばなければ配管設定(ベース)の
-              値を継承する(「継承（1/100）」のように表示)。縦区間(90°/270°)自体は
-              勾配を持たない（設定は水平寄りの区間側で行い、その高低差は自動で
-              上流の縦区間の寸法から差し引かれる）。 */}
-          {isSlopeEligible(effective?.pipeType, segment.vpSeries ?? effective?.vpSeries) &&
-            segment.angle !== 90 &&
-            segment.angle !== 270 && (
-              <>
-                <label className="field round-field">
-                  <span className="field-label">
-                    勾配
-                    <span className="field-note">横引き管は必ず設定してください</span>
-                  </span>
+        {/* ⑦ パーツ（フランジ・レジューサー等） */}
+        {/* フランジ引きしろ（フランジが付いた端があるときだけ表示・全フランジ共通）。
+            溶接フランジ等は引きしろが任意のため手入力する。 */}
+        {(segment.startFlange || segment.endFlange) && (
+          <div className="panel-grid">
+            <label className="field round-field">
+              <span className="field-label">
+                フランジ引きしろ(mm)
+                <span className="field-note">全フランジ共通</span>
+              </span>
+              <input
+                className="num-input"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                placeholder="例: 0"
+                value={flangeAllow || ''}
+                onChange={(e) =>
+                  onFlangeAllowChange(
+                    e.target.value === '' ? 0 : Number(e.target.value),
+                  )
+                }
+              />
+            </label>
+
+            {/* パッキン(ガスケット)。フランジ面間に必ず入る。加味する場合、厚みを切り寸から差し引く。
+                片フランジ・両フランジとも同様。全フランジ共通設定。 */}
+            <div className="field round-field">
+              <label className="gasket-check">
+                <input
+                  type="checkbox"
+                  checked={gasketOn}
+                  onChange={(e) =>
+                    onGasketChange(e.target.checked, gasketMm || 3)
+                  }
+                />
+                <span>パッキン厚を加味する</span>
+              </label>
+              {gasketOn && (
+                <div className="gasket-thick">
+                  <span className="field-note">パッキン厚(mm)</span>
                   <select
-                    value={segment.slopeDenom ?? ''}
-                    onChange={(e) =>
-                      onChange({
-                        slopeDenom: e.target.value === '' ? undefined : Number(e.target.value),
-                      })
-                    }
+                    className="num-input"
+                    value={gasketMm || 3}
+                    onChange={(e) => onGasketChange(true, Number(e.target.value))}
                   >
-                    <option value="">
-                      {baseSlopeDenom ? `継承（1/${baseSlopeDenom}）` : 'なし'}
-                    </option>
-                    {SLOPE_DENOM_OPTIONS.map((d) => (
-                      <option key={d} value={d}>
-                        1/{d}
+                    {[1, 2, 3, 4, 5, 6].map((t) => (
+                      <option key={t} value={t}>
+                        {t}
                       </option>
                     ))}
                   </select>
-                </label>
-                {effectiveSlopeDenom(segment, baseSlopeDenom) == null && (
-                  <div className="field round-field">
-                    <div className="socket-gap-warn">
-                      <p>
-                        排水・ドレン配管の横引き管には勾配が必須です。勾配が未設定のままです。
-                      </p>
-                    </div>
-                  </div>
-                )}
-              </>
-            )}
-
-          {/* 分岐(チーズ)接続時: もう一方(メイン管 or 枝管)のサイズもここで直接編集できる。
-              「サイズ」と「相手径」のような曖昧な関係をやめ、メイン管/枝管という
-              実務の呼び方で対になるサイズを直接編集する方式にした。 */}
-          {teeContext && (
-            <label className="field">
-              <span className="field-label">
-                {teeContext.selectedIsMain ? '枝管サイズ' : 'メイン管サイズ'}
-              </span>
-              <select
-                value={
-                  (teeContext.selectedIsMain
-                    ? teeContext.branchSize
-                    : teeContext.mainSize) ?? ''
-                }
-                onChange={(e) => {
-                  const ids = teeContext.selectedIsMain
-                    ? teeContext.branchSegId
-                      ? [teeContext.branchSegId]
-                      : []
-                    : teeContext.mainSegIds
-                  onSetTeeSize(ids, e.target.value || undefined)
-                }}
-              >
-                <option value="">未設定</option>
-                {sizes.map((s) => (
-                  <option key={s.code} value={s.code}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-
-          <label className="field">
-            <span className="field-label">継手</span>
-            <select
-              value={segment.fitting ?? ''}
-              onChange={(e) => onChange({ fitting: e.target.value || undefined })}
-            >
-              <option value="">{fittingEmpty}</option>
-              {visibleFittings.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span className="field-label">接続方法</span>
-            <select
-              value={segment.connection ?? ''}
-              onChange={(e) => onChange({ connection: e.target.value || undefined })}
-            >
-              <option value="">未設定</option>
-              {connectionMethods.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {/* 角ニップルは個体差・材質でねじ込み量が変わり芯々を一定に算出できない
-              ため、本アプリでは扱わない旨を接続方法=ねじ込み選択時に明示する。 */}
-          {segment.connection === 'thread' && (
-            <div className="socket-gap-warn">
-              <p>
-                角ニップルは個体差・材質（白ネジ/SUS等）によりねじ込み量が変わるため、本アプリでは芯々寸法の算出対象に含めていません。使用箇所は現場での実寸に基づいて調整してください。
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* レジューサー / 径違いチーズ: 相手径・合わせ面 */}
-        {needsCounterpart && (
-          <div className="panel-grid reducer-grid">
-            <label className="field">
-              <span className="field-label">
-                相手径
-                <span className="field-note">隣接から自動判定</span>
-              </span>
-              <select
-                value={segment.reducerSize ?? ''}
-                onChange={(e) => onChange({ reducerSize: e.target.value || undefined })}
-              >
-                <option value="">
-                  {cut?.autoCounterpart ? `自動（${cut.autoCounterpart}）` : '— 選択 —'}
-                </option>
-                {sizes.map((s) => (
-                  <option key={s.code} value={s.code}>
-                    {s.label}
-                  </option>
-                ))}
-              </select>
-            </label>
-            {effFittingId === 'reducer_eccentric' && (
-              <label className="field">
-                <span className="field-label">合わせ面（必須）</span>
-                <select
-                  value={segment.reducerAlign ?? ''}
-                  onChange={(e) =>
-                    onChange({
-                      reducerAlign: (e.target.value || undefined) as
-                        | 'top'
-                        | 'bottom'
-                        | undefined,
-                    })
-                  }
-                >
-                  <option value="">— 選択 —</option>
-                  <option value="top">上面合わせ（TOP）</option>
-                  <option value="bottom">下面合わせ（BOTTOM）</option>
-                </select>
-              </label>
-            )}
-          </div>
-        )}
-
-        {/* 端ごとの差引/フリー端の内訳 */}
-        {cut && !cut.needsCounterpart && (
-          <div className="end-breakdown">
-            <div className="end-row">
-              <span>始点側（{roleLabel(cut.startRole)}）</span>
-              <span>
-                {cut.startAllow > 0
-                  ? `− ${cut.startAllow} mm`
-                  : cut.startConnected
-                    ? '差引なし'
-                    : '芯出し基準'}
-              </span>
-            </div>
-            <div className="end-row">
-              <span>終点側（{roleLabel(cut.endRole)}）</span>
-              <span>
-                {cut.endAllow > 0
-                  ? `− ${cut.endAllow} mm`
-                  : cut.endConnected
-                    ? '差引なし'
-                    : '芯出し基準'}
-              </span>
-            </div>
-          </div>
-        )}
-
-        {cut?.status === 'over' && (
-          <p className="cut-warn danger">
-            継手が収まりません（芯々寸法が不足）。芯々寸法を大きくするか継手を見直してください。
-          </p>
-        )}
-        {cut?.status === 'zero' && (
-          <p className="cut-hint">
-            パイプ長さ0mm（継手同士が直結）。BOM のパイプ材にはカウントされません。
-          </p>
-        )}
-
-        {cut?.needsCounterpart && (
-          <p className="cut-warn">相手径を選択すると加工寸法を計算します。</p>
-        )}
-
-        {/* 偏心レジューサーの芯ズレ表示 */}
-        {cut?.eccentric && !cut.needsCounterpart && (
-          <div className="ecc-box">
-            {cut.eccentric.alignNeeded ? (
-              <p className="cut-warn">合わせ面（上面／下面）を選択してください。</p>
-            ) : cut.eccentric.offset != null ? (
-              <>
-                <div className="ecc-line">
-                  芯ズレ: <b>{cut.eccentric.offset} mm</b>（
-                  {cut.eccentric.align === 'top' ? '上面合わせ' : '下面合わせ'}）
                 </div>
-                <p className="ecc-note">
-                  レジューサー基準面から {cut.eccentric.offset}mm{' '}
-                  {cut.eccentric.align === 'top' ? '下' : '上'}に芯がズレています（
-                  {cut.eccentric.large}→{cut.eccentric.small}）。下流の立上り／立下り
-                  高さ確認の参考にしてください（図の見た目は変わりません）。
-                </p>
-              </>
-            ) : null}
+              )}
+            </div>
           </div>
         )}
 
@@ -839,6 +837,29 @@ export function SegmentPanel({
             </label>
           </div>
         </details>
+
+        {/* ⑧ 切り寸法の丸め（最下部・スクロールしないと見えない位置） */}
+        <div className="panel-grid">
+          <div className="field round-field">
+            <span className="field-label">切り寸法の丸め</span>
+            <div className="round-toggle">
+              <button
+                type="button"
+                className={roundMode === 'round' ? 'active' : ''}
+                onClick={() => onRoundModeChange('round')}
+              >
+                四捨五入
+              </button>
+              <button
+                type="button"
+                className={roundMode === 'floor' ? 'active' : ''}
+                onClick={() => onRoundModeChange('floor')}
+              >
+                切り捨て
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </section>
   )

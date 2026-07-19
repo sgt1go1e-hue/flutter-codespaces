@@ -794,6 +794,34 @@ body {
   font-weight: 700;
 }
 
+/* 管種・サイズ: 分岐や口径変更があるときだけ重要なため、既定(継承のまま)は
+   控えめな枠、この区間で個別に上書きしているときだけオレンジ枠＋バッジで強調する。 */
+.pipe-size-group {
+  position: relative;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 8px 10px 2px;
+  margin-top: 4px;
+}
+
+.pipe-size-group.overridden {
+  border-color: var(--label-tight);
+}
+
+.pipe-size-badge {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--label-tight);
+  border: 1px solid var(--label-tight);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-bottom: 4px;
+}
+
 .end-breakdown {
   margin-top: 8px;
   display: flex;
