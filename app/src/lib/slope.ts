@@ -28,6 +28,19 @@ export function elevationDrop(
   return round1(centerLength / slopeDenom)
 }
 
+/**
+ * 区間の実効的な勾配(1/N のN)。自分自身の値(個別上書き)があればそれを、
+ * 無ければ配管設定(ベース)の値を使う（管種・サイズの継承と同じパターン）。
+ * 縦区間(90°/270°)には勾配の概念が無いため常にundefined。
+ */
+export function effectiveSlopeDenom(
+  seg: Segment,
+  baseSlopeDenom?: number,
+): number | undefined {
+  if (seg.angle === 90 || seg.angle === 270) return undefined
+  return seg.slopeDenom ?? baseSlopeDenom
+}
+
 export interface SlopeEnds {
   start: number
   end: number
@@ -35,12 +48,14 @@ export interface SlopeEnds {
 
 /**
  * 各セグメントの端ごとに、そこから次数2(直列)でつながり続ける勾配区間の
- * 高低差を合計する。分岐・フリー端・勾配なしの区間に達したら打ち切る。
- * 縦区間(90°/270°)が、この値を自分の芯々寸法から差し引くために使う。
+ * 高低差を合計する。分岐・フリー端・勾配なし(個別上書きも配管設定ベースも
+ * 無い)区間に達したら打ち切る。縦区間(90°/270°)が、この値を自分の芯々
+ * 寸法から差し引くために使う。
  */
 export function computeChainedSlopeDrop(
   segments: Segment[],
   effectiveById: Record<string, Effective>,
+  baseSlopeDenom?: number,
 ): Record<string, SlopeEnds> {
   const out: Record<string, SlopeEnds> = {}
   const touchesPoint = (s: Segment, p: Point) =>
@@ -59,8 +74,9 @@ export function computeChainedSlopeDrop(
         if (neighbors.length !== 1) break // 分岐(2本以上) or フリー端(0本)で打ち切り
         const nb = neighbors[0]
         const eff = effectiveById[nb.id]
-        if (!nb.slopeDenom || !isSlopeEligible(eff?.pipeType, eff?.vpSeries)) break
-        total += elevationDrop(nb.centerLength, nb.slopeDenom)
+        const denom = effectiveSlopeDenom(nb, baseSlopeDenom)
+        if (!denom || !isSlopeEligible(eff?.pipeType, eff?.vpSeries)) break
+        total += elevationDrop(nb.centerLength, denom)
         currentPoint = samePoint(nb.start, currentPoint, NODE_EPS) ? nb.end : nb.start
         prevId = nb.id
       }

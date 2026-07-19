@@ -12,6 +12,8 @@ interface Props {
   effectiveById: Record<string, Effective>
   crossoverGaps: Record<string, number[]>
   cutById: Record<string, CutResult>
+  /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
+  baseSlopeDenom?: number
   onClose: () => void
 }
 
@@ -23,6 +25,7 @@ export function BomModal({
   effectiveById,
   crossoverGaps,
   cutById,
+  baseSlopeDenom,
   onClose,
 }: Props) {
   const empty =
@@ -226,6 +229,7 @@ export function BomModal({
               effectiveById={effectiveById}
               crossoverGaps={crossoverGaps}
               cutById={cutById}
+              baseSlopeDenom={baseSlopeDenom}
             />
           </div>
         )}

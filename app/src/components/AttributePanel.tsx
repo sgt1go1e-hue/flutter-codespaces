@@ -14,7 +14,7 @@ import {
   getConnectionMethod,
   connectionMethods,
 } from '../data/masters'
-import { isSlopeEligible, SLOPE_DENOM_OPTIONS } from '../lib/slope'
+import { isSlopeEligible, effectiveSlopeDenom, SLOPE_DENOM_OPTIONS } from '../lib/slope'
 import type { ElevationCheckResult } from '../lib/elevationCheck'
 
 export interface DrawDefaults {
@@ -22,6 +22,8 @@ export interface DrawDefaults {
   size?: string
   connection?: string
   vpSeries?: 'dv' | 'ts'
+  /** 勾配(1/N のN)のベース値。区間ごとに個別上書きが無ければこれを継承する。 */
+  slopeDenom?: number
 }
 
 function roleLabel(role: string): string {
@@ -65,6 +67,8 @@ interface SegmentPanelProps {
   onSetTeeSize: (segmentIds: string[], size: string | undefined) => void
   /** このセグメントのフリー端に設定した基準高さが関わる、高低差の整合チェック結果 */
   elevationChecks?: ElevationCheckResult[]
+  /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
+  baseSlopeDenom?: number
   /** 切り寸法の丸め方（全体設定・既定=四捨五入） */
   roundMode: 'round' | 'floor'
   onRoundModeChange: (mode: 'round' | 'floor') => void
@@ -92,6 +96,7 @@ export function SegmentPanel({
   teeContext,
   onSetTeeSize,
   elevationChecks,
+  baseSlopeDenom,
   roundMode,
   onRoundModeChange,
   flangeAllow,
@@ -574,8 +579,10 @@ export function SegmentPanel({
           )}
 
           {/* SGP管またはVP+DV継手の排水・ドレン配管のみ: 勾配(1/N)を設定できる。
-              縦区間(90°/270°)自体は勾配を持たない（設定は水平寄りの区間側で行い、
-              その高低差は自動で上流の縦区間の寸法から差し引かれる）。 */}
+              管種・サイズと同じ継承パターン: 個別に選ばなければ配管設定(ベース)の
+              値を継承する(「継承（1/100）」のように表示)。縦区間(90°/270°)自体は
+              勾配を持たない（設定は水平寄りの区間側で行い、その高低差は自動で
+              上流の縦区間の寸法から差し引かれる）。 */}
           {isSlopeEligible(effective?.pipeType, segment.vpSeries ?? effective?.vpSeries) &&
             segment.angle !== 90 &&
             segment.angle !== 270 && (
@@ -593,7 +600,9 @@ export function SegmentPanel({
                       })
                     }
                   >
-                    <option value="">なし</option>
+                    <option value="">
+                      {baseSlopeDenom ? `継承（1/${baseSlopeDenom}）` : 'なし'}
+                    </option>
                     {SLOPE_DENOM_OPTIONS.map((d) => (
                       <option key={d} value={d}>
                         1/{d}
@@ -601,7 +610,7 @@ export function SegmentPanel({
                     ))}
                   </select>
                 </label>
-                {!segment.slopeDenom && (
+                {effectiveSlopeDenom(segment, baseSlopeDenom) == null && (
                   <div className="field round-field">
                     <div className="socket-gap-warn">
                       <p>
@@ -862,6 +871,7 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
           <b>{pipeShort}</b>
           <b>{defaults.size ?? '未設定'}</b>
           {connectionName && <b>{connectionName}</b>}
+          {defaults.slopeDenom && <b>勾配1/{defaults.slopeDenom}</b>}
         </span>
       </button>
       {open && (
@@ -941,6 +951,30 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
                   角ニップルは個体差・材質（白ネジ/SUS等）によりねじ込み量が変わるため、本アプリでは芯々寸法の算出対象に含めていません。使用箇所は現場での実寸に基づいて調整してください。
                 </p>
               </div>
+            )}
+
+            {/* SGP管またはVP+DV継手のときだけ: これから描く横引き管に適用する
+                勾配のベース値。個々の区間の詳細パネルで個別に上書きできる
+                （管種・サイズと同じ継承パターン）。 */}
+            {isSlopeEligible(defaults.pipeType, defaults.vpSeries) && (
+              <label className="field">
+                <span className="field-label">勾配</span>
+                <select
+                  value={defaults.slopeDenom ?? ''}
+                  onChange={(e) =>
+                    onChange({
+                      slopeDenom: e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                >
+                  <option value="">未設定</option>
+                  {SLOPE_DENOM_OPTIONS.map((d) => (
+                    <option key={d} value={d}>
+                      1/{d}
+                    </option>
+                  ))}
+                </select>
+              </label>
             )}
           </div>
         </div>

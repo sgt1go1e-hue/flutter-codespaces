@@ -4,6 +4,7 @@ import { distance } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
+import { effectiveSlopeDenom } from '../lib/slope'
 import {
   estimateTextWidth,
   resolveOverlaps,
@@ -16,6 +17,8 @@ interface Props {
   effectiveById: Record<string, Effective>
   crossoverGaps: Record<string, number[]>
   cutById: Record<string, CutResult>
+  /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
+  baseSlopeDenom?: number
 }
 
 const CROSS_GAP = 9
@@ -77,6 +80,7 @@ export function PrintIsometric({
   effectiveById,
   crossoverGaps,
   cutById,
+  baseSlopeDenom,
 }: Props) {
   const resolvedLabels = useMemo(() => {
     const jobs: LabelJob[] = []
@@ -166,13 +170,15 @@ export function PrintIsometric({
         jobs.push({ key: `term-${s.id}-${at}`, cx, cy, w, h: 26, pushX: nx, pushY: ny })
       }
     }
-    // 排水勾配の「勾配1/N」マーク（区間中点のやや下）。他のラベルや
-    // 互いどうしとも重ならないよう、同じジョブ列に混ぜて解決する。
+    // 排水勾配の「勾配1/N」マーク（区間中点のやや下）。個別上書きが無い
+    // 区間は配管設定(ベース)の値を継承して表示する。他のラベルや互いどうし
+    // とも重ならないよう、同じジョブ列に混ぜて解決する。
     for (const s of segments) {
-      if (s.slopeDenom == null) continue
+      const denom = effectiveSlopeDenom(s, baseSlopeDenom)
+      if (denom == null) continue
       const mx = (s.start.x + s.end.x) / 2
       const my = (s.start.y + s.end.y) / 2
-      const w = estimateTextWidth(`勾配1/${s.slopeDenom}`, 11) + 6
+      const w = estimateTextWidth(`勾配1/${denom}`, 11) + 6
       jobs.push({ key: `slope-${s.id}`, cx: mx, cy: my + 16, w, h: 18, pushX: 0, pushY: 1 })
     }
     // データ上つながっていない線どうしが視覚的に交差する箇所は、複数のラベルの
@@ -219,7 +225,7 @@ export function PrintIsometric({
       }
     }
     return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles])
-  }, [segments, cutById, effectiveById, crossoverGaps])
+  }, [segments, cutById, effectiveById, crossoverGaps, baseSlopeDenom])
 
   const viewBox = useMemo(() => {
     if (segments.length === 0) return '0 0 200 200'
@@ -438,7 +444,8 @@ export function PrintIsometric({
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               eff?.fitting === 'elbow45_long' &&
               elbow45Mark(s, 'end')}
-            {s.slopeDenom != null && slopeMark(s, s.slopeDenom)}
+            {effectiveSlopeDenom(s, baseSlopeDenom) != null &&
+              slopeMark(s, effectiveSlopeDenom(s, baseSlopeDenom)!)}
             {eff?.showSizeLabel &&
               eff.size &&
               cutById[s.id]?.startConnected &&

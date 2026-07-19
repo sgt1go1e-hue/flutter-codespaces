@@ -333,9 +333,11 @@ export function computeAllCut(
   // パッキン(ガスケット)厚(mm)。フランジ面間に必ず入る。加味する場合、フランジ端で差し引く。
   // 加味しない場合は 0 を渡す。片フランジ・両フランジとも同様に適用。
   gasketMm = 0,
+  // 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときのフォールバック値。
+  baseSlopeDenom?: number,
 ): Record<string, CutResult> {
   const ends = computeEnds(segments, effectiveById)
-  const slopeDrops = computeChainedSlopeDrop(segments, effectiveById)
+  const slopeDrops = computeChainedSlopeDrop(segments, effectiveById, baseSlopeDenom)
   const out: Record<string, CutResult> = {}
 
   for (const s of segments) {

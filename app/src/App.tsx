@@ -228,6 +228,8 @@ export default function App() {
     gasketOn?: boolean
     /** パッキン厚(mm, 1〜6) */
     gasketMm?: number
+    /** 勾配(1/N のN)のベース値。区間ごとに個別上書きが無ければこれを継承する。 */
+    slopeDenom?: number
   }>('piping-iso:defaults', {})
   // パーツパレットからのドラッグ状態（画面座標で ghost を追従表示）
   const [partDrag, setPartDrag] = useState<{
@@ -269,6 +271,7 @@ export default function App() {
       defaults.roundMode ?? 'round',
       defaults.flangeAllow ?? 0,
       defaults.gasketOn ? (defaults.gasketMm ?? 0) : 0,
+      defaults.slopeDenom,
     )
     return (cut[segId]?.startAllow ?? 0) + (cut[segId]?.endAllow ?? 0)
   }
@@ -398,6 +401,7 @@ export default function App() {
         defaults.roundMode ?? 'round',
         defaults.flangeAllow ?? 0,
         defaults.gasketOn ? (defaults.gasketMm ?? 0) : 0,
+        defaults.slopeDenom,
       ),
     [
       segments,
@@ -406,6 +410,7 @@ export default function App() {
       defaults.flangeAllow,
       defaults.gasketOn,
       defaults.gasketMm,
+      defaults.slopeDenom,
     ],
   )
   // 材料集計(BOM)。モーダルを開いたときに使う。
@@ -718,6 +723,7 @@ export default function App() {
           inputDisabled={partDrag !== null}
           view={view}
           onViewChange={setView}
+          baseSlopeDenom={defaults.slopeDenom}
         />
 
         {/* ドラッグ中のパーツ ghost */}
@@ -754,6 +760,7 @@ export default function App() {
           elevationChecks={elevationChecks.filter(
             (c) => c.fromSegId === selected.id || c.toSegId === selected.id,
           )}
+          baseSlopeDenom={defaults.slopeDenom}
           roundMode={defaults.roundMode ?? 'round'}
           onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}
           flangeAllow={defaults.flangeAllow ?? 0}
@@ -786,6 +793,7 @@ export default function App() {
           effectiveById={effectiveById}
           crossoverGaps={crossoverGaps}
           cutById={cutById}
+          baseSlopeDenom={defaults.slopeDenom}
           onClose={() => setShowBom(false)}
         />
       )}
