@@ -337,6 +337,15 @@ body {
   color: #04222e;
 }
 
+/* 消しゴムモード中は、誤って線を消し続けないよう一目で分かる色にする
+   （削除系の色＝パネルの削除ボタンと同系色）。 */
+.tools button.eraser-toggle.active {
+  background: #3a1720;
+  color: #f87171;
+  border: 1px solid #5b2230;
+  font-weight: 800;
+}
+
 /* 主要アクション（集計/BOM）は色分けして目立たせる */
 .tools button.primary {
   background: #10b981;
@@ -361,6 +370,12 @@ body {
   display: block;
   background: var(--bg);
   touch-action: none;
+}
+
+/* 消しゴムモード中は、線をタップすると即削除であることが伝わるよう
+   カーソル自体も変える（マウス操作時のヒント。タッチでは見た目に影響しない）。 */
+.canvas.eraser-active {
+  cursor: crosshair;
 }
 
 /* アイソメグリッド線（薄いグレーで常時表示のガイド） */

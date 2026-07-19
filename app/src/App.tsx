@@ -211,6 +211,10 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 「作図設定」バーの開閉（寸法入力とは独立。既定は畳んだ状態で割り込まない）
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // 消しゴムモード。オンの間はキャンバス上の線をタップすると詳細パネルを
+  // 経由せずその場で即削除する（ルート変更等で何本もまとめて消したい場面向け）。
+  // 他のメニュー操作を行うと自動的に解除する（誤操作防止）。
+  const [eraserMode, setEraserMode] = useState(false)
   // 表示テーマ（暗い/明るい）。屋外の日差しの下では暗い画面が見づらいため、
   // 端末ごとに好みを覚えておいて切り替えられるようにする。
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>(
@@ -253,6 +257,15 @@ export default function App() {
     /** 勾配(1/N のN)のベース値。区間ごとに個別上書きが無ければこれを継承する。 */
     slopeDenom?: number
   }>('piping-iso:defaults', {})
+  // 配管設定(defaults)で管種・サイズを変更した直後は、たとえ既存の線から
+  // 続けて描く（＝親を持つ）新しい線であっても、その変更を次に描く1本には
+  // 必ず反映したい（接続方法は元々どの新規線にも毎回適用される仕様のため、
+  // 管種・サイズだけ「続きの線は上流から継承」に阻まれて反映されない不具合
+  // だった）。継承の仕組み自体（レジューサー等で下流のサイズが自動で縮小
+  // 反映される機能）は壊さないよう、defaults変更の直後の1本にだけ明示適用
+  // するフラグをここに持つ（適用したら消費して false に戻す）。
+  const pendingPipeTypeApplyRef = useRef(false)
+  const pendingSizeApplyRef = useRef(false)
   // パーツパレットからのドラッグ状態（画面座標で ghost を追従表示）
   const [partDrag, setPartDrag] = useState<{
     partId: string
@@ -330,6 +343,7 @@ export default function App() {
     setDrawingId(makeDrawingId())
     setSegments([])
     setSelectedId(null)
+    setEraserMode(false)
     setView({ scale: 1, tx: 0, ty: 0 })
     setScreen('drawing')
   }
@@ -339,15 +353,18 @@ export default function App() {
     setDrawingId(id)
     setSegments(loadDrawingSegments(id))
     setSelectedId(null)
+    setEraserMode(false)
     setView({ scale: 1, tx: 0, ty: 0 })
     setScreen('drawing')
   }
 
   function goToLauncher() {
+    setEraserMode(false)
     setScreen('launcher')
   }
 
   function openQuickCalc() {
+    setEraserMode(false)
     setScreen('quickcalc')
   }
 
@@ -492,17 +509,28 @@ export default function App() {
     if (defaults.connection) applied.connection = defaults.connection
     // 塩ビの継手タイプ(DV/TS)も接続方法と同様、継承対象外で毎回適用
     if (defaults.vpSeries) applied.vpSeries = defaults.vpSeries
-    // 管種・サイズはルート(接続元なし)にのみ付与。続きの線は上流から継承。
-    if (!parentId) {
+    // 管種・サイズは基本、ルート(接続元なし)にのみ付与し、続きの線は上流から
+    // 継承する（レジューサー等で下流のサイズが自動的に縮小反映される仕組みの
+    // 土台のため）。ただし配管設定でたった今どちらかを変更した直後は、続きの
+    // 線であってもその変更を次の1本に明示反映する（pendingフラグ、消費後リセット）。
+    if (!parentId || pendingPipeTypeApplyRef.current) {
       if (defaults.pipeType) applied.pipeType = defaults.pipeType
+    }
+    if (!parentId || pendingSizeApplyRef.current) {
       if (defaults.size) applied.size = defaults.size
     }
+    pendingPipeTypeApplyRef.current = false
+    pendingSizeApplyRef.current = false
     // 追加後、分岐点で貫通している本管を自動分割（奥側を独立して寸法入力可能に）
     mutateSegments((prev) => normalizeBranchSplits([...prev, applied], makeId))
   }
 
   // 作図設定（defaults）の更新。管種変更時はサイズ整合をとる。
   function updateDefaults(patch: Partial<typeof defaults>) {
+    // 管種・サイズを変更した直後は、続きの線であっても次の1本にだけ明示的に
+    // 反映する（addSegment側のpendingフラグ、詳細はそちらのコメント参照）。
+    if ('pipeType' in patch) pendingPipeTypeApplyRef.current = true
+    if ('size' in patch) pendingSizeApplyRef.current = true
     setDefaults((d) => {
       const next = { ...d, ...patch }
       if ('pipeType' in patch) {
@@ -557,11 +585,21 @@ export default function App() {
     closeSelection()
   }
 
+  // 消しゴムモード中、線をタップした瞬間に確認なしで即削除する。詳細パネルは
+  // 経由しない。何本もまとめて消したい操作を素早く行えるようにするための
+  // ものなので、1本ずつ確認ダイアログを出すと本来の目的を損なう（「元に戻す」で
+  // 復元できるため安全性は確保している）。
+  function eraseSegment(id: string) {
+    mutateSegments((prev) => prev.filter((s) => s.id !== id))
+    if (selectedId === id) setSelectedId(null)
+  }
+
   function undo() {
     if (history.length === 0) return
     const prevState = history[history.length - 1]
     setHistory((h) => h.slice(0, -1))
     setSegments(prevState)
+    setEraserMode(false)
     closeSelection()
   }
 
@@ -569,6 +607,7 @@ export default function App() {
     if (segments.length === 0) return
     if (confirm('図面をすべて消去しますか？')) {
       mutateSegments(() => [])
+      setEraserMode(false)
       closeSelection()
     }
   }
@@ -693,15 +732,39 @@ export default function App() {
               全消去
             </button>
             <button
+              className={`eraser-toggle${eraserMode ? ' active' : ''}`}
+              onClick={() => {
+                setEraserMode((m) => !m)
+                setSelectedId(null)
+              }}
+              disabled={segments.length === 0}
+              title="オンの間は線をタップするとその場で即削除します"
+            >
+              🧹 消しゴム{eraserMode ? '中' : ''}
+            </button>
+            <button
               className="primary"
-              onClick={() => setShowBom(true)}
+              onClick={() => {
+                setEraserMode(false)
+                setShowBom(true)
+              }}
               disabled={segments.length === 0}
             >
               集計・拾い出し
             </button>
-            <button onClick={() => setReviewDisclaimer(true)}>免責</button>
             <button
-              onClick={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+              onClick={() => {
+                setEraserMode(false)
+                setReviewDisclaimer(true)
+              }}
+            >
+              免責
+            </button>
+            <button
+              onClick={() => {
+                setEraserMode(false)
+                setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+              }}
               title="屋外の明るい場所では「明るい画面」が見やすくなります"
             >
               {theme === 'dark' ? '☀️ 明るい画面' : '🌙 暗い画面'}
@@ -727,6 +790,8 @@ export default function App() {
           view={view}
           onViewChange={setView}
           baseSlopeDenom={defaults.slopeDenom}
+          eraserMode={eraserMode}
+          onEraseSegment={eraseSegment}
         />
 
         {/* ドラッグ中のパーツ ghost */}

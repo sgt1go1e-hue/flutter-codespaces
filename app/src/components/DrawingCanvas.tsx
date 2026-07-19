@@ -44,6 +44,12 @@ interface Props {
   onViewChange: (view: { scale: number; tx: number; ty: number }) => void
   /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
   baseSlopeDenom?: number
+  /**
+   * 消しゴムモード。オンの間は新しい線の描画(ドラッグ)を無効化し、線を
+   * タップすると詳細パネルを経由せずその場で onEraseSegment を呼ぶ。
+   */
+  eraserMode?: boolean
+  onEraseSegment?: (id: string) => void
 }
 
 // 「指が動いたかどうか」のごく小さいデッドゾーン(px、画面座標＝ズーム非依存)。
@@ -133,6 +139,8 @@ export function DrawingCanvas({
   view,
   onViewChange,
   baseSlopeDenom,
+  eraserMode = false,
+  onEraseSegment,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
@@ -167,6 +175,13 @@ export function DrawingCanvas({
   } | null>(null)
   // このタッチシーケンス中に2本指ジェスチャが発生したか（描画/選択を抑止するため）
   const gestureActiveRef = useRef(false)
+  // タッチ開始位置が呼び径ラベルの当たり判定(terminusSize)に乗っていた場合の
+  // セグメントid。ラベルは線の実ジオメトリから離れた位置に大きめの当たり判定を
+  // 持つため、ここで押した情報を覚えておき、実際に指がほぼ動かず離された
+  // （＝タップ）と判定できたときだけ選択に使う。ラベルの押下だけで即座に
+  // 選択してしまうと、そこを起点にドラッグして新しい線を描こうとした操作まで
+  // タップ扱いになり、詳細パネルが誤って開いてしまう（密集した図面で頻発）。
+  const labelPointerDownSegIdRef = useRef<string | null>(null)
 
   useEffect(() => {
     const el = svgRef.current
@@ -284,10 +299,13 @@ export function DrawingCanvas({
       startLocalRef.current = null
       snappedStartRef.current = null
       startScreenRef.current = null
+      labelPointerDownSegIdRef.current = null
       setPreview(null)
       beginGesture()
       return
     }
+    // ラベルの onPointerDown は先(バブリング順で子→親)に発火しているはずなので、
+    // ここではリセットしない（このイベントで押されたラベルの情報を保持する）。
     startLocalRef.current = toLocal(e.clientX, e.clientY)
     snappedStartRef.current = snapStart(startLocalRef.current)
     startScreenRef.current = toScreenLocal(e.clientX, e.clientY)
@@ -327,6 +345,12 @@ export function DrawingCanvas({
     const start = startLocalRef.current
     const s = snappedStartRef.current
     if (!start || !s) return
+    if (eraserMode) {
+      // 消しゴムモード中は新しい線のプレビュー(＝描画)を出さない。タップ判定
+      // 自体(タップ/ドラッグの区別)は handlePointerUp 側でそのまま使い、
+      // ドラッグと判定された場合は「何もしない」に倒す（誤って線を描かない）。
+      return
+    }
     const pScreen = toScreenLocal(e.clientX, e.clientY)
     if (startScreenRef.current && distance(startScreenRef.current, pScreen) < TAP_DEADZONE_PX) {
       // ほぼ動いていない(デッドゾーン内)。snapEndFromStartは動いていなくても
@@ -361,6 +385,7 @@ export function DrawingCanvas({
       startLocalRef.current = null
       snappedStartRef.current = null
       startScreenRef.current = null
+      labelPointerDownSegIdRef.current = null
       setPreview(null)
       return
     }
@@ -368,9 +393,11 @@ export function DrawingCanvas({
     const start = startLocalRef.current
     const s = snappedStartRef.current
     const startScreen = startScreenRef.current
+    const labelSegId = labelPointerDownSegIdRef.current
     startLocalRef.current = null
     snappedStartRef.current = null
     startScreenRef.current = null
+    labelPointerDownSegIdRef.current = null
 
     if (start && s) {
       const pScreen = toScreenLocal(e.clientX, e.clientY)
@@ -380,12 +407,27 @@ export function DrawingCanvas({
       // (ドラッグ=描画)で判定する（pointerup時点の位置で確定判定）。
       const p = toLocal(e.clientX, e.clientY)
       const { end, angle } = snapEndFromStart(s, p, GRID_GAP)
-      if (!inDeadzone && !samePoint(s, end)) {
-        // ドラッグ = 描画
+      const isTap = inDeadzone || samePoint(s, end)
+      if (eraserMode) {
+        // 消しゴムモード中は新しい線を描かない。タップだった場合のみ、その場の
+        // 線を確認なしで即削除する（ドラッグはタップ/ドラッグ判定はそのまま
+        // 使うが、結果を「何もしない」に倒す誤操作防止）。
+        if (isTap) {
+          const seg = labelSegId
+            ? segments.find((sg) => sg.id === labelSegId)
+            : hitSegment(start)
+          if (seg) onEraseSegment?.(seg.id)
+        }
+      } else if (!isTap) {
+        // ドラッグ = 描画（呼び径ラベルの上から描き始めていても、動かした以上は
+        // 常に新しい線の描画として扱う。タップは発生させない）
         onAddSegment({ start: s, end, angle })
       } else {
-        // タップ（動かさず離す）= 線上なら選択、そうでなければ選択解除
-        const seg = hitSegment(start)
+        // タップ（動かさず離す）= 呼び径ラベルの上で押していればそれを優先、
+        // なければ通常どおり線上の当たり判定で選択。どちらもなければ選択解除。
+        const seg = labelSegId
+          ? segments.find((sg) => sg.id === labelSegId)
+          : hitSegment(start)
         if (seg) onSelectSegment(seg.id)
         else onBackgroundTap()
       }
@@ -629,13 +671,16 @@ export function DrawingCanvas({
     const resolved = resolvedLabels.get(`term-${s.id}-${at}`)
     const cx = resolved?.cx ?? pt.x + ox * along + nx * perp
     const cy = resolved?.cy ?? pt.y + oy * along + ny * perp
-    // タップでその区間を選択（線が細くても押しやすいよう当たり判定を広めに）
-    const onTap = (e: React.PointerEvent) => {
-      e.stopPropagation()
-      onSelectSegment(s.id)
+    // タップでその区間を選択（線が細くても押しやすいよう当たり判定を広めに）。
+    // ここではまだ選択を確定しない（押した位置を覚えるだけ）。実際にタップ
+    // だったか、ここを起点にドラッグして新しい線を描こうとしたのかは、通常の
+    // キャンバス側のジェスチャ判定(handlePointerUp)に委ねる。stopPropagation
+    // もしない（キャンバス側のジェスチャ検出を止めないため）。
+    const onLabelPointerDown = () => {
+      labelPointerDownSegIdRef.current = s.id
     }
     return (
-      <g pointerEvents="auto" style={{ cursor: 'pointer' }} onPointerDown={onTap}>
+      <g pointerEvents="auto" style={{ cursor: 'pointer' }} onPointerDown={onLabelPointerDown}>
         <rect
           x={cx - 22}
           y={cy - 13}
@@ -764,7 +809,7 @@ export function DrawingCanvas({
   return (
     <svg
       ref={svgRef}
-      className="canvas"
+      className={`canvas${eraserMode ? ' eraser-active' : ''}`}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
