@@ -17,6 +17,9 @@ export interface CutResult {
   center?: number
   startAllow: number
   endAllow: number
+  /** 始点側/終点側で実際に控除されたルートギャップ(mm、表示用)。対象外なら0。 */
+  startRootGap: number
+  endRootGap: number
   startRole: EndRole
   endRole: EndRole
   /** 各端で実際に取り出し寸法の計算に使われた継手id（45°ローリングオフセット判定などに使用） */
@@ -341,6 +344,10 @@ export function computeAllCut(
   gasketMm = 0,
   // 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときのフォールバック値。
   baseSlopeDenom?: number,
+  // ルートギャップ(mm)。突き合わせ溶接(接続方法=weld)で裏波を出すために設ける
+  // 隙間。溶接箇所(フランジの無い、実際に何かへ接続している端)ごとに追加で
+  // 控除する（全溶接箇所共通・フランジ引きしろと同じ考え方）。
+  rootGap = 0,
 ): Record<string, CutResult> {
   const ends = computeEnds(segments, effectiveById)
   const slopeDrops = computeChainedSlopeDrop(segments, effectiveById, baseSlopeDenom)
@@ -350,9 +357,17 @@ export function computeAllCut(
     const eff = effectiveById[s.id]
     const e = ends[s.id]
     // 取り出し寸法 = 継手の取り出し + (端にフランジがあれば)フランジ引きしろ + パッキン厚
+    //              + (突き合わせ溶接の端なら)ルートギャップ
     const flangeDeduct = flangeAllow + gasketMm
-    const startAllow = round1(e.start.mm) + (s.startFlange ? flangeDeduct : 0)
-    const endAllow = round1(e.end.mm) + (s.endFlange ? flangeDeduct : 0)
+    // ルートギャップは突き合わせ溶接(connection==='weld')の実際の接続箇所にのみ
+    // 適用する。フランジ端は溶接ではなくボルト締結のため対象外、フリー端は
+    // まだ何にも接続していないため対象外。
+    const startRootGap =
+      s.connection === 'weld' && !s.startFlange && e.start.role !== 'free' ? rootGap : 0
+    const endRootGap =
+      s.connection === 'weld' && !s.endFlange && e.end.role !== 'free' ? rootGap : 0
+    const startAllow = round1(e.start.mm) + (s.startFlange ? flangeDeduct : 0) + startRootGap
+    const endAllow = round1(e.end.mm) + (s.endFlange ? flangeDeduct : 0) + endRootGap
     // 縦区間(90°/270°)は、下流に隣接する排水勾配区間で生じる高低差の合計を
     // 切り寸法の計算にだけ差し引く（勾配で下がった分、縦区間はその分短くなる）。
     // 表示上の「芯々」は引き続きユーザーが入力した値のまま見せる。
@@ -462,6 +477,8 @@ export function computeAllCut(
       center,
       startAllow,
       endAllow,
+      startRootGap,
+      endRootGap,
       startRole: e.start.role,
       endRole: e.end.role,
       startFittingId: e.start.fittingId,

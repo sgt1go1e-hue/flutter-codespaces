@@ -17,6 +17,8 @@ import {
 import { isSlopeEligible, effectiveSlopeDenom, SLOPE_DENOM_OPTIONS } from '../lib/slope'
 import type { ElevationCheckResult } from '../lib/elevationCheck'
 
+const round1 = (x: number) => Math.round(x * 10) / 10
+
 export interface DrawDefaults {
   pipeType?: string
   size?: string
@@ -24,6 +26,11 @@ export interface DrawDefaults {
   vpSeries?: 'dv' | 'ts'
   /** 勾配(1/N のN)のベース値。区間ごとに個別上書きが無ければこれを継承する。 */
   slopeDenom?: number
+  /**
+   * ルートギャップ(mm)。突き合わせ溶接(接続方法=溶接)で裏波を出すために
+   * 設ける隙間。全溶接箇所に共通で適用（フランジ引きしろと同じ考え方）。
+   */
+  rootGap?: number
 }
 
 function roleLabel(role: string): string {
@@ -81,6 +88,9 @@ interface SegmentPanelProps {
   /** フランジの引きしろ(mm)・全フランジ共通 */
   flangeAllow: number
   onFlangeAllowChange: (mm: number) => void
+  /** ルートギャップ(mm)・全溶接箇所共通 */
+  rootGap: number
+  onRootGapChange: (mm: number) => void
   /** パッキン(ガスケット)を加味するか・厚み(mm) */
   gasketOn: boolean
   gasketMm: number
@@ -107,6 +117,8 @@ export function SegmentPanel({
   onRoundModeChange,
   flangeAllow,
   onFlangeAllowChange,
+  rootGap,
+  onRootGapChange,
   gasketOn,
   gasketMm,
   onGasketChange,
@@ -644,23 +656,35 @@ export function SegmentPanel({
             <div className="end-row">
               <span>始点側（{roleLabel(cut.startRole)}）</span>
               <span>
-                {cut.startAllow > 0
-                  ? `− ${cut.startAllow} mm`
+                {cut.startAllow - cut.startRootGap > 0
+                  ? `− ${round1(cut.startAllow - cut.startRootGap)} mm`
                   : cut.startConnected
                     ? '差引なし'
                     : '芯出し基準'}
               </span>
             </div>
+            {cut.startRootGap > 0 && (
+              <div className="end-row">
+                <span>始点側（ルートギャップ）</span>
+                <span>− {cut.startRootGap} mm</span>
+              </div>
+            )}
             <div className="end-row">
               <span>終点側（{roleLabel(cut.endRole)}）</span>
               <span>
-                {cut.endAllow > 0
-                  ? `− ${cut.endAllow} mm`
+                {cut.endAllow - cut.endRootGap > 0
+                  ? `− ${round1(cut.endAllow - cut.endRootGap)} mm`
                   : cut.endConnected
                     ? '差引なし'
                     : '芯出し基準'}
               </span>
             </div>
+            {cut.endRootGap > 0 && (
+              <div className="end-row">
+                <span>終点側（ルートギャップ）</span>
+                <span>− {cut.endRootGap} mm</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -784,6 +808,30 @@ export function SegmentPanel({
         </div>
 
         {/* ⑦ パーツ（フランジ・レジューサー等） */}
+        {/* ルートギャップ（接続方法が溶接のときだけ表示・全溶接箇所共通）。
+            突き合わせ溶接で裏波を出すために設ける隙間分、切り寸法から追加で控除する。 */}
+        {segment.connection === 'weld' && (
+          <div className="panel-grid">
+            <label className="field round-field">
+              <span className="field-label">
+                ルートギャップ(mm)
+                <span className="field-note">全溶接箇所共通</span>
+              </span>
+              <input
+                className="num-input"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                placeholder="例: 0"
+                value={rootGap || ''}
+                onChange={(e) =>
+                  onRootGapChange(e.target.value === '' ? 0 : Number(e.target.value))
+                }
+              />
+            </label>
+          </div>
+        )}
+
         {/* フランジ引きしろ（フランジが付いた端があるときだけ表示・全フランジ共通）。
             溶接フランジ等は引きしろが任意のため手入力する。 */}
         {(segment.startFlange || segment.endFlange) && (
@@ -932,6 +980,7 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
           <b>{defaults.size ?? '未設定'}</b>
           {connectionName && <b>{connectionName}</b>}
           {defaults.slopeDenom && <b>勾配1/{defaults.slopeDenom}</b>}
+          {!!defaults.rootGap && <b>RG{defaults.rootGap}mm</b>}
         </span>
       </button>
       {open && (
@@ -1036,6 +1085,26 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
                 </select>
               </label>
             )}
+
+            {/* 突き合わせ溶接(接続方法=溶接)で裏波を出すために設ける隙間。
+                切り寸法から溶接箇所ごとに追加で控除する（全溶接箇所共通）。
+                実用上は0〜4mm程度を想定するが、上限は特に設けない。 */}
+            <label className="field">
+              <span className="field-label">ルートギャップ(mm)</span>
+              <input
+                className="num-input"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                placeholder="例: 0"
+                value={defaults.rootGap || ''}
+                onChange={(e) =>
+                  onChange({
+                    rootGap: e.target.value === '' ? undefined : Number(e.target.value),
+                  })
+                }
+              />
+            </label>
           </div>
         </div>
       )}

@@ -228,6 +228,11 @@ export default function App() {
     gasketOn?: boolean
     /** パッキン厚(mm, 1〜6) */
     gasketMm?: number
+    /**
+     * ルートギャップ(mm)。突き合わせ溶接(接続方法=溶接)で裏波を出すために
+     * 設ける隙間。全溶接箇所に共通で適用（フランジ引きしろと同じ考え方）。
+     */
+    rootGap?: number
     /** 勾配(1/N のN)のベース値。区間ごとに個別上書きが無ければこれを継承する。 */
     slopeDenom?: number
   }>('piping-iso:defaults', {})
@@ -272,6 +277,7 @@ export default function App() {
       defaults.flangeAllow ?? 0,
       defaults.gasketOn ? (defaults.gasketMm ?? 0) : 0,
       defaults.slopeDenom,
+      defaults.rootGap ?? 0,
     )
     return (cut[segId]?.startAllow ?? 0) + (cut[segId]?.endAllow ?? 0)
   }
@@ -402,6 +408,7 @@ export default function App() {
         defaults.flangeAllow ?? 0,
         defaults.gasketOn ? (defaults.gasketMm ?? 0) : 0,
         defaults.slopeDenom,
+        defaults.rootGap ?? 0,
       ),
     [
       segments,
@@ -411,6 +418,7 @@ export default function App() {
       defaults.gasketOn,
       defaults.gasketMm,
       defaults.slopeDenom,
+      defaults.rootGap,
     ],
   )
   // 材料集計(BOM)。モーダルを開いたときに使う。
@@ -765,6 +773,8 @@ export default function App() {
           onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}
           flangeAllow={defaults.flangeAllow ?? 0}
           onFlangeAllowChange={(mm) => updateDefaults({ flangeAllow: mm })}
+          rootGap={defaults.rootGap ?? 0}
+          onRootGapChange={(mm) => updateDefaults({ rootGap: mm })}
           gasketOn={defaults.gasketOn ?? false}
           gasketMm={defaults.gasketMm ?? 0}
           onGasketChange={(on, mm) =>
