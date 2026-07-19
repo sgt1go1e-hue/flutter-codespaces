@@ -31,6 +31,8 @@ export interface DrawDefaults {
    * 設ける隙間。全溶接箇所に共通で適用（フランジ引きしろと同じ考え方）。
    */
   rootGap?: number
+  /** 相番(合番)表示のON/OFF。未設定(auto)ならセグメント数で自動判定する。 */
+  assemblyNumberMode?: 'auto' | 'on' | 'off'
 }
 
 function roleLabel(role: string): string {
@@ -136,6 +138,10 @@ interface SegmentPanelProps {
   gasketOn: boolean
   gasketMm: number
   onGasketChange: (on: boolean, mm: number) => void
+  /** 相番(合番)表示が有効か（セグメント数による自動判定 or 手動ON/OFF） */
+  assemblyNumberActive?: boolean
+  /** この区間の実効相番（自動採番 or 手動上書き済みの値）。芯々未入力なら undefined。 */
+  assemblyNumber?: number
   onChange: (patch: Partial<Segment>) => void
   onDelete: () => void
   /** パネルを閉じる（選択解除）。常に押しやすい固定位置のボタンとして用意。 */
@@ -165,6 +171,8 @@ export function SegmentPanel({
   gasketOn,
   gasketMm,
   onGasketChange,
+  assemblyNumberActive,
+  assemblyNumber,
   onChange,
   onDelete,
   onClose,
@@ -265,6 +273,39 @@ export function SegmentPanel({
         </button>
       </div>
       <div className="panel-body">
+        {/* 相番(合番)。相番表示が有効(自動判定 or 手動ON)かつ芯々寸法入力済みの
+            区間だけ表示する。既定値は配管の接続順で自動採番された番号。ここで
+            数値を変えると、その値が優先され(手動上書き)、自動採番のやり直しでも
+            上書きされなくなる。空にすると自動採番へ戻る。 */}
+        {assemblyNumberActive && cut && cut.status !== 'none' && (
+          <div className="assembly-number-row">
+            <span className="field-label">相番</span>
+            <input
+              className="num-input"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
+              value={segment.assemblyNumberOverride ?? assemblyNumber ?? ''}
+              onChange={(e) => {
+                const v = e.target.value
+                onChange({
+                  assemblyNumberOverride:
+                    v === '' ? undefined : Math.max(1, Math.round(Number(v))),
+                })
+              }}
+            />
+            {segment.assemblyNumberOverride != null && (
+              <button
+                type="button"
+                className="assembly-number-reset"
+                onClick={() => onChange({ assemblyNumberOverride: undefined })}
+              >
+                自動採番に戻す
+              </button>
+            )}
+          </div>
+        )}
         {/* ① 継手・分岐タイプ選択（最重要・スクロール不要で見える最上部） */}
         <div className="panel-grid">
           <label className="field">
@@ -1078,9 +1119,17 @@ interface DrawSettingsPanelProps {
   onChange: (patch: Partial<DrawDefaults>) => void
   open: boolean
   onToggle: () => void
+  /** 現在の図面の総セグメント数（相番表示の自動判定の目安表示に使う） */
+  segmentCount: number
 }
 
-export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSettingsPanelProps) {
+export function DrawSettingsPanel({
+  defaults,
+  onChange,
+  open,
+  onToggle,
+  segmentCount,
+}: DrawSettingsPanelProps) {
   const sizes = sizesForPipeType(defaults.pipeType)
   const od = getSizeInfo(defaults.size)?.od
   const pipeShort = defaults.pipeType
@@ -1222,6 +1271,27 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
                   })
                 }
               />
+            </label>
+
+            {/* 相番(合番)表示。既定(自動)はセグメント数が10本を超えたら図面上を
+                番号だけの表示に切り替える。10本以下でも相番にしたい／逆に本数に
+                関わらず寸法直書きのままにしたい、どちらも手動で固定できる。 */}
+            <label className="field">
+              <span className="field-label">相番表示</span>
+              <select
+                value={defaults.assemblyNumberMode ?? 'auto'}
+                onChange={(e) =>
+                  onChange({
+                    assemblyNumberMode: e.target.value as 'auto' | 'on' | 'off',
+                  })
+                }
+              >
+                <option value="auto">
+                  自動（11本以上でON・現在{segmentCount > 10 ? 'ON' : 'OFF'}）
+                </option>
+                <option value="on">常にON</option>
+                <option value="off">常にOFF</option>
+              </select>
             </label>
           </div>
         </div>

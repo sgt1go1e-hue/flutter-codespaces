@@ -230,7 +230,9 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  padding-top: max(10px, env(safe-area-inset-top));
+  /* 画面下部(パーツパレットと入れ替え済み)に配置しているため、ノッチ等の
+     セーフエリアは footer(statusbar) 側が下端として吸収する。ここでは
+     上端の特別な余白は不要。 */
   background: var(--panel);
   gap: 12px;
 }
@@ -519,6 +521,20 @@ body {
 
 .dim-cut.tight {
   fill: var(--label-tight);
+}
+
+/* 相番(合番)バッジ。密集した図面では芯々/切り寸法を直書きせず番号だけを
+   表示し、詳しい寸法はBOMの対応表で確認する運用（現場の相番方式）。 */
+.assembly-badge circle {
+  fill: var(--accent);
+  stroke: var(--label-outline);
+  stroke-width: 2px;
+}
+
+.assembly-badge text {
+  fill: var(--accent-on);
+  font-size: 12px;
+  font-weight: 800;
 }
 
 /* レジューサー記号（三角形） */
@@ -900,6 +916,37 @@ body {
   border-radius: 10px;
 }
 
+/* 相番(合番)の手動入力欄。パネル上部で目立たせて、自動採番の値をすぐ
+   上書き・確認できるようにする。 */
+.assembly-number-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 2px 12px;
+}
+
+.assembly-number-row .field-label {
+  flex-shrink: 0;
+}
+
+.assembly-number-row .num-input {
+  width: 84px;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: 800;
+  border-color: var(--accent);
+}
+
+.assembly-number-reset {
+  background: transparent;
+  color: var(--hint);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
 .socket-gap-warn p {
   margin: 0;
   font-size: 13px;
@@ -952,12 +999,15 @@ body {
   content: '▾ ';
 }
 
-/* --- パーツパレット（画面下部） --- */
+/* --- パーツパレット（画面上部。メニューバーと入れ替え済み） --- */
 .palette {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 8px 12px;
+  /* 画面最上部に来たため、ノッチ等のセーフエリア分を上端に確保する
+     （メニューバーが元々ここで行っていたのと同じ考慮）。 */
+  padding-top: max(8px, env(safe-area-inset-top));
   background: var(--panel);
   border-top: 1px solid var(--border-soft);
 }
@@ -1202,6 +1252,20 @@ body {
 
 .bom-table tbody td {
   color: var(--text);
+}
+
+/* 相番対応表の番号セル。ここで数値を変えると手動上書き（現場の組み立て
+   やすい順への最終調整）になる。 */
+.assembly-number-cell {
+  width: 56px;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
 }
 
 .bom-actions {
@@ -1505,6 +1569,7 @@ body {
      残しつつ、外側の余白・文字・アイコンを詰めて縦幅を抑える。 */
   .palette {
     padding: 3px 8px;
+    padding-top: max(3px, env(safe-area-inset-top));
     gap: 6px;
   }
 

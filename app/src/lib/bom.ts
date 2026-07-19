@@ -41,6 +41,19 @@ export interface Bom {
   flanges: FlangeRow[]
 }
 
+/** 相番(合番)対応表の1行。番号順に並べて使う。 */
+export interface AssemblyRow {
+  /** 対応するセグメントid（手動リナンバーUIで使う） */
+  id: string
+  number: number
+  pipeShort: string
+  size?: string
+  /** 芯々(両端継手接続) / 芯先(片端フリー端) */
+  mode: '芯々' | '芯先'
+  center?: number
+  cut?: number
+}
+
 const NODE_EPS = 1
 
 interface EndAt extends EndResult {
@@ -232,13 +245,45 @@ export function computeBom(
   }
 }
 
+/**
+ * 相番(合番)対応表を作る。番号・芯々/切り寸法の対応がひと目でわかる別表
+ * （図面上を番号だけの表示にする代わりの詳細確認先）。番号が振られていない
+ * 区間(=芯々未入力、または相番表示OFF中)は含めない。既存の芯々/切り寸法の
+ * 計算結果(cutById)はそのまま使うだけで、ここでは一切計算しない。
+ */
+export function computeAssemblyTable(
+  segments: Segment[],
+  effById: Record<string, Effective>,
+  cutById: Record<string, CutResult>,
+  assemblyNumberById: Record<string, number>,
+): AssemblyRow[] {
+  const rows: AssemblyRow[] = []
+  for (const s of segments) {
+    const number = assemblyNumberById[s.id]
+    if (number == null) continue
+    const c = cutById[s.id]
+    const eff = effById[s.id]
+    rows.push({
+      id: s.id,
+      number,
+      pipeShort: eff?.pipeType ? (getPipeType(eff.pipeType)?.short ?? eff.pipeType) : '—',
+      size: eff?.size,
+      mode: c?.mode ?? '芯々',
+      center: c?.center,
+      cut: c?.cut,
+    })
+  }
+  return rows.sort((a, b) => a.number - b.number)
+}
+
 const round1 = (x: number) => Math.round(x * 10) / 10
 
 /**
  * BOM を CSV 文字列にする。パイプは1本ごと（切り寸法の明細）＋サイズ別の小計、
- * 継手・フランジは数量で出力する。
+ * 継手・フランジは数量で出力する。相番(合番)対応表があれば、末尾に別セクション
+ * として追加する（番号・芯々・切り寸法の対応がひと目でわかる別表）。
  */
-export function bomToCsv(bom: Bom): string {
+export function bomToCsv(bom: Bom, assemblyTable?: AssemblyRow[]): string {
   const rows: string[][] = []
   rows.push(['区分', '品名', '呼び径', '接続方法', '切り寸法(mm)', '数量'])
   for (const p of bom.pipes) {
@@ -262,7 +307,27 @@ export function bomToCsv(bom: Bom): string {
   for (const f of bom.flanges) {
     rows.push(['フランジ', f.label, f.size, f.connection, '', String(f.count)])
   }
-  return rows
+  const csv = rows
     .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(','))
     .join('\n')
+
+  if (!assemblyTable || assemblyTable.length === 0) return csv
+
+  const assemblyRows: string[][] = [
+    ['番号', '管種', '呼び径', '芯々/芯先', '寸法(mm)', '切り寸法(mm)'],
+  ]
+  for (const a of assemblyTable) {
+    assemblyRows.push([
+      String(a.number),
+      a.pipeShort,
+      a.size ?? '',
+      a.mode,
+      a.center != null ? String(round1(a.center)) : '',
+      a.cut != null ? String(round1(a.cut)) : '',
+    ])
+  }
+  const assemblyCsv = assemblyRows
+    .map((r) => r.map((c) => (/[",\n]/.test(c) ? `"${c.replace(/"/g, '""')}"` : c)).join(','))
+    .join('\n')
+  return `${csv}\n\n相番対応表\n${assemblyCsv}`
 }

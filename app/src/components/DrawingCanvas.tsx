@@ -50,6 +50,14 @@ interface Props {
    */
   eraserMode?: boolean
   onEraseSegment?: (id: string) => void
+  /**
+   * 相番(合番)表示が有効か（セグメント数による自動判定 or 手動ON/OFF）。
+   * 有効な区間は、芯々/切り寸法の2段表記の代わりに番号だけを表示する
+   * （既存の芯々/切り寸法の計算結果自体は変えない。表示の切り替えのみ）。
+   */
+  assemblyNumberActive?: boolean
+  /** 区間ごとの実効相番。芯々未入力の区間には含まれない。 */
+  assemblyNumberById?: Record<string, number>
 }
 
 // 「指が動いたかどうか」のごく小さいデッドゾーン(px、画面座標＝ズーム非依存)。
@@ -141,6 +149,8 @@ export function DrawingCanvas({
   baseSlopeDenom,
   eraserMode = false,
   onEraseSegment,
+  assemblyNumberActive = false,
+  assemblyNumberById = {},
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
@@ -468,6 +478,12 @@ export function DrawingCanvas({
       else if (c.startConnected && !c.endConnected) t = 0.7
       const mx = s.start.x + (s.end.x - s.start.x) * t
       const my = s.start.y + (s.end.y - s.start.y) * t
+      // 相番(合番)表示が有効な区間は、寸法2段表記の代わりに番号だけの
+      // 小さな丸バッジを出す（既存の芯々/切り寸法テキストの計算・幅取りは
+      // 使わない）。相番の値自体は cutlength.ts の計算結果とは無関係の
+      // 表示専用データ（App側でassemblyNumberByIdとして都度算出）。
+      const assemblyNum = assemblyNumberActive ? assemblyNumberById[s.id] : undefined
+      const isNumbered = assemblyNum != null
       const line1 = `${c.mode} ${c.center}`
       const line2 =
         c.status === 'ok'
@@ -482,8 +498,9 @@ export function DrawingCanvas({
               : 'パイプ0（継手直結）'
             : '継手不足'
       const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
-      const w =
-        Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
+      const w = isNumbered
+        ? 24
+        : Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
       // 押し出す向きはセグメントに対して垂直な向きに固定する（セグメントの向き
       // なりに押すと、切り立った斜め/縦の配管では押し出しがほぼ線に沿った方向に
       // なってしまい、ラベルが自分の区間を越えて隣の区間の場所までズレて、
@@ -513,7 +530,7 @@ export function DrawingCanvas({
         cx: mx + perpX * 22,
         cy: my + perpY * 22,
         w,
-        h: 32,
+        h: isNumbered ? 24 : 32,
         pushX: perpX,
         pushY: perpY,
       })
@@ -603,7 +620,16 @@ export function DrawingCanvas({
       }
     }
     return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles])
-  }, [segments, cutById, effectiveById, crossoverGaps, GRID_GAP, baseSlopeDenom])
+  }, [
+    segments,
+    cutById,
+    effectiveById,
+    crossoverGaps,
+    GRID_GAP,
+    baseSlopeDenom,
+    assemblyNumberActive,
+    assemblyNumberById,
+  ])
 
   // フランジ記号を端点に描く。
   // 'double'(両) = 配管に直交する短い2本線、'single'(片) = 1本線（終端エンド）。
@@ -931,6 +957,20 @@ export function DrawingCanvas({
               const resolved = resolvedLabels.get(`dim-${s.id}`)
               const cx = resolved?.cx ?? mx
               const cCenter = resolved?.cy ?? my + 22
+              // 相番(合番)表示が有効な区間は、寸法2段表記の代わりに番号だけの
+              // 丸バッジを表示する（別表(BOM対応表)で芯々/切り寸法を確認する
+              // 運用のため、図面上は密集を避けて番号のみにする）。
+              const assemblyNum = assemblyNumberActive ? assemblyNumberById[s.id] : undefined
+              if (assemblyNum != null) {
+                return (
+                  <g className="assembly-badge">
+                    <circle cx={cx} cy={cCenter} r={11} />
+                    <text x={cx} y={cCenter} textAnchor="middle" dominantBaseline="central">
+                      {assemblyNum}
+                    </text>
+                  </g>
+                )
+              }
               const y1 = cCenter - 8
               const y2 = cCenter + 8
               return (

@@ -35,6 +35,7 @@ import {
   inheritedPipeType,
   inheritedSize,
 } from './lib/inheritance'
+import { computeAssemblyNumbers } from './lib/assemblyNumbers'
 import { getPart } from './data/parts'
 import { sizesForPipeType, nextReducerSize } from './data/masters'
 import type { Segment } from './types'
@@ -256,6 +257,11 @@ export default function App() {
     rootGap?: number
     /** 勾配(1/N のN)のベース値。区間ごとに個別上書きが無ければこれを継承する。 */
     slopeDenom?: number
+    /**
+     * 相番(合番)表示のON/OFF。未設定(auto)ならセグメント数が10本を超えたら
+     * 自動でON、10本以下ならOFFにする。'on'/'off' で本数によらず固定できる。
+     */
+    assemblyNumberMode?: 'auto' | 'on' | 'off'
   }>('piping-iso:defaults', {})
   // 配管設定(defaults)で管種・サイズを変更した直後は、たとえ既存の線から
   // 続けて描く（＝親を持つ）新しい線であっても、その変更を次に描く1本には
@@ -440,6 +446,20 @@ export default function App() {
       defaults.rootGap,
     ],
   )
+  // 相番(合番)表示: セグメント数が10本を超えたら自動でON、10本以下ならOFF
+  // （既定=自動判定）。defaults.assemblyNumberMode で手動に上書き可能。
+  const assemblyNumberActive =
+    defaults.assemblyNumberMode === 'on'
+      ? true
+      : defaults.assemblyNumberMode === 'off'
+        ? false
+        : segments.length > 10
+  // 相番の割り当て（都度算出・非破壊。既存の芯々/切り寸法計算には触れない）。
+  const assemblyNumberById = useMemo(
+    () => computeAssemblyNumbers(segments, cutById),
+    [segments, cutById],
+  )
+
   // 選択中セグメントがレジューサー区間の「メイン側」または「先端側」なら、
   // もう一方(パートナー)の区間とその切り寸法を返す。詳細パネルで
   // メイン側/先端側の寸法をまとめて1箇所で入力できるようにするために使う。
@@ -565,6 +585,15 @@ export default function App() {
     const idSet = new Set(segmentIds)
     setSegments((prev) =>
       prev.map((s) => (idSet.has(s.id) ? { ...s, size } : s)),
+    )
+  }
+
+  // 相番(合番)の手動上書き。BOMの対応表・詳細パネルどちらからも呼べる
+  // （どちらも同じ assemblyNumberOverride フィールドを直接書き換えるだけ）。
+  // undefined を渡すと上書きを解除し、自動採番(接続順)に戻す。
+  function setAssemblyNumberOverride(id: string, num: number | undefined) {
+    setSegments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, assemblyNumberOverride: num } : s)),
     )
   }
 
@@ -718,6 +747,94 @@ export default function App() {
 
       {screen === 'drawing' && (
         <>
+      {/* パーツ(両フランジ・レジューサー等)は画面上部に常設（親指の届く下部は
+          「元に戻す」等の頻用メニューに譲る。ドラッグして配管上へ配置する
+          操作自体は位置に関係なく機能する）。 */}
+      <PartsPalette
+        onDragStart={(partId, x, y) => setPartDrag({ partId, x, y })}
+        draggingId={partDrag?.partId ?? null}
+      />
+
+      <main className="stage" ref={stageRef}>
+        <DrawingCanvas
+          segments={segments}
+          selectedId={selectedId}
+          onAddSegment={addSegment}
+          onSelectSegment={handleSelect}
+          onBackgroundTap={closeSelection}
+          effectiveById={effectiveById}
+          crossoverGaps={crossoverGaps}
+          cutById={cutById}
+          inputDisabled={partDrag !== null}
+          view={view}
+          onViewChange={setView}
+          baseSlopeDenom={defaults.slopeDenom}
+          eraserMode={eraserMode}
+          onEraseSegment={eraseSegment}
+          assemblyNumberActive={assemblyNumberActive}
+          assemblyNumberById={assemblyNumberById}
+        />
+
+        {/* ドラッグ中のパーツ ghost */}
+        {partDrag && (
+          <div
+            className="part-ghost"
+            style={{ left: partDrag.x, top: partDrag.y }}
+          >
+            {getPart(partDrag.partId)?.icon}
+          </div>
+        )}
+
+        {/* 作図設定（左上に浮かせて常設。これから描く線の初期値。選択時は自動で開かない） */}
+        <DrawSettingsPanel
+          defaults={defaults}
+          onChange={updateDefaults}
+          open={settingsOpen}
+          onToggle={() => setSettingsOpen((v) => !v)}
+          segmentCount={segments.length}
+        />
+      </main>
+
+      {/* 寸法・属性の編集パネル（線を選択したときだけ表示。作図設定とは独立） */}
+      {selected && (
+        <SegmentPanel
+          segment={selected}
+          effective={effectiveById[selected.id]}
+          inheritedPipeType={inheritedPipeType(selected, byId)}
+          inheritedSize={inheritedSize(selected, byId)}
+          cut={cutById[selected.id]}
+          elbowClash={selectedClash}
+          onApplyElbowClash={() => selectedClash && applyElbowClash(selectedClash)}
+          teeContext={teeContext}
+          onSetTeeSize={setSizeForSegments}
+          reducerPartner={reducerPartner}
+          onChangeReducerPair={updateReducerPair}
+          elevationChecks={elevationChecks.filter(
+            (c) => c.fromSegId === selected.id || c.toSegId === selected.id,
+          )}
+          baseSlopeDenom={defaults.slopeDenom}
+          roundMode={defaults.roundMode ?? 'round'}
+          onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}
+          flangeAllow={defaults.flangeAllow ?? 0}
+          onFlangeAllowChange={(mm) => updateDefaults({ flangeAllow: mm })}
+          rootGap={defaults.rootGap ?? 0}
+          onRootGapChange={(mm) => updateDefaults({ rootGap: mm })}
+          gasketOn={defaults.gasketOn ?? false}
+          gasketMm={defaults.gasketMm ?? 0}
+          onGasketChange={(on, mm) =>
+            updateDefaults({ gasketOn: on, gasketMm: mm })
+          }
+          assemblyNumberActive={assemblyNumberActive}
+          assemblyNumber={assemblyNumberById[selected.id]}
+          onChange={updateSelected}
+          onDelete={deleteSelected}
+          onClose={closeSelection}
+        />
+      )}
+
+      {/* メニュー(新規作成・過去の図面・元に戻す・全消去・集計拾い出し・免責等)は
+          画面下部(親指の届きやすい位置)に配置。特に「元に戻す」は使用頻度が
+          高いための要望。 */}
       <header className="topbar">
         <div className="title">配管アイソメ図</div>
         <div className={`tools-wrap${toolsOverflow ? ' has-more' : ''}`}>
@@ -776,83 +893,6 @@ export default function App() {
         </div>
       </header>
 
-      <main className="stage" ref={stageRef}>
-        <DrawingCanvas
-          segments={segments}
-          selectedId={selectedId}
-          onAddSegment={addSegment}
-          onSelectSegment={handleSelect}
-          onBackgroundTap={closeSelection}
-          effectiveById={effectiveById}
-          crossoverGaps={crossoverGaps}
-          cutById={cutById}
-          inputDisabled={partDrag !== null}
-          view={view}
-          onViewChange={setView}
-          baseSlopeDenom={defaults.slopeDenom}
-          eraserMode={eraserMode}
-          onEraseSegment={eraseSegment}
-        />
-
-        {/* ドラッグ中のパーツ ghost */}
-        {partDrag && (
-          <div
-            className="part-ghost"
-            style={{ left: partDrag.x, top: partDrag.y }}
-          >
-            {getPart(partDrag.partId)?.icon}
-          </div>
-        )}
-
-        {/* 作図設定（左上に浮かせて常設。これから描く線の初期値。選択時は自動で開かない） */}
-        <DrawSettingsPanel
-          defaults={defaults}
-          onChange={updateDefaults}
-          open={settingsOpen}
-          onToggle={() => setSettingsOpen((v) => !v)}
-        />
-      </main>
-
-      {/* 寸法・属性の編集パネル（線を選択したときだけ表示。作図設定とは独立） */}
-      {selected && (
-        <SegmentPanel
-          segment={selected}
-          effective={effectiveById[selected.id]}
-          inheritedPipeType={inheritedPipeType(selected, byId)}
-          inheritedSize={inheritedSize(selected, byId)}
-          cut={cutById[selected.id]}
-          elbowClash={selectedClash}
-          onApplyElbowClash={() => selectedClash && applyElbowClash(selectedClash)}
-          teeContext={teeContext}
-          onSetTeeSize={setSizeForSegments}
-          reducerPartner={reducerPartner}
-          onChangeReducerPair={updateReducerPair}
-          elevationChecks={elevationChecks.filter(
-            (c) => c.fromSegId === selected.id || c.toSegId === selected.id,
-          )}
-          baseSlopeDenom={defaults.slopeDenom}
-          roundMode={defaults.roundMode ?? 'round'}
-          onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}
-          flangeAllow={defaults.flangeAllow ?? 0}
-          onFlangeAllowChange={(mm) => updateDefaults({ flangeAllow: mm })}
-          rootGap={defaults.rootGap ?? 0}
-          onRootGapChange={(mm) => updateDefaults({ rootGap: mm })}
-          gasketOn={defaults.gasketOn ?? false}
-          gasketMm={defaults.gasketMm ?? 0}
-          onGasketChange={(on, mm) =>
-            updateDefaults({ gasketOn: on, gasketMm: mm })
-          }
-          onChange={updateSelected}
-          onDelete={deleteSelected}
-          onClose={closeSelection}
-        />
-      )}
-
-      <PartsPalette
-        onDragStart={(partId, x, y) => setPartDrag({ partId, x, y })}
-        draggingId={partDrag?.partId ?? null}
-      />
-
       <footer className="statusbar">
         <span className="count">セグメント数: {segments.length}</span>
       </footer>
@@ -866,6 +906,8 @@ export default function App() {
           crossoverGaps={crossoverGaps}
           cutById={cutById}
           baseSlopeDenom={defaults.slopeDenom}
+          assemblyNumberById={assemblyNumberById}
+          onRenumber={setAssemblyNumberOverride}
           onClose={() => setShowBom(false)}
         />
       )}

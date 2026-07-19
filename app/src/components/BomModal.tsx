@@ -1,6 +1,6 @@
 import { Fragment, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
-import { bomToCsv, type Bom } from '../lib/bom'
+import { bomToCsv, computeAssemblyTable, type Bom } from '../lib/bom'
 import { PrintIsometric } from './PrintIsometric'
 import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
@@ -14,6 +14,10 @@ interface Props {
   cutById: Record<string, CutResult>
   /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
   baseSlopeDenom?: number
+  /** 区間ごとの実効相番。芯々未入力または相番表示OFF中の区間は含まれない。 */
+  assemblyNumberById: Record<string, number>
+  /** 相番の手動上書き（undefinedで自動採番に戻す） */
+  onRenumber: (id: string, num: number | undefined) => void
   onClose: () => void
 }
 
@@ -26,12 +30,16 @@ export function BomModal({
   crossoverGaps,
   cutById,
   baseSlopeDenom,
+  assemblyNumberById,
+  onRenumber,
   onClose,
 }: Props) {
   const empty =
     bom.pipes.length === 0 &&
     bom.fittings.length === 0 &&
     bom.flanges.length === 0
+
+  const assemblyTable = computeAssemblyTable(segments, effectiveById, cutById, assemblyNumberById)
 
   // PDF/印刷レイアウト: 詳細(複数ページ, パイプ1本ごとの明細つき) か
   // 1ページ集約(アイソメ図を縮小・パイプ明細は小計のみ、改ページなし) かを選べる。
@@ -61,7 +69,7 @@ export function BomModal({
 
   function downloadCsv() {
     // Excel(日本語)で文字化けしないよう BOM 付き UTF-8 で出力
-    const csv = '﻿' + bomToCsv(bom)
+    const csv = '﻿' + bomToCsv(bom, assemblyTable)
     const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
@@ -168,6 +176,56 @@ export function BomModal({
                       <td>{f.size}</td>
                       <td>{f.connection}</td>
                       <td className="num">{f.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )}
+
+          {assemblyTable.length > 0 && (
+            <>
+              <h4 className="bom-section">相番対応表</h4>
+              <p className="panel-hint">
+                図面上は番号のみ表示中です。番号欄を編集すると、その区間の相番を
+                手動で固定できます（空にすると自動採番に戻ります）。
+              </p>
+              <table className="bom-table assembly-table">
+                <thead>
+                  <tr>
+                    <th className="num">番号</th>
+                    <th>管種</th>
+                    <th>呼び径</th>
+                    <th>{'芯々/芯先'}</th>
+                    <th className="num">寸法(mm)</th>
+                    <th className="num">切り寸法(mm)</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {assemblyTable.map((a) => (
+                    <tr key={a.id}>
+                      <td className="num">
+                        <input
+                          className="assembly-number-cell"
+                          type="number"
+                          inputMode="numeric"
+                          min={1}
+                          step={1}
+                          value={a.number}
+                          onChange={(e) => {
+                            const v = e.target.value
+                            onRenumber(
+                              a.id,
+                              v === '' ? undefined : Math.max(1, Math.round(Number(v))),
+                            )
+                          }}
+                        />
+                      </td>
+                      <td>{a.pipeShort}</td>
+                      <td>{a.size ?? '—'}</td>
+                      <td>{a.mode}</td>
+                      <td className="num">{a.center != null ? round1(a.center) : '—'}</td>
+                      <td className="num">{a.cut != null ? round1(a.cut) : '—'}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -316,6 +374,36 @@ export function BomModal({
                     <td>{f.size}</td>
                     <td>{f.connection}</td>
                     <td>{f.count}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </>
+        )}
+
+        {assemblyTable.length > 0 && (
+          <>
+            <h2>相番対応表</h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>番号</th>
+                  <th>管種</th>
+                  <th>呼び径</th>
+                  <th>{'芯々/芯先'}</th>
+                  <th>寸法(mm)</th>
+                  <th>切り寸法(mm)</th>
+                </tr>
+              </thead>
+              <tbody>
+                {assemblyTable.map((a) => (
+                  <tr key={a.id}>
+                    <td>{a.number}</td>
+                    <td>{a.pipeShort}</td>
+                    <td>{a.size ?? '—'}</td>
+                    <td>{a.mode}</td>
+                    <td>{a.center != null ? round1(a.center) : '—'}</td>
+                    <td>{a.cut != null ? round1(a.cut) : '—'}</td>
                   </tr>
                 ))}
               </tbody>
