@@ -1105,8 +1105,8 @@
     },
     {
       "id": "elbow90_vp_dv",
-      "name": "90°エルボ（塩ビ・DV継手）",
-      "short": "EL90(VP-DV)",
+      "name": "90°エルボ（DL・塩ビ・DV継手）",
+      "short": "EL90DL(VP-DV)",
       "calc": "centerMinus",
       "source": "sekisui_eslon_dv_vp",
       "drawingNo": "D-VP-006",
@@ -1238,6 +1238,109 @@
         "100_75": { "run": 68, "branch": 56 },
         "150_75": { "run": 94, "branch": 63 },
         "150_100": { "run": 98, "branch": 76 }
+      }
+    },
+    {
+      "id": "elbow90_ll_vp_dv",
+      "name": "90°大曲りエルボ（LL・塩ビ・DV継手）",
+      "short": "EL90LL(VP-DV)",
+      "calc": "centerMinus",
+      "source": "sekisui_eslon_dv_vp",
+      "drawingNo": "D-VP-007",
+      "dims": {
+        "40": 52,
+        "50": 66,
+        "65": 90,
+        "75": 100,
+        "100": 128,
+        "125": 140,
+        "150": 170
+      }
+    },
+    {
+      "id": "y45_vp_dv",
+      "name": "45°Y（同径・塩ビ・DV継手）",
+      "short": "Y45(VP-DV)",
+      "calc": "centerMinus",
+      "source": "sekisui_eslon_dv_vp",
+      "drawingNo": "D-VP-011",
+      "dims": {
+        "40": { "near": 12, "far": 58, "branch": 62 },
+        "50": { "near": 20, "far": 72, "branch": 78 },
+        "65": { "near": 20, "far": 92, "branch": 98 },
+        "75": { "near": 26, "far": 106, "branch": 115 },
+        "100": { "near": 32, "far": 134, "branch": 144 },
+        "125": { "near": 38, "far": 172, "branch": 175 },
+        "150": { "near": 44, "far": 204, "branch": 210 }
+      }
+    },
+    {
+      "id": "y45_reducing_vp_dv",
+      "name": "45°Y（径違い・塩ビ・DV継手）",
+      "short": "Y45(VP-DV,R)",
+      "calc": "centerMinus",
+      "source": "sekisui_eslon_dv_vp",
+      "drawingNo": "D-VP-012",
+      "dims": {
+        "40_30": { "near": 6, "far": 50, "branch": 58 },
+        "50_30": { "near": 0, "far": 56, "branch": 65 },
+        "50_40": { "near": 8, "far": 62, "branch": 70 },
+        "65_40": { "near": -1, "far": 72, "branch": 82 },
+        "65_50": { "near": 8, "far": 80, "branch": 88 },
+        "75_40": { "near": -6, "far": 78, "branch": 92 },
+        "75_50": { "near": 3, "far": 86, "branch": 98 },
+        "75_65": { "near": 14, "far": 98, "branch": 106 },
+        "100_40": { "near": -14, "far": 96, "branch": 112 },
+        "100_50": { "near": -8, "far": 98, "branch": 118 },
+        "100_65": { "near": 3, "far": 110, "branch": 125 },
+        "100_75": { "near": 19, "far": 118, "branch": 132 },
+        "125_100": { "near": 19, "far": 150, "branch": 171 },
+        "150_100": { "near": 6, "far": 165, "branch": 185 }
+      }
+    },
+    {
+      "id": "y90lt_vp_dv",
+      "name": "90°大曲りY（LT・同径・塩ビ・DV継手）",
+      "short": "LT(VP-DV)",
+      "calc": "centerMinus",
+      "source": "sekisui_eslon_dv_vp",
+      "drawingNo": "D-VP-013",
+      "dims": {
+        "40": { "near": 52, "far": 23, "branch": 52 },
+        "50": { "near": 66, "far": 26, "branch": 66 },
+        "65": { "near": 90, "far": 33, "branch": 90 },
+        "75": { "near": 100, "far": 30, "branch": 100 },
+        "100": { "near": 128, "far": 45, "branch": 128 },
+        "125": { "near": 140, "far": 50, "branch": 140 },
+        "150": { "near": 170, "far": 65, "branch": 170 }
+      }
+    },
+    {
+      "id": "y90lt_reducing_vp_dv",
+      "name": "90°大曲りY（LT・径違い・塩ビ・DV継手）",
+      "short": "LT(VP-DV,R)",
+      "calc": "centerMinus",
+      "source": "sekisui_eslon_dv_vp",
+      "drawingNo": "D-VP-014",
+      "dims": {
+        "50_40": { "near": 52, "far": 23, "branch": 57 },
+        "65_40": { "near": 52, "far": 24, "branch": 66 },
+        "65_50": { "near": 66, "far": 27, "branch": 74 },
+        "75_40": { "near": 52, "far": 25, "branch": 65 },
+        "75_50": { "near": 66, "far": 29, "branch": 79 },
+        "75_65": { "near": 90, "far": 32, "branch": 95 },
+        "100_40": { "near": 52, "far": 28, "branch": 82 },
+        "100_50": { "near": 66, "far": 32, "branch": 90 },
+        "100_65": { "near": 90, "far": 36, "branch": 107 },
+        "100_75": { "near": 100, "far": 33, "branch": 110 },
+        "125_50": { "near": 66, "far": 34, "branch": 103 },
+        "125_65": { "near": 90, "far": 38, "branch": 120 },
+        "125_75": { "near": 100, "far": 42, "branch": 124 },
+        "125_100": { "near": 128, "far": 52, "branch": 140 },
+        "150_65": { "near": 90, "far": 42, "branch": 130 },
+        "150_75": { "near": 100, "far": 45, "branch": 135 },
+        "150_100": { "near": 128, "far": 53, "branch": 152 },
+        "150_125": { "near": 145, "far": 63, "branch": 153 }
       }
     }
   ]

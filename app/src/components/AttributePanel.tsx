@@ -44,6 +44,12 @@ function roleLabel(role: string): string {
       return 'チーズ＋レジューサー'
     case 'tee-branch':
       return 'チーズ'
+    case 'wye-run':
+      return 'Y継手'
+    case 'wye-run-reducer':
+      return 'Y継手＋レジューサー'
+    case 'wye-branch':
+      return 'Y継手'
     default:
       return role
   }
@@ -249,7 +255,40 @@ export function SegmentPanel({
               </select>
             </label>
           )}
+
+          {/* Y継手(45°Y・90°大曲りY)分岐の本管側: 枝の直後(near)/手前(far)で
+              控え寸法が大きく異なり、幾何学的に自動判定できないため明示選択させる。
+              反対側の本管区間で既に選んでいれば、そちらの逆を自動で採用する
+              （両側どちらから選んでもよい。takeout.ts側のロジックと対応）。 */}
+          {(cut?.startRole === 'wye-run' ||
+            cut?.startRole === 'wye-run-reducer' ||
+            cut?.endRole === 'wye-run' ||
+            cut?.endRole === 'wye-run-reducer') && (
+            <label className="field">
+              <span className="field-label">Y継手 本管の位置</span>
+              <select
+                value={segment.wyeRole ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    wyeRole: (e.target.value || undefined) as 'near' | 'far' | undefined,
+                  })
+                }
+              >
+                <option value="">未選択</option>
+                <option value="near">枝の直後（下流側）</option>
+                <option value="far">枝の手前（上流側）</option>
+              </select>
+            </label>
+          )}
         </div>
+
+        {cut?.needsWyeRole && (
+          <div className="socket-gap-warn">
+            <p>
+              Y継手（45°Y・90°大曲りY）の本管側で、枝の直後／手前のどちらかを選択してください。未選択のままだと控え寸法が0として計算されます。
+            </p>
+          </div>
+        )}
 
         {/* レジューサー / 径違いチーズ: 相手径・合わせ面 */}
         {needsCounterpart && (

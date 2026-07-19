@@ -49,7 +49,12 @@ interface EndAt extends EndResult {
 }
 
 const isTeeRole = (r: EndRole) =>
-  r === 'tee-run' || r === 'tee-branch' || r === 'tee-run-reducer'
+  r === 'tee-run' ||
+  r === 'tee-branch' ||
+  r === 'tee-run-reducer' ||
+  r === 'wye-run' ||
+  r === 'wye-branch' ||
+  r === 'wye-run-reducer'
 
 // 大径_小径の順で "100A×50A" のような表示ラベルを作る
 function pairLabel(a?: string, b?: string): string {
@@ -137,11 +142,11 @@ export function computeBom(
   for (const cl of clusters) {
     const roles = cl.map((e) => e.role)
     if (roles.some(isTeeRole)) {
-      // チーズ節点
+      // チーズ／Y継手(45°Y・90°大曲りY)節点
       const runEnds = cl.filter(
-        (e) => e.role === 'tee-run' || e.role === 'tee-run-reducer',
+        (e) => e.role === 'tee-run' || e.role === 'tee-run-reducer' || e.role === 'wye-run' || e.role === 'wye-run-reducer',
       )
-      const branchEnds = cl.filter((e) => e.role === 'tee-branch')
+      const branchEnds = cl.filter((e) => e.role === 'tee-branch' || e.role === 'wye-branch')
       // 本管(ラン)ヘッダ径 = ラン側の最大径
       let runSize = branchEnds[0]?.size
       let runN = -1
@@ -170,9 +175,9 @@ export function computeBom(
         if (reducing) addFit(fittingId, pairLabel(runSize, branchEnd?.size))
         else addFit(fittingId, `${runSize ?? branchEnd?.size ?? '?'}`)
       }
-      // ツキ合わせのレジューサー（縮径したラン側 = tee-run-reducer 端ごとに1個）
+      // ツキ合わせのレジューサー（縮径したラン側 = tee-run-reducer/wye-run-reducer 端ごとに1個）
       for (const e of cl) {
-        if (e.role === 'tee-run-reducer')
+        if (e.role === 'tee-run-reducer' || e.role === 'wye-run-reducer')
           addFit('reducer_concentric', pairLabel(runSize, e.size))
       }
     } else if (roles.includes('elbow-reducer')) {

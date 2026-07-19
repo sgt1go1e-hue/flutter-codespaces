@@ -829,9 +829,11 @@ export function DrawingCanvas({
               )}
             {/* チーズ／エルボ横のレジューサー記号（径違い＝ツキ合わせ0mmで継手に直結） */}
             {(cutById[s.id]?.startRole === 'tee-run-reducer' ||
+              cutById[s.id]?.startRole === 'wye-run-reducer' ||
               cutById[s.id]?.startRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'start')}
             {(cutById[s.id]?.endRole === 'tee-run-reducer' ||
+              cutById[s.id]?.endRole === 'wye-run-reducer' ||
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'end')}
             {(cutById[s.id]?.startRole === 'elbow' ||

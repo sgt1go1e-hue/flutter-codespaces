@@ -20,7 +20,14 @@ export type FittingCalc = 'centerMinus' | 'overall' | 'endDepth' | 'none'
 // dims の値: エルボ/キャップ=数値, チーズ={run,branch}, レジューサー={H,od1,od2}
 export type TeeDim = { run: number; branch: number }
 export type ReducerDim = { H: number; od1: number | null; od2: number | null }
-export type DimValue = number | TeeDim | ReducerDim
+/**
+ * Y継手（45°Y・90°大曲りY等）の3方向控え寸法。チーズ(T字)と違い両側の
+ * 本管ポートが対称でない(枝の分岐角度により芯〜差込み面の距離が異なる)ため、
+ * run/branch の2値ではなく3値で持つ。near=下流側本管(枝の直後)・
+ * far=上流側本管・branch=枝側。呼び方はカタログのZ1/Z2/Z3に対応。
+ */
+export type WyeDim = { near: number; far: number; branch: number }
+export type DimValue = number | TeeDim | ReducerDim | WyeDim
 
 export interface Fitting {
   id: string

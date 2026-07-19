@@ -272,11 +272,14 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
       const mainN = nominalOf(tee?.mainSize)
       const branchN = nominalOf(tee?.branchSize)
       const reducing = mainN != null && branchN != null && mainN !== branchN
+      // VP-DV(塩ビ・DV継手)の排水配管は、突き合わせ/差込/ねじ込みのチーズとは別の
+      // Y継手系(45°Y・90°大曲りY)で分岐する。未選択時は90°大曲りY(LT)を既定にする
+      // （'tee_equal_vp_dv'/'tee_reducing_vp_dv' はマスタにデータが無いため使わない）。
       fitting = reducing
         ? vp
           ? s.vpSeries === 'ts'
             ? 'tee_reducing_vp_ts'
-            : 'tee_reducing_vp_dv'
+            : 'y90lt_reducing_vp_dv'
           : socket
             ? 'tee_reducing_socket'
             : thread
@@ -285,7 +288,7 @@ export function computeEffective(segments: Segment[]): Record<string, Effective>
         : vp
           ? s.vpSeries === 'ts'
             ? 'tee_equal_vp_ts'
-            : 'tee_equal_vp_dv'
+            : 'y90lt_vp_dv'
           : socket
             ? 'tee_equal_socket'
             : thread

@@ -54,6 +54,12 @@ export interface CutResult {
    * 促すために使う。
    */
   needsReducerLength: boolean
+  /**
+   * Y継手(45°Y・90°大曲りY)分岐の本管側で、この区間が枝の直後(near)/手前(far)
+   * かが未選択で決定できないとき true。UIが選択を促す（本管の両側で控え寸法が
+   * 大きく異なるため、黙って近似しない）。
+   */
+  needsWyeRole: boolean
   /** レジューサー描画用: 大径側が始点側か */
   reducerLargeAtStart?: boolean
   /**
@@ -392,7 +398,7 @@ export function computeAllCut(
       eccentric = { offset, align: s.reducerAlign, alignNeeded: !s.reducerAlign, large, small }
       needsCounterpart = !cp
       if (cp) {
-        const r = resolveReducerH(eff?.size, cp, s.reducerLengthOverride)
+        const r = resolveReducerH(eff?.size, cp, s.reducerLengthOverride, eff?.pipeType, eff?.vpSeries)
         reducerH = r.H
         needsReducerLength = r.needsInput
       }
@@ -400,7 +406,7 @@ export function computeAllCut(
       const cp = s.reducerSize ?? autoCounterpart
       needsCounterpart = !cp
       if (cp) {
-        const r = resolveReducerH(eff?.size, cp, s.reducerLengthOverride)
+        const r = resolveReducerH(eff?.size, cp, s.reducerLengthOverride, eff?.pipeType, eff?.vpSeries)
         reducerH = r.H
         needsReducerLength = r.needsInput
       }
@@ -474,6 +480,7 @@ export function computeAllCut(
       reducerH,
       needsReducerLength:
         needsReducerLength || e.start.needsReducerLength === true || e.end.needsReducerLength === true,
+      needsWyeRole: e.start.needsWyeRole === true || e.end.needsWyeRole === true,
       reducerLargeAtStart:
         s.fitting === 'reducer_concentric' ||
         s.fitting === 'reducer_eccentric' ||

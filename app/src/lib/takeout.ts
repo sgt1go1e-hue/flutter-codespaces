@@ -1,7 +1,8 @@
 import type { Point, Segment } from '../types'
 import { samePoint, distanceToSegment, distance } from './isometric'
-import { getFitting, nominalOf, type TeeDim } from '../data/masters'
+import { getFitting, nominalOf, type TeeDim, type WyeDim } from '../data/masters'
 import { getReducerLength } from '../data/reducerLengths'
+import { getReducerLengthVpDv } from '../data/reducerLengthsVpDv'
 // ノード同一判定の許容誤差(px)
 const NODE_EPS = 1
 
@@ -23,6 +24,9 @@ export type EndRole =
   | 'tee-run'
   | 'tee-run-reducer' // チーズ(ラン)直後にレジューサーで縮径（ツキ合わせ）
   | 'tee-branch'
+  | 'wye-run' // Y継手(45°Y・90°大曲りY)の本管側
+  | 'wye-run-reducer' // Y継手の本管直後にレジューサーで縮径（ツキ合わせ）
+  | 'wye-branch' // Y継手の枝側
 
 export interface EndResult {
   role: EndRole
@@ -44,6 +48,13 @@ export interface EndResult {
    * 手入力ダイアログを促す。該当しない場合は常にfalse/undefined。
    */
   needsReducerLength?: boolean
+  /**
+   * wye-run/wye-run-reducer のとき、この区間が45°Y/90°大曲りYの本管の
+   * どちら側(枝の直後=near / 枝の手前=far)かが未選択(wyeRole未設定)で
+   * 決定できないとき true。近似値へ黙ってフォールバックせず、UIが選択を
+   * 促す（本管の両側で控え寸法が大きく異なるため）。
+   */
+  needsWyeRole?: boolean
 }
 
 interface Inc {
@@ -71,6 +82,7 @@ const isElbowId = (id?: string) =>
   id === 'elbow90_thread' ||
   id === 'elbow45_thread' ||
   id === 'elbow90_vp_dv' ||
+  id === 'elbow90_ll_vp_dv' ||
   id === 'elbow45_vp_dv' ||
   id === 'elbow90_vp_ts' ||
   id === 'elbow45_vp_ts'
@@ -91,6 +103,22 @@ const isReducerId = (id?: string) =>
   id === 'reducer_socket' ||
   id === 'reducer_thread' ||
   id === 'bushing_thread'
+// VP-DV排水配管の分岐(Y継手)ファミリー。'tee_equal_vp_dv'/'tee_reducing_vp_dv'は
+// マスタにデータが無い(未登録)ため、VP-DVの分岐は必ずこちらのY継手系で計算する。
+// 45°Yは明示選択時のみ、それ以外(未選択時)は90°大曲りY(LT)を既定にする
+// （現場で大曲り側が標準的に使われ、タイトな90°Y(DT)は今回未登録のため）。
+export type WyeFamily = 'y45' | 'y90lt'
+const isYId = (id?: string) =>
+  id === 'y45_vp_dv' ||
+  id === 'y45_reducing_vp_dv' ||
+  id === 'y90lt_vp_dv' ||
+  id === 'y90lt_reducing_vp_dv'
+const wyeFamilyOf = (id?: string): WyeFamily | undefined =>
+  id === 'y45_vp_dv' || id === 'y45_reducing_vp_dv'
+    ? 'y45'
+    : id === 'y90lt_vp_dv' || id === 'y90lt_reducing_vp_dv'
+      ? 'y90lt'
+      : undefined
 
 function buildGraph(
   segments: Segment[],
@@ -164,48 +192,61 @@ function elbowTakeout(inc: Inc, nb?: Inc): number {
 }
 
 /**
- * サイズ組み合わせからレジューサーの面間寸法(H)を求める共通ロジック。
- * reducerLengths.ts のマスタ表を第一の情報源とし、無ければ手入力値
- * (override、セグメントの reducerLengthOverride)にフォールバックする。
- * どちらにも無ければ H=0 かつ needsInput=true を返し、呼び出し側(UI)が
- * 手入力ダイアログを促せるようにする（0にフォールバックしたまま黙って
- * 計算を続けると、面間寸法が控除されず下流の配管が伸びてしまうため）。
+ * サイズ組み合わせからレジューサー/インクリーザの面間寸法(H)を求める共通ロジック。
+ * 管種が塩ビ(VP)のDV継手のときは reducerLengthsVpDv.ts の専用マスタを、
+ * それ以外(SUS304突き合わせ溶接等)は reducerLengths.ts の共通マスタを
+ * 第一の情報源とし、無ければ手入力値(override、セグメントの
+ * reducerLengthOverride)にフォールバックする。どちらにも無ければ H=0 かつ
+ * needsInput=true を返し、呼び出し側(UI)が手入力ダイアログを促せるように
+ * する（0にフォールバックしたまま黙って計算を続けると、面間寸法が控除
+ * されず下流の配管が伸びてしまうため）。
  */
 export function resolveReducerH(
   size?: string,
   counterpartSize?: string,
   override?: number,
+  pipeType?: string,
+  vpSeries?: 'dv' | 'ts',
 ): { H: number; needsInput: boolean } {
   const a = nominalOf(size)
   const b = nominalOf(counterpartSize)
   if (a == null || b == null) return { H: 0, needsInput: false }
-  const tableH = getReducerLength(a, b)
+  const tableH =
+    pipeType === 'vp' && vpSeries === 'dv' ? getReducerLengthVpDv(a, b) : getReducerLength(a, b)
   if (tableH != null) return { H: tableH, needsInput: false }
   if (override != null) return { H: override, needsInput: false }
   return { H: 0, needsInput: true }
 }
 
-// レジューサーの取り出し寸法（大径側=0/小径側=全長H。face基準）を、
+// レジューサー/インクリーザの取り出し寸法（大径側=0/小径側=全長H。face基準）を、
 // 自分のサイズ・相手径・手入力値(override)から直接求める共通ロジック。
 export function reducerTakeoutById(
   size?: string,
   counterpartSize?: string,
   override?: number,
+  pipeType?: string,
+  vpSeries?: 'dv' | 'ts',
 ): { mm: number; needsInput: boolean } {
   const a = nominalOf(size)
   const b = nominalOf(counterpartSize)
   if (a == null || b == null) return { mm: 0, needsInput: false }
-  const { H, needsInput } = resolveReducerH(size, counterpartSize, override)
+  const { H, needsInput } = resolveReducerH(size, counterpartSize, override, pipeType, vpSeries)
   const isLarge = a >= b
   return { mm: isLarge ? 0 : H, needsInput: isLarge ? false : needsInput }
 }
 
-// レジューサーの取り出し寸法（大径側=0/小径側=全長H。face 基準）
+// レジューサー/インクリーザの取り出し寸法（大径側=0/小径側=全長H。face 基準）
 function reducerTakeout(inc: Inc, nb: Inc): { mm: number; id: string; needsInput: boolean } {
   const reducerInc = isReducerId(inc.seg.fitting) ? inc : isReducerId(nb.seg.fitting) ? nb : undefined
   const id = (reducerInc?.seg.fitting as string) ?? 'reducer_concentric'
   const override = reducerInc?.seg.reducerLengthOverride
-  const { mm, needsInput } = reducerTakeoutById(inc.size, nb.size, override)
+  const { mm, needsInput } = reducerTakeoutById(
+    inc.size,
+    nb.size,
+    override,
+    inc.pipeType,
+    inc.vpSeries ?? nb.vpSeries,
+  )
   return { mm, id, needsInput }
 }
 
@@ -254,6 +295,33 @@ export function teeTakeout(
   return { mm: isRun ? dim.run : dim.branch, id }
 }
 
+// Y継手(45°Y・90°大曲りY)の取り出し寸法。チーズと違い本管の両側が
+// 非対称(枝の分岐角度により芯〜差込み面の距離が異なる)なため、run側は
+// さらに near(枝の直後=下流側)/far(枝の手前=上流側)を指定する必要がある。
+// role='branch'なら枝側の値を返す（近似不要・一意に決まる）。
+export function wyeTakeout(
+  runSize: string | undefined,
+  branchSize: string | undefined,
+  role: 'near' | 'far' | 'branch',
+  family: WyeFamily,
+): { mm: number; id: string } {
+  const runN = nominalOf(runSize)
+  const brN = nominalOf(branchSize)
+  const reducing = runN != null && brN != null && runN !== brN
+  const equalId = family === 'y45' ? 'y45_vp_dv' : 'y90lt_vp_dv'
+  const reducingId = family === 'y45' ? 'y45_reducing_vp_dv' : 'y90lt_reducing_vp_dv'
+  const id = reducing ? reducingId : equalId
+  let dim: WyeDim | undefined
+  if (reducing) {
+    dim = getFitting(reducingId)?.dims[`${runN}_${brN}`] as WyeDim | undefined
+  } else {
+    dim = getFitting(equalId)?.dims[String(runN ?? '')] as WyeDim | undefined
+  }
+  if (!dim) return { mm: 0, id }
+  const mm = role === 'branch' ? dim.branch : role === 'near' ? dim.near : dim.far
+  return { mm, id }
+}
+
 // ノードの本管(run)軸のサイズ。貫通線・同一直線ペアのうち最大径を本管ヘッダ径とする。
 // （途中でレジューサーにより縮径していても、チーズ本体の呼びは大径側で決まるため）
 function runAxisSize(
@@ -282,8 +350,8 @@ function runAxisSize(
 }
 
 // 同心レジューサーの全長 H（大径→小径の縮径分）。本管軸上で径が変わる継手接続に足す。
-function reducerHmm(large?: string, small?: string): number {
-  return resolveReducerH(large, small).H
+function reducerHmm(large?: string, small?: string, pipeType?: string, vpSeries?: 'dv' | 'ts'): number {
+  return resolveReducerH(large, small, undefined, pipeType, vpSeries).H
 }
 
 function resolveEnd(
@@ -340,6 +408,50 @@ function resolveEnd(
           : node.incs.some((i) => i.seg.connection === 'thread')
             ? 'thread'
             : 'buttweld'
+    // VP-DV(塩ビ・DV継手)の排水配管は、突き合わせ/差込/ねじ込みのチーズと違い
+    // 45°Y・90°大曲りY(LT)というY継手系で分岐する。'tee_equal_vp_dv'/
+    // 'tee_reducing_vp_dv' はマスタにデータが無いため使わない。
+    if (connectionKind === 'vp_dv') {
+      const explicitYFitting = node.incs.map((i) => i.seg.fitting).find(isYId)
+      const family: WyeFamily = wyeFamilyOf(explicitYFitting) ?? 'y90lt'
+      if (!isRun) {
+        const w = wyeTakeout(runSize, branchSize, 'branch', family)
+        return { role: 'wye-branch', mm: w.mm, fittingId: w.id, teeCounterpart: runSize }
+      }
+      // 本管側は枝の直後(near)/手前(far)で控え寸法が大きく異なり、幾何学的に
+      // 自動判定できないため明示選択(wyeRole)が必要。自分に未設定でも、反対側の
+      // 本管区間に設定があればその逆を採用する（両側どちらから選んでもよい）。
+      const oppositeRole = opposite?.seg.wyeRole
+      const myRole = inc.seg.wyeRole ?? (oppositeRole === 'near' ? 'far' : oppositeRole === 'far' ? 'near' : undefined)
+      let mm: number
+      let fittingId: string
+      let needsWyeRole = false
+      if (myRole) {
+        const w = wyeTakeout(runSize, branchSize, myRole, family)
+        mm = w.mm
+        fittingId = w.id
+      } else {
+        mm = 0
+        fittingId = family === 'y45' ? 'y45_vp_dv' : 'y90lt_vp_dv'
+        needsWyeRole = true
+      }
+      let role: EndRole = 'wye-run'
+      // Y継手本管直後にレジューサーで縮径（ツキ合わせ）。チーズ(tee-run-reducer)と同じ考え方。
+      const rn = nominalOf(runSize)
+      const an = nominalOf(inc.size)
+      if (rn != null && an != null && an < rn) {
+        mm += reducerHmm(runSize, inc.size, inc.pipeType, inc.vpSeries)
+        role = 'wye-run-reducer'
+      }
+      return {
+        role,
+        mm,
+        fittingId,
+        teeCounterpart: branchSize,
+        needsWyeRole: needsWyeRole || undefined,
+      }
+    }
+
     const t = teeTakeout(runSize, branchSize, isRun, connectionKind)
     let mm = t.mm
     let role: EndRole = isRun ? 'tee-run' : 'tee-branch'
@@ -349,7 +461,7 @@ function resolveEnd(
       const rn = nominalOf(runSize)
       const an = nominalOf(inc.size)
       if (rn != null && an != null && an < rn) {
-        mm += reducerHmm(runSize, inc.size)
+        mm += reducerHmm(runSize, inc.size, inc.pipeType, inc.vpSeries)
         role = 'tee-run-reducer'
       }
     }
@@ -467,6 +579,44 @@ export function computeEnds(
     const end = key.slice(sep + 1) as 'start' | 'end'
     if (out[segId]?.[end]) {
       out[segId][end] = { ...out[segId][end], role: 'straight' }
+    }
+  }
+
+  // 45°Yなど分岐継手の直後に、勾配を表現するためだけに角度を付けて描いた
+  // 「中間の折れ点」(継手・サイズ・芯々寸法を持たない透過区間)を挟んでいる
+  // 場合、その折れ点は実在の継手ではないため、自動判定でエルボの取り出し
+  // 寸法を控除してしまわないようにする。これにより、45°Yの芯から折れ点を
+  // 経由して次の継手の芯までを、折れ点側の区間には何も入力せず、ひとつの
+  // 芯々寸法(次の継手側の区間の芯々寸法)としてそのまま入力できる。
+  // ※ エルボtoエルボの畳み込み(下のキック区間処理)やレジューサー畳み込み
+  //    (上の処理)とは独立のケースのため、既存の折り込みロジックには影響しない。
+  for (const s of segments) {
+    for (const end of ['start', 'end'] as const) {
+      const result = out[s.id][end]
+      if (result.role !== 'elbow') continue
+      const p = end === 'start' ? s.start : s.end
+      const node = nodeAt(p)
+      let cur = node.incs.find((i) => i.seg.id !== s.id)
+      const visited = new Set<string>([s.id])
+      let reachedWye = false
+      while (cur) {
+        if (visited.has(cur.seg.id)) break
+        visited.add(cur.seg.id)
+        if (!isPhantomSeg(cur.seg)) break
+        const farEnd = cur.end === 'start' ? 'end' : 'start'
+        const farRole = out[cur.seg.id]?.[farEnd]?.role
+        if (farRole === 'wye-run' || farRole === 'wye-run-reducer' || farRole === 'wye-branch') {
+          reachedWye = true
+          break
+        }
+        const farPoint = farEnd === 'start' ? cur.seg.start : cur.seg.end
+        const farNode = nodeAt(farPoint)
+        const farOthers = farNode.incs.filter((i) => i.seg.id !== cur!.seg.id)
+        cur = farOthers.length === 1 ? farOthers[0] : undefined
+      }
+      if (reachedWye) {
+        out[s.id][end] = { role: 'straight', mm: 0 }
+      }
     }
   }
 

@@ -431,9 +431,11 @@ export function PrintIsometric({
                 cutById[s.id]?.reducerLargeAtStart ?? true,
               )}
             {(cutById[s.id]?.startRole === 'tee-run-reducer' ||
+              cutById[s.id]?.startRole === 'wye-run-reducer' ||
               cutById[s.id]?.startRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'start')}
             {(cutById[s.id]?.endRole === 'tee-run-reducer' ||
+              cutById[s.id]?.endRole === 'wye-run-reducer' ||
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'end')}
             {(cutById[s.id]?.startRole === 'elbow' ||
