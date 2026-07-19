@@ -27,7 +27,7 @@ import type { Point } from './types'
 import { computeCrossoverGaps } from './lib/crossover'
 import { normalizeBranchSplits } from './lib/branching'
 import { computeAllCut } from './lib/cutlength'
-import { findTeeContext } from './lib/takeout'
+import { findTeeContext, isReducerId } from './lib/takeout'
 import { detectElbowClashes, applyElbowSuggestion, type ElbowClash } from './lib/elbowClash'
 import {
   buildSegmentMap,
@@ -140,7 +140,16 @@ function splitForReducer(
   // 終点(フランジがあれば付いていた場所)ではないため、endFlangeは引き継がない
   // （引き継ぐと存在しない場所にフランジが付いたことになってしまう）。
   // 元の終点はBが引き継ぐので、endFlange・接続方法はBへ渡す。
-  const A: Segment = { ...target, end: P, endFlange: undefined }
+  //
+  // 芯々寸法のルール: レジューサーで分割すると区間は「メイン側」(継手〜
+  // レジューサー太い方=A)と「先端側」(レジューサー細い方〜先=B)に分かれる。
+  // どちらの寸法にするかは必ず現場判断でユーザーが指定するため、ここでは
+  // どちらにも既定値を自動設定しない（A.centerLength は元のtargetの寸法を
+  // 引き継がず、いったん未入力にする）。元の全体寸法は reducerSpanLength として
+  // Bに凍結しておき、メイン側/先端側のどちらか一方だけ入力されたとき、
+  // もう一方をこの値から自動算出できるようにする（未入力ならレジューサー
+  // 追加時に寸法入力を促す扱いになる＝ Rule 1）。
+  const A: Segment = { ...target, end: P, endFlange: undefined, centerLength: undefined }
   const B: Segment = {
     id: bId,
     start: P,
@@ -152,6 +161,7 @@ function splitForReducer(
     reducerSize: largeSize,
     endFlange: target.endFlange,
     connection: target.connection,
+    reducerSpanLength: target.centerLength,
   }
   const result: Segment[] = []
   for (const s of segments) {
@@ -273,21 +283,6 @@ export default function App() {
     }
   }
 
-  // 指定セグメント区間の取り出し寸法合計(継手直結=0mmになる芯々寸法)を求める。
-  // レジューサー配置直後の既定値や、サイズ変更時の再計算に使う。
-  function reducerButtAllowance(segs: Segment[], segId: string): number {
-    const eff = computeEffective(segs)
-    const cut = computeAllCut(
-      segs,
-      eff,
-      defaults.roundMode ?? 'round',
-      defaults.flangeAllow ?? 0,
-      defaults.gasketOn ? (defaults.gasketMm ?? 0) : 0,
-      defaults.slopeDenom,
-      defaults.rootGap ?? 0,
-    )
-    return (cut[segId]?.startAllow ?? 0) + (cut[segId]?.endAllow ?? 0)
-  }
 
   // ツールバーが横スクロール可能なとき、右端に「まだ続きがある」ヒントを出す
   // （初見でも「集計・拾い出し」等がスクロール先にあると気づけるように）。
@@ -428,6 +423,34 @@ export default function App() {
       defaults.rootGap,
     ],
   )
+  // 選択中セグメントがレジューサー区間の「メイン側」または「先端側」なら、
+  // もう一方(パートナー)の区間とその切り寸法を返す。詳細パネルで
+  // メイン側/先端側の寸法をまとめて1箇所で入力できるようにするために使う。
+  const reducerPartner = useMemo(() => {
+    if (!selected) return undefined
+    if (isReducerId(selected.fitting)) {
+      const main = selected.parentId ? segments.find((s) => s.id === selected.parentId) : undefined
+      if (!main) return undefined
+      return { segment: main, cut: cutById[main.id], selectedRole: 'tip' as const }
+    }
+    const tip = segments.find((s) => s.parentId === selected.id && isReducerId(s.fitting))
+    if (!tip) return undefined
+    return { segment: tip, cut: cutById[tip.id], selectedRole: 'main' as const }
+  }, [selected, segments, cutById])
+
+  // レジューサー区間のメイン側/先端側の芯々寸法をまとめて更新する。
+  // 片方だけ渡せばその区間だけ更新し、もう一方は cutlength.ts 側の
+  // deriveReducerCenterLength が自動算出する（データは書き換えない）。
+  function updateReducerPair(mainId: string, tipId: string, patch: { main?: number; tip?: number }) {
+    setSegments((prev) =>
+      prev.map((s) => {
+        if (s.id === mainId && 'main' in patch) return { ...s, centerLength: patch.main }
+        if (s.id === tipId && 'tip' in patch) return { ...s, centerLength: patch.tip }
+        return s
+      }),
+    )
+  }
+
   // 材料集計(BOM)。モーダルを開いたときに使う。
   const bom = useMemo(
     () => computeBom(segments, effectiveById, cutById),
@@ -494,57 +517,17 @@ export default function App() {
     })
   }
 
+  // レジューサー区間のメイン側/先端側の芯々寸法(centerLength)は、片方だけ
+  // 入力されているとき、もう片方を reducerSpanLength(分割前の全体寸法) から
+  // 「継手/レジューサーの控え寸法込みで自動算出」する。この算出は
+  // cutlength.ts 側でセグメントのデータを書き換えずに読み取り時に行う
+  // （effectiveSlopeDenom 等と同じ「都度算出」パターン）ため、サイズや
+  // 相手径を変更してレジューサーの取り出し寸法(H)が変わっても、未入力のまま
+  // 残しているデータは自動的に追従する。そのため updateSelected 側では
+  // レジューサー専用の特別なサイズ変更処理は不要（通常のパッチ適用のみでよい）。
   function updateSelected(patch: Partial<Segment>) {
     if (!selectedId) return
-    setSegments((prev) => {
-      const cur = prev.find((s) => s.id === selectedId)
-      if (!cur) return prev
-      const isReducer =
-        cur.fitting === 'reducer_concentric' ||
-        cur.fitting === 'reducer_eccentric' ||
-        cur.fitting === 'reducer_socket' ||
-        cur.fitting === 'reducer_thread' ||
-        cur.fitting === 'bushing_thread'
-      const sizeChanged =
-        ('size' in patch && patch.size !== cur.size) ||
-        ('reducerSize' in patch && patch.reducerSize !== cur.reducerSize)
-      // レジューサー区間のサイズ(自分側/相手側)を変えたとき、芯々寸法がまだ
-      // 変更前サイズの「継手直結(0mm)」既定値のままなら、新サイズに合わせて
-      // 再計算する。既定のまま次のサイズへ変えると、前のサイズ用の取り出し
-      // 寸法が残ってしまい「継手不足」エラーになるのを防ぐ（手動で芯々寸法を
-      // 調整済みの場合は上書きしない）。
-      if (isReducer && sizeChanged) {
-        const oldAllow = reducerButtAllowance(prev, selectedId)
-        const atDefault =
-          cur.centerLength != null && Math.abs(cur.centerLength - oldAllow) < 0.6
-        const next = prev.map((s) =>
-          s.id === selectedId ? { ...s, ...patch } : s,
-        )
-        if (atDefault) {
-          const newAllow = reducerButtAllowance(next, selectedId)
-          const delta = newAllow - oldAllow
-          // レジューサー配置直後(パーツドロップ)は、分割元の区間(親、大径側)の
-          // 芯々寸法から自区間の取り出し寸法ぶんを差し引いて自動設定している
-          // （AとBの合計＝配置時点の全体実測値、という不変条件）。ここでサイズを
-          // 変えて自区間のH(取り出し寸法)が変わったにもかかわらず親側を更新しない
-          // と、この不変条件が崩れ、親側の切り寸法にサイズ変更前のHが残ったまま
-          // になってしまう（＝チーズ等の控え寸法と合わせた合算がズレるバグ）。
-          // 親側の芯々寸法が未入力のときは対象外（そのまま）。
-          const parent = cur.parentId ? prev.find((s) => s.id === cur.parentId) : undefined
-          return next.map((s) => {
-            if (s.id === selectedId) {
-              return { ...s, centerLength: Math.round(newAllow * 10) / 10 }
-            }
-            if (parent && s.id === parent.id && s.centerLength != null && Math.abs(delta) > 0.05) {
-              return { ...s, centerLength: Math.round((s.centerLength - delta) * 10) / 10 }
-            }
-            return s
-          })
-        }
-        return next
-      }
-      return prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s))
-    })
+    setSegments((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s)))
   }
 
   // 分岐(チーズ)の「メイン管サイズ／枝管サイズ」編集用。指定したセグメント群の
@@ -633,8 +616,6 @@ export default function App() {
       // の実カタログに実在する組み合わせから選ぶ（呼び径の並び上の1段小さい
       // サイズだと規格に無い組み合わせになり得るため）。
       const small = nextReducerSize(large)
-      const target = segments.find((s) => s.id === targetId)
-      const originalCenter = target?.centerLength
       const { segments: next, newId } = splitForReducer(
         segments,
         targetId,
@@ -643,27 +624,17 @@ export default function App() {
         large,
         small,
       )
+      // 芯々寸法(メイン側/先端側)は、どちらもここでは自動設定しない
+      // （現場でどちらを実測して入力するかはユーザーが選ぶ。片方だけ入力
+      // すれば、もう片方は分割前の全体寸法から自動算出される）。
+      mutateSegments(() => next)
       if (newId) {
-        // 新しくできた区間(レジューサー〜隣の継手側)は、既定で「継手直結(0mm)」に
-        // なる芯々寸法を自動設定する（レジューサーと隣の継手が突き合わせという
-        // 最も一般的なケースを既定値にする。間に配管を入れたい場合は芯々寸法を
-        // 増やせばよい）。上流側には、元の芯々寸法からその分を差し引いた残りを
-        // 引き継ぎ、分割前に入力していた全体の実測値を保つ。
-        const bAllow = reducerButtAllowance(next, newId)
-        const round1 = (x: number) => Math.round(x * 10) / 10
-        const withDefaults = next.map((s) => {
-          if (s.id === newId) return { ...s, centerLength: round1(bAllow) }
-          if (s.id === targetId && originalCenter != null)
-            return { ...s, centerLength: round1(originalCenter - bAllow) }
-          return s
-        })
-        mutateSegments(() => withDefaults)
-        // 置いた直後に選択状態にして、サイズ選択パネルをすぐ開けるようにする
-        // （下の setSelectedId(null) は上書きしない）。
+        // 置いた直後に選択状態にして、寸法入力欄(メイン側/先端側)とサイズ
+        // 選択パネルをすぐ開けるようにする（下の setSelectedId(null) は
+        // 上書きしない）。
         setSelectedId(newId)
         return
       }
-      mutateSegments(() => next)
     }
     // 分割後は選択状態をリセット（前後が別データになるため）
     setSelectedId(null)
@@ -789,6 +760,8 @@ export default function App() {
           onApplyElbowClash={() => selectedClash && applyElbowClash(selectedClash)}
           teeContext={teeContext}
           onSetTeeSize={setSizeForSegments}
+          reducerPartner={reducerPartner}
+          onChangeReducerPair={updateReducerPair}
           elevationChecks={elevationChecks.filter(
             (c) => c.fromSegId === selected.id || c.toSegId === selected.id,
           )}

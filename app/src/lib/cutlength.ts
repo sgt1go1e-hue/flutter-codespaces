@@ -1,7 +1,7 @@
 import type { Segment } from '../types'
 import type { Effective } from './inheritance'
 import { reducerCounterpart, reducerLargeAtStart } from './inheritance'
-import { computeEnds, resolveReducerH, type EndRole } from './takeout'
+import { computeEnds, resolveReducerH, isReducerId, type EndRole } from './takeout'
 import { getFitting, nominalOf, reducerKey, type ReducerDim } from '../data/masters'
 import { computeChainedSlopeDrop } from './slope'
 
@@ -97,6 +97,22 @@ export interface CutResult {
    * center(入力した芯々寸法)からこの分を引いた値で切り寸法を計算している。
    */
   slopeAdjust?: number
+  /**
+   * レジューサー区間で、この区間自身(メイン側 or 先端側)の芯々寸法が
+   * 未入力のため、reducerSpanLength(分割前の全体寸法)ともう一方の
+   * 実測値から自動算出した値。center はこの値を使って計算されている。
+   * 入力欄に「参考値」として表示するためのもので、ユーザーが実際に
+   * 入力するまでは segment.centerLength 自体は書き換えない。
+   */
+  derivedCenter?: number
+  /**
+   * レジューサー区間(メイン側/先端側のどちらか)で、自分の芯々寸法が未入力
+   * かつ、もう一方の値や分割前の全体寸法(reducerSpanLength)からも自動算出
+   * できない(＝メイン側・先端側ともに未入力、またはレジューサー追加前に
+   * 全体寸法が入力されていなかった)とき true。UIが「メイン側か先端側の
+   * どちらかの寸法を入力してください」という警告を促す。
+   */
+  needsReducerSpanInput: boolean
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -327,6 +343,45 @@ export function computeCutFromAllowances(
 }
 
 /**
+ * レジューサー区間(メイン側=継手〜レジューサー太い方 / 先端側=レジューサー
+ * 細い方〜先)のうち、自分の芯々寸法(centerLength)が未入力の側について、
+ * もう一方の実測値と reducerSpanLength(分割前の全体寸法)から
+ * 「reducerSpanLength − もう一方の実測値 − レジューサー長さ(H)」で自動算出する。
+ * 両方入力されている場合や、reducerSpanLength/もう一方が未入力で算出できない
+ * 場合は undefined を返す（既存のセグメントデータそのものは書き換えない、
+ * 読み取り時にだけ都度算出する effectiveSlopeDenom 等と同じパターン）。
+ */
+function deriveReducerCenterLength(
+  s: Segment,
+  segments: Segment[],
+  effectiveById: Record<string, Effective>,
+): number | undefined {
+  const eff = effectiveById[s.id]
+  if (isReducerId(s.fitting)) {
+    // s は先端側(tip)。分割元のメイン側(main)を親から探す。
+    const main = s.parentId ? segments.find((x) => x.id === s.parentId) : undefined
+    if (!main || main.centerLength == null || s.reducerSpanLength == null) return undefined
+    const mainEff = effectiveById[main.id]
+    const cp = s.reducerSize ?? mainEff?.size
+    const { H } = resolveReducerH(eff?.size, cp, s.reducerLengthOverride, eff?.pipeType, eff?.vpSeries)
+    return round1(s.reducerSpanLength - main.centerLength - H)
+  }
+  // s はメイン側候補。先端側(tip、fittingがレジューサーで自分を親に持つ区間)を探す。
+  const tip = segments.find((x) => x.parentId === s.id && isReducerId(x.fitting))
+  if (!tip || tip.centerLength == null || tip.reducerSpanLength == null) return undefined
+  const tipEff = effectiveById[tip.id]
+  const cp = tip.reducerSize ?? eff?.size
+  const { H } = resolveReducerH(tipEff?.size, cp, tip.reducerLengthOverride, tipEff?.pipeType, tipEff?.vpSeries)
+  return round1(tip.reducerSpanLength - tip.centerLength - H)
+}
+
+/** sがレジューサーのメイン側/先端側どちらかとして、区間ペアに属しているか */
+function isReducerPairMember(s: Segment, segments: Segment[]): boolean {
+  if (isReducerId(s.fitting)) return true
+  return segments.some((x) => x.parentId === s.id && isReducerId(x.fitting))
+}
+
+/**
  * 全セグメントの切断（加工）寸法を、端ごと（per-end）に計算する。
  * 各端の取り出し寸法は、その端のノードの役割（エルボ/チーズ/レジューサー/直管/フリー端）と
  * そのセグメント自身の実効サイズから、takeout.ts のノードグラフで求める。
@@ -374,7 +429,13 @@ export function computeAllCut(
     const isVertical = s.angle === 90 || s.angle === 270
     const slopeAdjust =
       isVertical ? round1(slopeDrops[s.id].start + slopeDrops[s.id].end) : 0
-    const center = s.centerLength
+    // レジューサー区間(メイン側/先端側)で自分の芯々寸法が未入力なら、もう一方の
+    // 実測値と分割前の全体寸法(reducerSpanLength)から自動算出する。
+    const derivedCenter =
+      s.centerLength == null ? deriveReducerCenterLength(s, segments, effectiveById) : undefined
+    const center = s.centerLength ?? derivedCenter
+    const needsReducerSpanInput =
+      s.centerLength == null && derivedCenter == null && isReducerPairMember(s, segments)
     const adjustedCenter = center != null ? center - slopeAdjust : undefined
     const { rawCut, cut, status } = computeCutFromAllowances(
       adjustedCenter,
@@ -475,6 +536,8 @@ export function computeAllCut(
 
     out[s.id] = {
       center,
+      derivedCenter,
+      needsReducerSpanInput,
       startAllow,
       endAllow,
       startRootGap,

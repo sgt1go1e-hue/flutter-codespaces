@@ -78,6 +78,18 @@ interface SegmentPanelProps {
   teeContext?: TeeContext
   /** メイン管／枝管サイズの直接編集（対象セグメントid配列とサイズを渡す） */
   onSetTeeSize: (segmentIds: string[], size: string | undefined) => void
+  /**
+   * 選択中の区間がレジューサーの「メイン側」または「先端側」なら、
+   * もう一方(パートナー)の区間と切り寸法。メイン側/先端側の芯々寸法を
+   * 1箇所でまとめて入力できるようにするために使う。
+   */
+  reducerPartner?: {
+    segment: Segment
+    cut?: CutResult
+    selectedRole: 'main' | 'tip'
+  }
+  /** レジューサーのメイン側/先端側の芯々寸法をまとめて更新する */
+  onChangeReducerPair: (mainId: string, tipId: string, patch: { main?: number; tip?: number }) => void
   /** このセグメントのフリー端に設定した基準高さが関わる、高低差の整合チェック結果 */
   elevationChecks?: ElevationCheckResult[]
   /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
@@ -111,6 +123,8 @@ export function SegmentPanel({
   onApplyElbowClash,
   teeContext,
   onSetTeeSize,
+  reducerPartner,
+  onChangeReducerPair,
   elevationChecks,
   baseSlopeDenom,
   roundMode,
@@ -400,7 +414,76 @@ export function SegmentPanel({
 
         {/* ② 寸法入力 */}
         <div className="panel-grid">
-          {(() => {
+          {reducerPartner ? (
+            (() => {
+              // レジューサー区間は「メイン側」(継手〜レジューサー太い方)と
+              // 「先端側」(レジューサー細い方〜先)の2つの寸法に分けて入力する。
+              // どちらを選んでも(メイン/先端どちらの区間を選択していても)同じ
+              // 組で1箇所にまとめて表示し、片方だけ入力すればもう一方は
+              // 自動算出値をプレースホルダーで示す(値は書き換えない)。
+              const isSelectedMain = reducerPartner.selectedRole === 'main'
+              const mainSeg = isSelectedMain ? segment : reducerPartner.segment
+              const tipSeg = isSelectedMain ? reducerPartner.segment : segment
+              const mainCut = isSelectedMain ? cut : reducerPartner.cut
+              const tipCut = isSelectedMain ? reducerPartner.cut : cut
+              return (
+                <>
+                  <label className="field dim-field">
+                    <span className="field-label">
+                      メイン側寸法(mm)
+                      <span className="field-note">継手〜レジューサー太い方</span>
+                    </span>
+                    <input
+                      className="num-input"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      placeholder={
+                        mainCut?.derivedCenter != null
+                          ? `自動算出 ${mainCut.derivedCenter}`
+                          : '例: 800'
+                      }
+                      value={mainSeg.centerLength ?? ''}
+                      onChange={(e) =>
+                        onChangeReducerPair(mainSeg.id, tipSeg.id, {
+                          main: e.target.value === '' ? undefined : Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  <label className="field dim-field">
+                    <span className="field-label">
+                      先端側寸法(mm)
+                      <span className="field-note">レジューサー細い方〜先</span>
+                    </span>
+                    <input
+                      className="num-input"
+                      type="number"
+                      inputMode="numeric"
+                      min={0}
+                      placeholder={
+                        tipCut?.derivedCenter != null
+                          ? `自動算出 ${tipCut.derivedCenter}`
+                          : '例: 300'
+                      }
+                      value={tipSeg.centerLength ?? ''}
+                      onChange={(e) =>
+                        onChangeReducerPair(mainSeg.id, tipSeg.id, {
+                          tip: e.target.value === '' ? undefined : Number(e.target.value),
+                        })
+                      }
+                    />
+                  </label>
+                  {(mainCut?.needsReducerSpanInput || tipCut?.needsReducerSpanInput) && (
+                    <div className="socket-gap-warn">
+                      <p>メイン側か先端側のどちらかの寸法を入力してください。</p>
+                    </div>
+                  )}
+                </>
+              )
+            })()
+          ) : (
+            (() => {
             const dimField = (
               <label className="field dim-field" key="dim">
                 <span className="field-label">
@@ -466,7 +549,8 @@ export function SegmentPanel({
             ) : (
               dimField
             )
-          })()}
+            })()
+          )}
 
           <div className="field cut-field">
             <span className="field-label">

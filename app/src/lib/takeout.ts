@@ -97,7 +97,7 @@ const isTeeId = (id?: string) =>
   id === 'tee_reducing_vp_dv' ||
   id === 'tee_equal_vp_ts' ||
   id === 'tee_reducing_vp_ts'
-const isReducerId = (id?: string) =>
+export const isReducerId = (id?: string) =>
   id === 'reducer_concentric' ||
   id === 'reducer_eccentric' ||
   id === 'reducer_socket' ||
