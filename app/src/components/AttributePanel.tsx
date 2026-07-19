@@ -62,6 +62,35 @@ function roleLabel(role: string): string {
   }
 }
 
+// 45°オフセット計算: 現場の標準手法として「オフセット量×1.414」を斜め区間の
+// 芯々寸法として使う。三平方の定理(√(横²+縦²)のような二辺入力)ではなく、
+// 45°専用のこの係数だけを使う（過去に三平方の定理案が出たことがあるが誤り）。
+const OFFSET_45_FACTOR = 1.414
+
+// オフセット入力(45°キック)の対象になる継手id。45°側(斜めへ振る側)と、
+// 90°側寄り(まっすぐ受ける側)を分けて判定する。
+const isFortyFiveFitting = (id?: string) =>
+  id === 'elbow45_long' ||
+  id === 'elbow45_socket' ||
+  id === 'elbow45_thread' ||
+  id === 'elbow45_vp_dv' ||
+  id === 'elbow45_vp_ts' ||
+  id === 'y45_vp_dv' ||
+  id === 'y45_reducing_vp_dv'
+const isNinetyIshFitting = (id?: string) =>
+  id === 'elbow90_short' ||
+  id === 'elbow90_long' ||
+  id === 'elbow90_socket' ||
+  id === 'elbow90_thread' ||
+  id === 'elbow90_vp_dv' ||
+  id === 'elbow90_ll_vp_dv' ||
+  id === 'elbow90_vp_ts' ||
+  id === 'y90lt_vp_dv' ||
+  id === 'y90lt_reducing_vp_dv'
+// オフセット入力の対象になる区間の両端の「役割」。エルボtoエルボの従来ケースに
+// 加え、45°Yの本管/枝(wye-run・wye-branch)が絡む斜め区間もここに含める。
+const KICK_ROLES = new Set(['elbow', 'wye-run', 'wye-run-reducer', 'wye-branch'])
+
 // ============================================================
 // 寸法・属性パネル（線を選択したときに表示）
 // ============================================================
@@ -143,15 +172,19 @@ export function SegmentPanel({
   const dimRef = useRef<HTMLInputElement>(null)
   const offsetRef = useRef<HTMLInputElement>(null)
 
-  // 2つのエルボ(45°を含む)に挟まれた斜めのキック区間かどうか。現場では横方向の
-  // 逃げ寸法(オフセット)しか測らないことが多く、芯々（斜め管の実寸）は逆算する
-  // ものなので、この区間を選んだときはオフセット欄を優先して見せる・フォーカスする。
+  // 45°の継手(45°エルボ・45°Y等)に挟まれた斜めのキック区間かどうか。現場では
+  // 横方向の逃げ寸法(オフセット)しか測らないことが多く、芯々（斜め管の実寸）は
+  // 逆算するものなので、この区間を選んだときはオフセット欄を優先して見せる・
+  // フォーカスする。少なくとも片側が45°系の継手で、両端とも45°系または
+  // 90°寄りの継手(まっすぐ受ける側)であることを条件にする。
   const isKickSegment =
-    cut?.startRole === 'elbow' &&
-    cut?.endRole === 'elbow' &&
-    (cut?.startFittingId === 'elbow45_long' || cut?.endFittingId === 'elbow45_long') &&
-    (cut?.startFittingId === 'elbow45_long' || cut?.startFittingId === 'elbow90_long') &&
-    (cut?.endFittingId === 'elbow45_long' || cut?.endFittingId === 'elbow90_long')
+    !!cut?.startRole &&
+    KICK_ROLES.has(cut.startRole) &&
+    !!cut?.endRole &&
+    KICK_ROLES.has(cut.endRole) &&
+    (isFortyFiveFitting(cut?.startFittingId) || isFortyFiveFitting(cut?.endFittingId)) &&
+    (isFortyFiveFitting(cut?.startFittingId) || isNinetyIshFitting(cut?.startFittingId)) &&
+    (isFortyFiveFitting(cut?.endFittingId) || isNinetyIshFitting(cut?.endFittingId))
 
   // 別の線を選ぶたびに、キック区間ならオフセット欄へ、それ以外は芯々寸法欄へ
   // フォーカス（連続入力を最短タップに）。
@@ -510,8 +543,9 @@ export function SegmentPanel({
             // 現場では横方向の逃げ寸法しか測らず、斜め管の実寸(芯々)を直接測ることは
             // ほぼ無いため、この区間ではオフセット欄を芯々欄より前・優先で見せる。
             // 45°×2（平行→平行のローリングオフセット）でも、90°+45°（垂直⇄水平の
-            // 切替時、片方のエルボを45°ぶんずらして繋ぐ場合）でも、斜め管自体は
-            // 直角二等辺三角形の斜辺になるため式は共通（トラベル=オフセット×1.4142）。
+            // 切替時、片方を45°ぶんずらして繋ぐ場合）でも、45°Yの分岐脚を使う
+            // 場合でも、現場のオフセット計算は共通（斜め区間の芯々寸法＝
+            // オフセット量×1.414。三平方の定理(二辺入力)は使わない）。
             const offsetField = isKickSegment && (
               <label className="field offset-field" key="offset">
                 <span className="field-label">
@@ -526,7 +560,7 @@ export function SegmentPanel({
                   placeholder="例: 200"
                   value={
                     segment.centerLength != null
-                      ? Math.round((segment.centerLength / Math.SQRT2) * 10) / 10
+                      ? Math.round((segment.centerLength / OFFSET_45_FACTOR) * 10) / 10
                       : ''
                   }
                   onChange={(e) => {
@@ -536,7 +570,7 @@ export function SegmentPanel({
                     }
                     const offset = Number(e.target.value)
                     if (Number.isNaN(offset)) return
-                    onChange({ centerLength: Math.round(offset * Math.SQRT2 * 10) / 10 })
+                    onChange({ centerLength: Math.round(offset * OFFSET_45_FACTOR * 10) / 10 })
                   }}
                 />
               </label>
