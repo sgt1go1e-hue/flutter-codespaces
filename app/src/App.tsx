@@ -18,6 +18,7 @@ import {
   migrateLegacyDrawing,
 } from './lib/drawingStore'
 import {
+  distance,
   distanceToSegment,
   projectOnSegment,
   samePoint,
@@ -119,10 +120,16 @@ function splitForReducer(
   const target = segments.find((s) => s.id === targetId)
   if (!target) return { segments }
   // 隣の継手のすぐ際へ置きたいことが多いため、端に寄った位置は弾かず、
-  // 安全な最小マージンへスナップする（ピクセル単位で狙わなくても確実に置ける）。
+  // 安全な最小マージンへスナップする（両側の区間が縮退(長さ0)しない程度の
+  // ごく小さな余白）。ドロップ位置をできるだけ忠実に反映するため、区間の
+  // 長さに対する割合ではなく、画面上のピクセル距離で余白を決める
+  // （割合方式だと長い区間ほど余白が大きくなり、チーズのすぐ近くを狙って
+  // ドロップしても区間の遠い側へ大きくずれてしまっていた）。
   const { t: rawT } = projectOnSegment(dropPoint, target.start, target.end)
-  const MARGIN = 0.03
-  const t = Math.min(1 - MARGIN, Math.max(MARGIN, rawT))
+  const MARGIN_PX = 6
+  const totalLen = distance(target.start, target.end) || 1
+  const marginFrac = Math.min(0.45, MARGIN_PX / totalLen)
+  const t = Math.min(1 - marginFrac, Math.max(marginFrac, rawT))
   const P: Point = {
     x: target.start.x + t * (target.end.x - target.start.x),
     y: target.start.y + t * (target.end.y - target.start.y),
@@ -515,11 +522,24 @@ export default function App() {
         )
         if (atDefault) {
           const newAllow = reducerButtAllowance(next, selectedId)
-          return next.map((s) =>
-            s.id === selectedId
-              ? { ...s, centerLength: Math.round(newAllow * 10) / 10 }
-              : s,
-          )
+          const delta = newAllow - oldAllow
+          // レジューサー配置直後(パーツドロップ)は、分割元の区間(親、大径側)の
+          // 芯々寸法から自区間の取り出し寸法ぶんを差し引いて自動設定している
+          // （AとBの合計＝配置時点の全体実測値、という不変条件）。ここでサイズを
+          // 変えて自区間のH(取り出し寸法)が変わったにもかかわらず親側を更新しない
+          // と、この不変条件が崩れ、親側の切り寸法にサイズ変更前のHが残ったまま
+          // になってしまう（＝チーズ等の控え寸法と合わせた合算がズレるバグ）。
+          // 親側の芯々寸法が未入力のときは対象外（そのまま）。
+          const parent = cur.parentId ? prev.find((s) => s.id === cur.parentId) : undefined
+          return next.map((s) => {
+            if (s.id === selectedId) {
+              return { ...s, centerLength: Math.round(newAllow * 10) / 10 }
+            }
+            if (parent && s.id === parent.id && s.centerLength != null && Math.abs(delta) > 0.05) {
+              return { ...s, centerLength: Math.round((s.centerLength - delta) * 10) / 10 }
+            }
+            return s
+          })
         }
         return next
       }
