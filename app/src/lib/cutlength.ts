@@ -1,7 +1,7 @@
 import type { Segment } from '../types'
 import type { Effective } from './inheritance'
 import { reducerCounterpart, reducerLargeAtStart } from './inheritance'
-import { computeEnds, type EndRole } from './takeout'
+import { computeEnds, resolveReducerH, type EndRole } from './takeout'
 import { getFitting, nominalOf, reducerKey, type ReducerDim } from '../data/masters'
 import { computeChainedSlopeDrop } from './slope'
 
@@ -43,6 +43,17 @@ export interface CutResult {
   /** 隣接から自動判定した相手径（表示用） */
   autoCounterpart?: string
   eccentric?: EccentricInfo
+  /**
+   * レジューサー(同心/偏心)の面間寸法(H, mm)。s.fitting が reducer_concentric/
+   * reducer_eccentric で相手径が判明しているときだけ設定される（表示用）。
+   */
+  reducerH?: number
+  /**
+   * レジューサーの面間寸法(H)がマスタ(reducerLengths.ts)に無い組み合わせで、
+   * 手入力(reducerLengthOverride)も未設定のとき true。UIが手入力ダイアログを
+   * 促すために使う。
+   */
+  needsReducerLength: boolean
   /** レジューサー描画用: 大径側が始点側か */
   reducerLargeAtStart?: boolean
   /**
@@ -357,6 +368,11 @@ export function computeAllCut(
     let eccentric: EccentricInfo | undefined
     let needsCounterpart = false
     const autoCounterpart = reducerCounterpart(s, segments, effectiveById)
+    // レジューサー(同心/偏心)の面間寸法(H)。表示用・手入力ダイアログ判定用。
+    // 実際の切り寸法への控除は takeout.ts 側(resolveEnd の 'reducer' role)で
+    // 既に行われているため、ここでは表示・警告のための値だけを求める。
+    let reducerH: number | undefined
+    let needsReducerLength = false
     if (s.fitting === 'reducer_eccentric') {
       const cp = s.reducerSize ?? autoCounterpart
       const key = reducerKey(eff?.size, cp)
@@ -373,12 +389,20 @@ export function computeAllCut(
       const small = a != null && b != null ? `${Math.min(a, b)}A` : undefined
       eccentric = { offset, align: s.reducerAlign, alignNeeded: !s.reducerAlign, large, small }
       needsCounterpart = !cp
-    } else if (
-      s.fitting === 'reducer_concentric' ||
-      s.fitting === 'reducer_socket' ||
-      s.fitting === 'reducer_thread' ||
-      s.fitting === 'bushing_thread'
-    ) {
+      if (cp) {
+        const r = resolveReducerH(eff?.size, cp, s.reducerLengthOverride)
+        reducerH = r.H
+        needsReducerLength = r.needsInput
+      }
+    } else if (s.fitting === 'reducer_concentric') {
+      const cp = s.reducerSize ?? autoCounterpart
+      needsCounterpart = !cp
+      if (cp) {
+        const r = resolveReducerH(eff?.size, cp, s.reducerLengthOverride)
+        reducerH = r.H
+        needsReducerLength = r.needsInput
+      }
+    } else if (s.fitting === 'reducer_socket' || s.fitting === 'reducer_thread' || s.fitting === 'bushing_thread') {
       needsCounterpart = !(s.reducerSize ?? autoCounterpart)
     }
     // tee_reducing(径違いチーズ)は「メイン管サイズ／枝管サイズ」で実サイズを直接編集する
@@ -445,6 +469,9 @@ export function computeAllCut(
       needsCounterpart,
       autoCounterpart,
       eccentric,
+      reducerH,
+      needsReducerLength:
+        needsReducerLength || e.start.needsReducerLength === true || e.end.needsReducerLength === true,
       reducerLargeAtStart:
         s.fitting === 'reducer_concentric' ||
         s.fitting === 'reducer_eccentric' ||

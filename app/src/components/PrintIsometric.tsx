@@ -108,7 +108,9 @@ export function PrintIsometric({
               ? '加工不可能（差込み代不足）'
               : `切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}`
           : c.status === 'zero'
-            ? 'パイプ0（継手直結）'
+            ? c.reducerH != null
+              ? `レジューサー H=${c.reducerH}（継手直結）`
+              : 'パイプ0（継手直結）'
             : '継手不足'
       const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
       const w =
@@ -501,7 +503,9 @@ export function PrintIsometric({
                   )}
                   {c.status === 'zero' && (
                     <text className="dim-cut zero" x={cx} y={y2} textAnchor="middle">
-                      パイプ0（継手直結）
+                      {c.reducerH != null
+                        ? `レジューサー H=${c.reducerH}（継手直結）`
+                        : 'パイプ0（継手直結）'}
                     </text>
                   )}
                   {c.status === 'over' && (

@@ -36,6 +36,12 @@ export interface Segment {
   reducerSize?: string
   /** 偏心レジューサーの合わせ面。'top'=上面合わせ / 'bottom'=下面合わせ。必須選択。 */
   reducerAlign?: 'top' | 'bottom'
+  /**
+   * レジューサーの面間寸法(H, mm)の手入力値。reducerLengths.ts のマスタ表に
+   * 無いサイズ組み合わせのときだけ使う(手入力ダイアログで設定)。マスタに
+   * 値があるときはこちらは無視され、常にマスタの値を優先する。
+   */
+  reducerLengthOverride?: number
   /** 接続方法（connections の id）。例: フランジ接合 'flange' */
   connection?: string
   /**

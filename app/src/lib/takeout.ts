@@ -1,12 +1,7 @@
 import type { Point, Segment } from '../types'
 import { samePoint, distanceToSegment, distance } from './isometric'
-import {
-  getFitting,
-  nominalOf,
-  reducerKey,
-  type ReducerDim,
-  type TeeDim,
-} from '../data/masters'
+import { getFitting, nominalOf, type TeeDim } from '../data/masters'
+import { getReducerLength } from '../data/reducerLengths'
 // ノード同一判定の許容誤差(px)
 const NODE_EPS = 1
 
@@ -43,6 +38,12 @@ export interface EndResult {
    * 異なる場合の参照に使う。
    */
   teeCounterpart?: string
+  /**
+   * レジューサーの面間寸法(H)がマスタ(reducerLengths.ts)に無い組み合わせで、
+   * 手入力(reducerLengthOverride)も未設定のとき true。UIはこれを見て
+   * 手入力ダイアログを促す。該当しない場合は常にfalse/undefined。
+   */
+  needsReducerLength?: boolean
 }
 
 interface Inc {
@@ -162,31 +163,50 @@ function elbowTakeout(inc: Inc, nb?: Inc): number {
   return elbowTakeoutById(defaultElbowId(inc, nb), inc.size)
 }
 
-// レジューサーの取り出し寸法（大径側=0/小径側=全長H。face基準）を、継手id・
-// 自分のサイズ・相手径から直接求める共通ロジック。
-export function reducerTakeoutById(
-  fittingId: string,
+/**
+ * サイズ組み合わせからレジューサーの面間寸法(H)を求める共通ロジック。
+ * reducerLengths.ts のマスタ表を第一の情報源とし、無ければ手入力値
+ * (override、セグメントの reducerLengthOverride)にフォールバックする。
+ * どちらにも無ければ H=0 かつ needsInput=true を返し、呼び出し側(UI)が
+ * 手入力ダイアログを促せるようにする（0にフォールバックしたまま黙って
+ * 計算を続けると、面間寸法が控除されず下流の配管が伸びてしまうため）。
+ */
+export function resolveReducerH(
   size?: string,
   counterpartSize?: string,
-): number {
+  override?: number,
+): { H: number; needsInput: boolean } {
   const a = nominalOf(size)
   const b = nominalOf(counterpartSize)
-  if (a == null || b == null) return 0
-  const key = reducerKey(size, counterpartSize)
-  const dim = key ? (getFitting(fittingId)?.dims[key] as ReducerDim | undefined) : undefined
-  const H = dim?.H ?? 0
+  if (a == null || b == null) return { H: 0, needsInput: false }
+  const tableH = getReducerLength(a, b)
+  if (tableH != null) return { H: tableH, needsInput: false }
+  if (override != null) return { H: override, needsInput: false }
+  return { H: 0, needsInput: true }
+}
+
+// レジューサーの取り出し寸法（大径側=0/小径側=全長H。face基準）を、
+// 自分のサイズ・相手径・手入力値(override)から直接求める共通ロジック。
+export function reducerTakeoutById(
+  size?: string,
+  counterpartSize?: string,
+  override?: number,
+): { mm: number; needsInput: boolean } {
+  const a = nominalOf(size)
+  const b = nominalOf(counterpartSize)
+  if (a == null || b == null) return { mm: 0, needsInput: false }
+  const { H, needsInput } = resolveReducerH(size, counterpartSize, override)
   const isLarge = a >= b
-  return isLarge ? 0 : H
+  return { mm: isLarge ? 0 : H, needsInput: isLarge ? false : needsInput }
 }
 
 // レジューサーの取り出し寸法（大径側=0/小径側=全長H。face 基準）
-function reducerTakeout(inc: Inc, nb: Inc): { mm: number; id: string } {
-  const id = isReducerId(inc.seg.fitting)
-    ? (inc.seg.fitting as string)
-    : isReducerId(nb.seg.fitting)
-      ? (nb.seg.fitting as string)
-      : 'reducer_concentric'
-  return { mm: reducerTakeoutById(id, inc.size, nb.size), id }
+function reducerTakeout(inc: Inc, nb: Inc): { mm: number; id: string; needsInput: boolean } {
+  const reducerInc = isReducerId(inc.seg.fitting) ? inc : isReducerId(nb.seg.fitting) ? nb : undefined
+  const id = (reducerInc?.seg.fitting as string) ?? 'reducer_concentric'
+  const override = reducerInc?.seg.reducerLengthOverride
+  const { mm, needsInput } = reducerTakeoutById(inc.size, nb.size, override)
+  return { mm, id, needsInput }
 }
 
 // チーズの取り出し寸法（ラン/枝で C・M を出し分け）。connectionKindで
@@ -263,11 +283,7 @@ function runAxisSize(
 
 // 同心レジューサーの全長 H（大径→小径の縮径分）。本管軸上で径が変わる継手接続に足す。
 function reducerHmm(large?: string, small?: string): number {
-  const key = reducerKey(large, small)
-  const dim = key
-    ? (getFitting('reducer_concentric')?.dims[key] as ReducerDim | undefined)
-    : undefined
-  return dim?.H ?? 0
+  return resolveReducerH(large, small).H
 }
 
 function resolveEnd(
@@ -354,7 +370,7 @@ function resolveEnd(
     const b = nominalOf(nb.size)
     if (a != null && b != null && a !== b) {
       const r = reducerTakeout(inc, nb)
-      return { role: 'reducer', mm: r.mm, fittingId: r.id }
+      return { role: 'reducer', mm: r.mm, fittingId: r.id, needsReducerLength: r.needsInput }
     }
     return { role: 'straight', mm: 0 }
   }

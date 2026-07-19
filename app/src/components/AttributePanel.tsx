@@ -276,12 +276,43 @@ export function SegmentPanel({
                     : cut?.status === 'ok'
                       ? `${cut.cut} mm`
                       : cut?.status === 'zero'
-                        ? 'パイプ0mm（継手直結）'
+                        ? cut.reducerH != null
+                          ? `レジューサー H=${cut.reducerH}mm（継手直結）`
+                          : 'パイプ0mm（継手直結）'
                         : cut?.status === 'over'
                           ? '継手が収まりません'
                           : '—'}
             </div>
           </div>
+
+          {/* レジューサーの面間寸法(H)がマスタ(reducerLengths.ts)に無い組み合わせのとき、
+              0にフォールバックさせず手入力を促す。入力するとその値がHとして使われ、
+              以後この区間の切り寸法計算に反映される。 */}
+          {cut?.needsReducerLength && (
+            <div className="field round-field">
+              <div className="socket-gap-warn">
+                <p>
+                  このサイズ組み合わせのレジューサー面間寸法(H)がマスタにありません。面間寸法を入力してください。
+                </p>
+              </div>
+              <label className="field">
+                <span className="field-label">面間寸法 H(mm) 手入力</span>
+                <input
+                  className="num-input"
+                  type="number"
+                  inputMode="decimal"
+                  placeholder="例: 101.6"
+                  value={segment.reducerLengthOverride ?? ''}
+                  onChange={(e) =>
+                    onChange({
+                      reducerLengthOverride:
+                        e.target.value === '' ? undefined : Number(e.target.value),
+                    })
+                  }
+                />
+              </label>
+            </div>
+          )}
 
           {/* 下流に隣接する排水勾配区間があり、その高低差が芯々寸法から差し引かれている場合の案内。 */}
           {!!cut?.slopeAdjust && (
