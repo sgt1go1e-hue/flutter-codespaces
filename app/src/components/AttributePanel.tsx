@@ -1062,29 +1062,29 @@ export function DrawSettingsPanel({ defaults, onChange, open, onToggle }: DrawSe
               </div>
             )}
 
-            {/* SGP管またはVP+DV継手のときだけ: これから描く横引き管に適用する
-                勾配のベース値。個々の区間の詳細パネルで個別に上書きできる
-                （管種・サイズと同じ継承パターン）。 */}
-            {isSlopeEligible(defaults.pipeType, defaults.vpSeries) && (
-              <label className="field">
-                <span className="field-label">勾配</span>
-                <select
-                  value={defaults.slopeDenom ?? ''}
-                  onChange={(e) =>
-                    onChange({
-                      slopeDenom: e.target.value === '' ? undefined : Number(e.target.value),
-                    })
-                  }
-                >
-                  <option value="">未設定</option>
-                  {SLOPE_DENOM_OPTIONS.map((d) => (
-                    <option key={d} value={d}>
-                      1/{d}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
+            {/* これから描く横引き管に適用する勾配のベース値。個々の区間の詳細パネルで
+                個別に上書きできる（管種・サイズと同じ継承パターン）。実際に計算へ
+                反映されるのはSGP管またはVP+DV継手のときだけだが、管種を切り替えても
+                入力欄自体は常に表示する（SUS等でも手動で設定したいケースがあるため。
+                管種を切り替えた時点でベース値自体は未設定にリセットされる＝下のonChange参照）。 */}
+            <label className="field">
+              <span className="field-label">勾配</span>
+              <select
+                value={defaults.slopeDenom ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    slopeDenom: e.target.value === '' ? undefined : Number(e.target.value),
+                  })
+                }
+              >
+                <option value="">未設定</option>
+                {SLOPE_DENOM_OPTIONS.map((d) => (
+                  <option key={d} value={d}>
+                    1/{d}
+                  </option>
+                ))}
+              </select>
+            </label>
 
             {/* 突き合わせ溶接(接続方法=溶接)で裏波を出すために設ける隙間。
                 切り寸法から溶接箇所ごとに追加で控除する（全溶接箇所共通）。

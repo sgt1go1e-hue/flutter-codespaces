@@ -478,6 +478,10 @@ export default function App() {
       if ('pipeType' in patch) {
         const avail = sizesForPipeType(next.pipeType).map((s) => s.code)
         if (next.size && !avail.includes(next.size)) next.size = undefined
+        // 勾配(1/N)は排水配管(VP/SGP)特有の概念のため、管種が実際に変わった
+        // ときだけベース値を未設定に戻す（既に個別上書き済みの線の勾配には
+        // 影響しない）。サイズ・接続方法だけの変更では保持したままでよい。
+        if (next.pipeType !== d.pipeType) next.slopeDenom = undefined
       }
       return next
     })
