@@ -524,16 +524,18 @@ body {
 }
 
 /* 相番(合番)バッジ。密集した図面では芯々/切り寸法を直書きせず番号だけを
-   表示し、詳しい寸法はBOMの対応表で確認する運用（現場の相番方式）。 */
+   表示し、詳しい寸法はBOMの対応表で確認する運用（現場の相番方式）。
+   老眼等でも読み取れるよう、円・文字サイズは通常のラベルよりかなり
+   大きめにしている（従来比 約1.6倍）。 */
 .assembly-badge circle {
   fill: var(--accent);
   stroke: var(--label-outline);
-  stroke-width: 2px;
+  stroke-width: 2.5px;
 }
 
 .assembly-badge text {
   fill: var(--accent-on);
-  font-size: 12px;
+  font-size: 19px;
   font-weight: 800;
 }
 

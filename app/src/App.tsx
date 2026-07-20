@@ -635,7 +635,14 @@ export default function App() {
   function clearAll() {
     if (segments.length === 0) return
     if (confirm('図面をすべて消去しますか？')) {
-      mutateSegments(() => [])
+      // 「元に戻す」履歴も一緒に消す。mutateSegments経由だと消去前の
+      // segmentsが履歴に積まれてしまい、全消去の直後に元に戻すを押すと
+      // 消去前の古い区間(古い管種・寸法・相番等)がまるごと復元されて
+      // しまう（「新しく描いた線のはずが古いデータが残っている」ように
+      // 見える不具合の原因）。新規作成/図面を開くときと同様、全消去も
+      // 完全なリセットとして扱うため、履歴には積まずに直接空にする。
+      setHistory([])
+      setSegments([])
       setEraserMode(false)
       closeSelection()
     }

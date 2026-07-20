@@ -69,6 +69,9 @@ interface Props {
 const TAP_DEADZONE_PX = 4
 // タップ位置からセグメントを拾うヒット距離(px)
 const HIT_DIST = 18
+// 相番(合番)バッジの円の半径(px)。老眼等でも読み取れるよう、通常の寸法
+// ラベルよりかなり大きめにする（重なり回避のジョブサイズもこれに合わせる）。
+const ASSEMBLY_BADGE_R = 17
 // アイソメグリッドの間隔(px)＝格子スナップの基準。
 // 画面幅が狭いほど間隔を詰め、スマホでも1画面に描ける範囲を広くする。
 const GRID_GAP_PHONE = 20 // 〜599px（スマホ）
@@ -499,7 +502,7 @@ export function DrawingCanvas({
             : '継手不足'
       const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
       const w = isNumbered
-        ? 24
+        ? ASSEMBLY_BADGE_R * 2 + 4
         : Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
       // 押し出す向きはセグメントに対して垂直な向きに固定する（セグメントの向き
       // なりに押すと、切り立った斜め/縦の配管では押し出しがほぼ線に沿った方向に
@@ -530,7 +533,7 @@ export function DrawingCanvas({
         cx: mx + perpX * 22,
         cy: my + perpY * 22,
         w,
-        h: isNumbered ? 24 : 32,
+        h: isNumbered ? ASSEMBLY_BADGE_R * 2 + 4 : 32,
         pushX: perpX,
         pushY: perpY,
       })
@@ -964,7 +967,7 @@ export function DrawingCanvas({
               if (assemblyNum != null) {
                 return (
                   <g className="assembly-badge">
-                    <circle cx={cx} cy={cCenter} r={11} />
+                    <circle cx={cx} cy={cCenter} r={ASSEMBLY_BADGE_R} />
                     <text x={cx} y={cCenter} textAnchor="middle" dominantBaseline="central">
                       {assemblyNum}
                     </text>
