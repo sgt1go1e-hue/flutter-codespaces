@@ -4,6 +4,8 @@ import { SegmentPanel, DrawSettingsPanel } from './components/AttributePanel'
 import { PartsPalette } from './components/PartsPalette'
 import { DisclaimerModal } from './components/DisclaimerModal'
 import { BomModal } from './components/BomModal'
+import { MenuOrderModal } from './components/MenuOrderModal'
+import { DEFAULT_MENU_ORDER, sanitizeMenuOrder, type MenuItemId } from './lib/menuOrder'
 import { DrawingLauncher } from './components/DrawingLauncher'
 import { QuickCalc } from './components/QuickCalc'
 import { computeBom } from './lib/bom'
@@ -234,6 +236,15 @@ export default function App() {
   const [reviewDisclaimer, setReviewDisclaimer] = useState(false)
   // 材料集計(BOM)モーダルの表示
   const [showBom, setShowBom] = useState(false)
+  // 画面下段メニューの並び順（端末に保存。並び替え設定でいつでも変更・
+  // 初期順序に戻せる）。将来項目が増減しても壊れないよう、読み込み時に
+  // sanitizeMenuOrder で必ず全項目が揃った状態に補修する。
+  const [menuOrderRaw, setMenuOrderRaw] = useLocalStorage<MenuItemId[]>(
+    'piping-iso:menuOrder',
+    DEFAULT_MENU_ORDER,
+  )
+  const menuOrder = useMemo(() => sanitizeMenuOrder(menuOrderRaw), [menuOrderRaw])
+  const [showMenuOrder, setShowMenuOrder] = useState(false)
   const needConsent = consent.version !== CONSENT_VERSION
   // これから描く線に適用する初期設定（線を選択せず通常画面で入力）
   const [defaults, setDefaults] = useLocalStorage<{
@@ -737,6 +748,86 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [partDrag?.partId])
 
+  // 画面下段メニューの各ボタン本体。表示順は menuOrder に従うため、ここでは
+  // idごとの中身(機能・見た目)だけを定義する（並び替えの影響を受けない）。
+  const menuItemNodes: Record<MenuItemId, React.ReactNode> = {
+    newDrawing: (
+      <button key="newDrawing" onClick={createNewDrawing}>
+        新規作成
+      </button>
+    ),
+    openLauncher: (
+      <button key="openLauncher" onClick={goToLauncher}>
+        過去の図面
+      </button>
+    ),
+    quickCalc: (
+      <button key="quickCalc" onClick={openQuickCalc}>
+        🧮 クイック計算
+      </button>
+    ),
+    undo: (
+      <button key="undo" onClick={undo} disabled={history.length === 0}>
+        元に戻す
+      </button>
+    ),
+    clearAll: (
+      <button key="clearAll" onClick={clearAll} disabled={segments.length === 0}>
+        全消去
+      </button>
+    ),
+    eraser: (
+      <button
+        key="eraser"
+        className={`eraser-toggle${eraserMode ? ' active' : ''}`}
+        onClick={() => {
+          setEraserMode((m) => !m)
+          setSelectedId(null)
+        }}
+        disabled={segments.length === 0}
+        title="オンの間は線をタップするとその場で即削除します"
+      >
+        🧹 消しゴム{eraserMode ? '中' : ''}
+      </button>
+    ),
+    bom: (
+      <button
+        key="bom"
+        className="primary"
+        onClick={() => {
+          setEraserMode(false)
+          setShowBom(true)
+        }}
+        disabled={segments.length === 0}
+      >
+        集計・拾い出し
+      </button>
+    ),
+    disclaimer: (
+      <button
+        key="disclaimer"
+        onClick={() => {
+          setEraserMode(false)
+          setReviewDisclaimer(true)
+        }}
+      >
+        免責
+      </button>
+    ),
+    theme: (
+      <button
+        key="theme"
+        onClick={() => {
+          setEraserMode(false)
+          setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
+        }}
+        title="屋外の明るい場所では「明るい画面」が見やすくなります"
+      >
+        {theme === 'dark' ? '☀️ 明るい画面' : '🌙 暗い画面'}
+      </button>
+    ),
+  }
+
   return (
     <div className="app">
       {screen === 'launcher' && (
@@ -799,6 +890,7 @@ export default function App() {
           open={settingsOpen}
           onToggle={() => setSettingsOpen((v) => !v)}
           segmentCount={segments.length}
+          onOpenMenuOrder={() => setShowMenuOrder(true)}
         />
       </main>
 
@@ -839,60 +931,16 @@ export default function App() {
         />
       )}
 
-      {/* メニュー(新規作成・過去の図面・元に戻す・全消去・集計拾い出し・免責等)は
-          画面下部(親指の届きやすい位置)に配置。特に「元に戻す」は使用頻度が
-          高いための要望。 */}
+      {/* メニュー(元に戻す・消しゴム・全消去・集計拾い出し・クイック計算・
+          新規作成・過去の図面・免責・テーマ切替)は画面下部(親指の届きやすい
+          位置)に配置。特に「元に戻す・消しゴム・全消去」は使用頻度が高いため
+          左寄せの既定順にしている。表示順は menuOrder(並び替え設定で変更・
+          端末に保存)に従う。ボタン自体の機能・見た目は並び替えの対象外。 */}
       <header className="topbar">
         <div className="title">配管アイソメ図</div>
         <div className={`tools-wrap${toolsOverflow ? ' has-more' : ''}`}>
           <div className="tools" ref={toolsRef}>
-            <button onClick={createNewDrawing}>新規作成</button>
-            <button onClick={goToLauncher}>過去の図面</button>
-            <button onClick={openQuickCalc}>🧮 クイック計算</button>
-            <button onClick={undo} disabled={history.length === 0}>
-              元に戻す
-            </button>
-            <button onClick={clearAll} disabled={segments.length === 0}>
-              全消去
-            </button>
-            <button
-              className={`eraser-toggle${eraserMode ? ' active' : ''}`}
-              onClick={() => {
-                setEraserMode((m) => !m)
-                setSelectedId(null)
-              }}
-              disabled={segments.length === 0}
-              title="オンの間は線をタップするとその場で即削除します"
-            >
-              🧹 消しゴム{eraserMode ? '中' : ''}
-            </button>
-            <button
-              className="primary"
-              onClick={() => {
-                setEraserMode(false)
-                setShowBom(true)
-              }}
-              disabled={segments.length === 0}
-            >
-              集計・拾い出し
-            </button>
-            <button
-              onClick={() => {
-                setEraserMode(false)
-                setReviewDisclaimer(true)
-              }}
-            >
-              免責
-            </button>
-            <button
-              onClick={() => {
-                setEraserMode(false)
-                setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
-              }}
-              title="屋外の明るい場所では「明るい画面」が見やすくなります"
-            >
-              {theme === 'dark' ? '☀️ 明るい画面' : '🌙 暗い画面'}
-            </button>
+            {menuOrder.map((id) => menuItemNodes[id])}
           </div>
           <span className="tools-scroll-hint" aria-hidden="true">
             ›
@@ -916,6 +964,15 @@ export default function App() {
           assemblyNumberById={assemblyNumberById}
           onRenumber={setAssemblyNumberOverride}
           onClose={() => setShowBom(false)}
+        />
+      )}
+
+      {/* 画面下段メニューの並び替え設定 */}
+      {showMenuOrder && (
+        <MenuOrderModal
+          order={menuOrder}
+          onChange={setMenuOrderRaw}
+          onClose={() => setShowMenuOrder(false)}
         />
       )}
         </>

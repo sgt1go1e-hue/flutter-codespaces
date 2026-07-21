@@ -1121,6 +1121,8 @@ interface DrawSettingsPanelProps {
   onToggle: () => void
   /** 現在の図面の総セグメント数（相番表示の自動判定の目安表示に使う） */
   segmentCount: number
+  /** 画面下段メニューの並び替え設定を開く */
+  onOpenMenuOrder: () => void
 }
 
 export function DrawSettingsPanel({
@@ -1129,6 +1131,7 @@ export function DrawSettingsPanel({
   open,
   onToggle,
   segmentCount,
+  onOpenMenuOrder,
 }: DrawSettingsPanelProps) {
   const sizes = sizesForPipeType(defaults.pipeType)
   const od = getSizeInfo(defaults.size)?.od
@@ -1294,6 +1297,13 @@ export function DrawSettingsPanel({
               </select>
             </label>
           </div>
+
+          {/* 画面下段メニューの並び順を変更する設定への入り口。
+              ボタン自体は独立した操作なので管種・サイズ等のグリッドとは
+              分けて置く。 */}
+          <button type="button" className="menu-order-open" onClick={onOpenMenuOrder}>
+            メニューの並び替え
+          </button>
         </div>
       )}
     </section>
