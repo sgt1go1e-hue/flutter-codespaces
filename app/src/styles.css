@@ -1425,6 +1425,38 @@ body {
   color: #1e1b3a;
 }
 
+/* PDFの用紙サイズ・向き選択。A3横+1ページ集約のときだけ、左2/3アイソメ図・
+   右1/3明細の専用レイアウト(.a3-landscape)が使われる。 */
+.pdf-paper-row {
+  display: flex;
+  gap: 14px;
+  padding: 8px 16px 4px;
+  flex-wrap: wrap;
+}
+
+.pdf-paper-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-paper-label {
+  color: var(--hint);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.pdf-paper-group .pdf-mode-btn {
+  flex: none;
+  min-width: 44px;
+}
+
+.pdf-a3-hint {
+  padding: 0 16px 4px;
+  color: var(--hint);
+  font-size: 12px;
+}
+
 /* 印刷専用レイアウト。画面表示では隠しておき、「PDFで見る」の画面プレビュー
    または実際の印刷/PDF化のときだけ表示する。内容のスタイル(見出し・表など)は
    プレビューと印刷で共通のため、@media print の外（常時有効）で定義し、
@@ -1523,6 +1555,51 @@ body {
   height: 240px;
 }
 
+/* A3横1ページレイアウト（左2/3アイソメ図・右1/3明細）。A3横向き＋
+   「1ページに集約」のときだけ使う専用レイアウトで、アイソメ図・明細表
+   それぞれの中身(データ・計算)は通常レイアウトと完全に共通。ここでは
+   配置とサイズだけを変える。左右比率(2:1)はプレビュー(画面上の縮小表示)
+   でも実際の印刷でも同じflexで保たれるため、アイソメ図はSVGのviewBox
+   拡大縮小(preserveAspectRatio)により文字が潰れず自動で大きく表示される。 */
+.a3-sheet-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.a3-iso-col {
+  flex: 2;
+  min-width: 0;
+}
+
+.a3-detail-col {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 右側は幅が狭いため、通常の1ページ集約(.compact)よりさらに詰めた
+   文字サイズにして、明細ができるだけ1枚に収まるようにする。収まりきら
+   ない分は自然に次ページへ続く(既存の複数ページ機能へのフォールバック)。 */
+.a3-detail-col h2 {
+  font-size: 10px;
+  margin: 10px 0 3px;
+}
+
+.a3-detail-col th,
+.a3-detail-col td {
+  padding: 2px 4px;
+  font-size: 8.5px;
+}
+
+.a3-iso-col .print-iso-wrap {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+.a3-iso-col .print-iso-svg {
+  height: 480px;
+}
+
 /* 画面プレビュー（「PDFで見る」）。印刷ダイアログを介さずまず内容を確認できる
    ようにし、確認後に上部の「印刷/PDFで保存」ボタンで初めて window.print() を
    呼ぶ（現場では即印刷できず、まず見る→LINE等で加工場へ送る、の順のため）。 */
@@ -1580,6 +1657,20 @@ body {
   @page {
     size: A4;
     margin: 12mm;
+  }
+  /* A3横向き＋1ページ集約のときだけ使う名前付きページ(CSS Paged Media)。
+     対応ブラウザでは .a3-landscape 要素に `page` プロパティ経由でこの
+     用紙サイズ・向きが適用される（未対応環境では既定の@page(A4)や、
+     印刷ダイアログ側の用紙設定にフォールバックする＝A4設定と同じ限界）。 */
+  @page a3-landscape {
+    size: A3 landscape;
+    margin: 10mm;
+  }
+  .bom-print-only.a3-landscape {
+    page: a3-landscape;
+  }
+  .bom-print-only.a3-landscape .a3-iso-col .print-iso-svg {
+    height: 230mm;
   }
   /* アプリ本体(#root)は fixed/absolute配置と 100vh 固定+overflow:hidden の
      1画面レイアウトなので、これを印刷対象に含めると1ページ分の高さで

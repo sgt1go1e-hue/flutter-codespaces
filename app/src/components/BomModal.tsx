@@ -44,6 +44,12 @@ export function BomModal({
   // PDF/印刷レイアウト: 詳細(複数ページ, パイプ1本ごとの明細つき) か
   // 1ページ集約(アイソメ図を縮小・パイプ明細は小計のみ、改ページなし) かを選べる。
   const [compact, setCompact] = useState(false)
+  // 用紙サイズ・向き。既定はA4縦（従来の出力と同じ）。A3横 + 1ページ集約が
+  // 選ばれたときだけ、左2/3にアイソメ図・右1/3に明細を並べる専用レイアウトを
+  // 使う（それ以外の組み合わせは従来通りの出力のまま変更しない）。
+  const [paperSize, setPaperSize] = useState<'a4' | 'a3'>('a4')
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
+  const a3Landscape1Page = paperSize === 'a3' && orientation === 'landscape' && compact
   // 「PDFで見る」は、現場ではすぐに印刷できず「まず画面で確認→LINE等で
   // 加工場へ送る→印刷」という順番で使うため、押してすぐ印刷ダイアログを
   // 開くのではなく、まず画面プレビューを表示する。実際の印刷/PDF化は
@@ -247,6 +253,43 @@ export function BomModal({
             1ページに集約
           </button>
         </div>
+        <div className="pdf-paper-row">
+          <div className="pdf-paper-group">
+            <span className="pdf-paper-label">用紙サイズ</span>
+            <button
+              className={`pdf-mode-btn${paperSize === 'a4' ? ' active' : ''}`}
+              onClick={() => setPaperSize('a4')}
+            >
+              A4
+            </button>
+            <button
+              className={`pdf-mode-btn${paperSize === 'a3' ? ' active' : ''}`}
+              onClick={() => setPaperSize('a3')}
+            >
+              A3
+            </button>
+          </div>
+          <div className="pdf-paper-group">
+            <span className="pdf-paper-label">向き</span>
+            <button
+              className={`pdf-mode-btn${orientation === 'portrait' ? ' active' : ''}`}
+              onClick={() => setOrientation('portrait')}
+            >
+              縦
+            </button>
+            <button
+              className={`pdf-mode-btn${orientation === 'landscape' ? ' active' : ''}`}
+              onClick={() => setOrientation('landscape')}
+            >
+              横
+            </button>
+          </div>
+        </div>
+        {a3Landscape1Page && (
+          <p className="panel-hint pdf-a3-hint">
+            A3横向き・1ページに集約: 左2/3にアイソメ図、右1/3に明細を並べた1枚のPDFになります。
+          </p>
+        )}
         <div className="bom-actions">
           <button className="bom-pdf" onClick={() => setPreviewOpen(true)} disabled={empty}>
             PDFで見る
@@ -266,7 +309,9 @@ export function BomModal({
         2ページ目以降が印刷されなくなるため、body直下へ portal で逃がす。
         画面には出さず、画面プレビュー(preview)または印刷/PDF化のときだけ表示する。 */}
     {createPortal(
-      <div className={`bom-print-only${compact ? ' compact' : ''}${previewOpen ? ' preview' : ''}`}>
+      <div
+        className={`bom-print-only${compact ? ' compact' : ''}${previewOpen ? ' preview' : ''}${a3Landscape1Page ? ' a3-landscape' : ''}`}
+      >
         <div className="preview-toolbar">
           <button className="preview-print-btn" onClick={printAsPdf}>
             印刷 / PDFで保存
@@ -279,137 +324,165 @@ export function BomModal({
         <h1>配管アイソメ図 材料集計表</h1>
         <p className="print-meta">作成日: {dateStr}</p>
 
-        {segments.length > 0 && (
-          <div className="print-iso-wrap">
-            <h2>アイソメ図</h2>
-            <PrintIsometric
-              segments={segments}
-              effectiveById={effectiveById}
-              crossoverGaps={crossoverGaps}
-              cutById={cutById}
-              baseSlopeDenom={baseSlopeDenom}
-            />
-          </div>
-        )}
+        {(() => {
+          // アイソメ図・各明細表のJSXは、通常レイアウト(縦積み・複数ページ)と
+          // A3横1ページレイアウト(左2/3アイソメ図・右1/3明細)の両方で共通の
+          // ものを使う（データ・計算ロジックは一切変えず、配置だけを分ける）。
+          const isoBlock = segments.length > 0 && (
+            <div className="print-iso-wrap">
+              <h2>アイソメ図</h2>
+              <PrintIsometric
+                segments={segments}
+                effectiveById={effectiveById}
+                crossoverGaps={crossoverGaps}
+                cutById={cutById}
+                baseSlopeDenom={baseSlopeDenom}
+              />
+            </div>
+          )
 
-        {bom.pipes.length > 0 && (
-          <>
-            <h2>パイプ（切り寸法明細）</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>管種</th>
-                  <th>呼び径</th>
-                  <th>切り寸法(mm)</th>
-                  <th>本数</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bom.pipes.map((p, i) => (
-                  <Fragment key={i}>
-                    {!compact &&
-                      p.cuts.map((c, j) => (
-                        <tr key={j}>
-                          <td>{p.pipeShort}</td>
-                          <td>{p.size ?? '—'}</td>
-                          <td>{round1(c)}</td>
-                          <td>1</td>
-                        </tr>
-                      ))}
-                    <tr className="print-subtotal">
-                      <td>{p.pipeShort}</td>
-                      <td>{p.size ?? '—'}</td>
-                      <td>{compact ? '計' : '小計'} {round1(p.totalMm)}</td>
-                      <td>{p.count}</td>
+          const pipesBlock = bom.pipes.length > 0 && (
+            <>
+              <h2>パイプ（切り寸法明細）</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>管種</th>
+                    <th>呼び径</th>
+                    <th>切り寸法(mm)</th>
+                    <th>本数</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bom.pipes.map((p, i) => (
+                    <Fragment key={i}>
+                      {!compact &&
+                        p.cuts.map((c, j) => (
+                          <tr key={j}>
+                            <td>{p.pipeShort}</td>
+                            <td>{p.size ?? '—'}</td>
+                            <td>{round1(c)}</td>
+                            <td>1</td>
+                          </tr>
+                        ))}
+                      <tr className="print-subtotal">
+                        <td>{p.pipeShort}</td>
+                        <td>{p.size ?? '—'}</td>
+                        <td>{compact ? '計' : '小計'} {round1(p.totalMm)}</td>
+                        <td>{p.count}</td>
+                      </tr>
+                    </Fragment>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )
+
+          const fittingsBlock = bom.fittings.length > 0 && (
+            <>
+              <h2>継手</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>品名</th>
+                    <th>呼び径</th>
+                    <th>接続方法</th>
+                    <th>数量</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bom.fittings.map((f, i) => (
+                    <tr key={i}>
+                      <td>{f.label}</td>
+                      <td>{f.size}</td>
+                      <td>{f.connection}</td>
+                      <td>{f.count}</td>
                     </tr>
-                  </Fragment>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )
 
-        {bom.fittings.length > 0 && (
-          <>
-            <h2>継手</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>品名</th>
-                  <th>呼び径</th>
-                  <th>接続方法</th>
-                  <th>数量</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bom.fittings.map((f, i) => (
-                  <tr key={i}>
-                    <td>{f.label}</td>
-                    <td>{f.size}</td>
-                    <td>{f.connection}</td>
-                    <td>{f.count}</td>
+          const flangesBlock = bom.flanges.length > 0 && (
+            <>
+              <h2>フランジ</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>品名</th>
+                    <th>呼び径</th>
+                    <th>接続方法</th>
+                    <th>枚数</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
+                </thead>
+                <tbody>
+                  {bom.flanges.map((f, i) => (
+                    <tr key={i}>
+                      <td>{f.label}</td>
+                      <td>{f.size}</td>
+                      <td>{f.connection}</td>
+                      <td>{f.count}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )
 
-        {bom.flanges.length > 0 && (
-          <>
-            <h2>フランジ</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>品名</th>
-                  <th>呼び径</th>
-                  <th>接続方法</th>
-                  <th>枚数</th>
-                </tr>
-              </thead>
-              <tbody>
-                {bom.flanges.map((f, i) => (
-                  <tr key={i}>
-                    <td>{f.label}</td>
-                    <td>{f.size}</td>
-                    <td>{f.connection}</td>
-                    <td>{f.count}</td>
+          const assemblyBlock = assemblyTable.length > 0 && (
+            <>
+              <h2>相番対応表</h2>
+              <table>
+                <thead>
+                  <tr>
+                    <th>番号</th>
+                    <th>管種</th>
+                    <th>呼び径</th>
+                    <th>{'芯々/芯先'}</th>
+                    <th>寸法(mm)</th>
+                    <th>切り寸法(mm)</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
+                </thead>
+                <tbody>
+                  {assemblyTable.map((a) => (
+                    <tr key={a.id}>
+                      <td>{a.number}</td>
+                      <td>{a.pipeShort}</td>
+                      <td>{a.size ?? '—'}</td>
+                      <td>{a.mode}</td>
+                      <td>{a.center != null ? round1(a.center) : '—'}</td>
+                      <td>{a.cut != null ? round1(a.cut) : '—'}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </>
+          )
 
-        {assemblyTable.length > 0 && (
-          <>
-            <h2>相番対応表</h2>
-            <table>
-              <thead>
-                <tr>
-                  <th>番号</th>
-                  <th>管種</th>
-                  <th>呼び径</th>
-                  <th>{'芯々/芯先'}</th>
-                  <th>寸法(mm)</th>
-                  <th>切り寸法(mm)</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assemblyTable.map((a) => (
-                  <tr key={a.id}>
-                    <td>{a.number}</td>
-                    <td>{a.pipeShort}</td>
-                    <td>{a.size ?? '—'}</td>
-                    <td>{a.mode}</td>
-                    <td>{a.center != null ? round1(a.center) : '—'}</td>
-                    <td>{a.cut != null ? round1(a.cut) : '—'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </>
-        )}
+          if (a3Landscape1Page) {
+            return (
+              <div className="a3-sheet-body">
+                <div className="a3-iso-col">{isoBlock}</div>
+                <div className="a3-detail-col">
+                  {pipesBlock}
+                  {fittingsBlock}
+                  {flangesBlock}
+                  {assemblyBlock}
+                </div>
+              </div>
+            )
+          }
+          return (
+            <>
+              {isoBlock}
+              {pipesBlock}
+              {fittingsBlock}
+              {flangesBlock}
+              {assemblyBlock}
+            </>
+          )
+        })()}
         </div>
       </div>,
       document.body,
