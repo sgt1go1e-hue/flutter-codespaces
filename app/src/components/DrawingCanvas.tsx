@@ -915,8 +915,13 @@ export function DrawingCanvas({
       onPointerCancel={handlePointerUp}
     >
       {/* ピンチズーム・パン用の変換。中身は全て論理座標(=セグメント座標系)のまま描き、
-          この<g>だけを拡大縮小・移動する。 */}
-      <g transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`}>
+          この<g>だけを拡大縮小・移動する。willChangeで専用の合成レイヤーを
+          明示しておくことで、一部のブラウザでtransform変更時に再描画範囲が
+          正しく更新されず、画面の一部が古い状態(空白)のまま残る描画崩れを防ぐ。 */}
+      <g
+        transform={`translate(${view.tx} ${view.ty}) scale(${view.scale})`}
+        style={{ willChange: 'transform' }}
+      >
       {/* アイソメ格子：30°/150° の菱形パターン（描画はこの交点間に拘束される） */}
       <g className="iso-grid" pointerEvents="none">
         {gridLines.map((l, i) => (
