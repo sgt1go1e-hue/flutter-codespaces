@@ -380,10 +380,13 @@ body {
   cursor: crosshair;
 }
 
-/* アイソメグリッド線（薄いグレーで常時表示のガイド） */
+/* アイソメグリッド線（薄いグレーで常時表示のガイド）。--ui-scale は
+   DrawingCanvas のルート<svg>で画面幅に応じて設定される表示スケール
+   係数（iPhone幅で1、iPad等の広い画面ほど大きくなる）。PDF出力側
+   (PrintIsometric)はこの変数を持たないため既定値1のまま影響を受けない。 */
 .iso-grid line {
   stroke: var(--grid-line);
-  stroke-width: 1;
+  stroke-width: calc(1px * var(--ui-scale, 1));
 }
 
 .statusbar {
@@ -446,14 +449,18 @@ body {
   width: 100%;
 }
 
-/* セグメント上のサイズ表示ラベル */
+/* セグメント上のサイズ表示ラベル。フォント・縁取りとも --ui-scale
+   （DrawingCanvasのルート<svg>で画面幅に応じて設定。iPhone幅=1、iPad等の
+   広い画面ほど大きい）に比例させ、iPadでグリッド・線に対して文字が
+   相対的に小さく見えないようにする。PDF出力(PrintIsometric)は
+   --ui-scale を持たないため既定値1のまま(=表示スケーリングの対象外)。 */
 .seg-label {
   fill: var(--label-main);
-  font-size: 12px;
+  font-size: calc(12px * var(--ui-scale, 1));
   font-weight: 600;
   paint-order: stroke;
   stroke: var(--label-outline);
-  stroke-width: 3px;
+  stroke-width: calc(3px * var(--ui-scale, 1));
 }
 
 /* 継承（仮適用）中のサイズラベルは控えめに表示 */
@@ -465,19 +472,19 @@ body {
 /* 末端（フリー端）の呼び径ラベル。配管サイズを端に明示（手書き流） */
 .seg-label.terminus {
   fill: var(--label-terminus);
-  font-size: 13px;
+  font-size: calc(13px * var(--ui-scale, 1));
   font-weight: 800;
-  stroke-width: 3.5px;
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
 }
 
 /* 寸法2段表記（セグメント下側） */
 .dim-center {
   fill: var(--label-sub); /* 上段: 芯々寸法（控えめ） */
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ui-scale, 1));
   font-weight: 600;
   paint-order: stroke;
   stroke: var(--label-outline);
-  stroke-width: 3px;
+  stroke-width: calc(3px * var(--ui-scale, 1));
 }
 
 /*
@@ -488,35 +495,35 @@ body {
  */
 .dim-cut-outline {
   fill: none;
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-scale, 1));
   font-weight: 800;
   stroke: var(--label-outline);
-  stroke-width: 3.5px;
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
 }
 
 .dim-cut {
   fill: var(--label-cut); /* 下段: 切り寸（強調・現場で使う数値） */
-  font-size: 12.5px;
+  font-size: calc(12.5px * var(--ui-scale, 1));
   font-weight: 800;
   text-decoration: underline;
 }
 
 .dim-cut.zero {
   fill: var(--label-zero);
-  font-size: 10.5px;
+  font-size: calc(10.5px * var(--ui-scale, 1));
   text-decoration: none;
   paint-order: stroke;
   stroke: var(--label-outline);
-  stroke-width: 3.5px;
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
 }
 
 .dim-cut.over {
   fill: var(--label-over);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
   text-decoration: none;
   paint-order: stroke;
   stroke: var(--label-outline);
-  stroke-width: 3.5px;
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
 }
 
 .dim-cut.tight {
@@ -526,16 +533,17 @@ body {
 /* 相番(合番)バッジ。密集した図面では芯々/切り寸法を直書きせず番号だけを
    表示し、詳しい寸法はBOMの対応表で確認する運用（現場の相番方式）。
    老眼等でも読み取れるよう、円・文字サイズは通常のラベルよりかなり
-   大きめにしている（従来比 約1.6倍）。 */
+   大きめにしている（従来比 約1.6倍）。円の半径自体はJS側(uiScale)で
+   拡大済みのため、ここでは文字・縁取りだけ --ui-scale に合わせる。 */
 .assembly-badge circle {
   fill: var(--accent);
   stroke: var(--label-outline);
-  stroke-width: 2.5px;
+  stroke-width: calc(2.5px * var(--ui-scale, 1));
 }
 
 .assembly-badge text {
   fill: var(--accent-on);
-  font-size: 19px;
+  font-size: calc(19px * var(--ui-scale, 1));
   font-weight: 800;
 }
 
@@ -543,34 +551,34 @@ body {
 .reducer-mark {
   fill: var(--reducer-fill);
   stroke: var(--text);
-  stroke-width: 2;
+  stroke-width: calc(2px * var(--ui-scale, 1));
   stroke-linejoin: round;
 }
 
 /* 45°エルボ使用箇所のマーク（90°エルボと区別できるよう明示） */
 .elbow45-mark {
   fill: var(--label-elbow45);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
   font-weight: 800;
   paint-order: stroke;
   stroke: var(--label-outline);
-  stroke-width: 3px;
+  stroke-width: calc(3px * var(--ui-scale, 1));
 }
 
 /* 排水勾配(1/N)を設定した区間のマーク */
 .slope-mark {
   fill: var(--label-elbow45);
-  font-size: 11px;
+  font-size: calc(11px * var(--ui-scale, 1));
   font-weight: 800;
   paint-order: stroke;
   stroke: var(--label-outline);
-  stroke-width: 3px;
+  stroke-width: calc(3px * var(--ui-scale, 1));
 }
 
 /* フランジ記号（配管に直交する2本線） */
 .flange-mark {
   stroke: var(--text);
-  stroke-width: 2.5;
+  stroke-width: calc(2.5px * var(--ui-scale, 1));
   stroke-linecap: round;
 }
 

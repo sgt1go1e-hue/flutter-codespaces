@@ -72,15 +72,26 @@ const HIT_DIST = 18
 // 相番(合番)バッジの円の半径(px)。老眼等でも読み取れるよう、通常の寸法
 // ラベルよりかなり大きめにする（重なり回避のジョブサイズもこれに合わせる）。
 const ASSEMBLY_BADGE_R = 17
-// アイソメグリッドの間隔(px)＝格子スナップの基準。
-// 画面幅が狭いほど間隔を詰め、スマホでも1画面に描ける範囲を広くする。
-const GRID_GAP_PHONE = 20 // 〜599px（スマホ）
-const GRID_GAP_TABLET = 30 // 600〜999px（iPad縦向き等）
-const GRID_GAP_WIDE = 40 // 1000px〜（iPad横向き・デスクトップ）
+// 画面幅に応じた表示スケール係数。iPhone相当の画面幅を基準(=1.0)とし、
+// 画面が広くなるほどグリッドのマス目・線の太さ・寸法ラベルの文字・
+// ノード(点)の大きさを比例して拡大する。iPadのような大きい画面で、
+// これらの要素が画面サイズに対して相対的に小さく(グリッドが必要以上に
+// 細かく)見えてしまう不具合の対策。iPhone幅では従来と完全に同じ見た目
+// になる(scale=1.0)よう、基準幅以下では拡大しない。上限を設けているのは、
+// デスクトップ等の非常に広い画面でグリッドが粗くなりすぎるのを防ぐため。
+// 芯々寸法等の計算ロジックには一切関与しない、表示専用の係数。
+const UI_SCALE_BASE_WIDTH = 430 // 〜iPhone Pro Max相当の幅までは scale=1.0
+const UI_SCALE_MAX = 2 // 上限(iPhone比 最大2倍)
+function uiScaleForWidth(w: number): number {
+  if (w <= 0) return 1
+  const scale = 1 + Math.max(0, w - UI_SCALE_BASE_WIDTH) / 800
+  return Math.min(UI_SCALE_MAX, scale)
+}
+// アイソメグリッドの間隔(px)＝格子スナップの基準。uiScaleに比例するため、
+// 画面が広いほど間隔も広がる(スマホでは従来通り20px)。
+const GRID_GAP_BASE = 20
 function gridGapForWidth(w: number): number {
-  if (w > 0 && w < 600) return GRID_GAP_PHONE
-  if (w > 0 && w < 1000) return GRID_GAP_TABLET
-  return GRID_GAP_WIDE
+  return GRID_GAP_BASE * uiScaleForWidth(w)
 }
 // またぎ表示の途切れ幅(px)
 const CROSS_GAP = 9
@@ -160,7 +171,9 @@ export function DrawingCanvas({
     null,
   )
   const [size, setSize] = useState({ w: 0, h: 0 })
-  // 画面幅に応じた格子間隔（スマホは詰め、iPad/デスクトップは従来どおり）
+  // 画面幅に応じた表示スケール係数・格子間隔（iPhone幅では1.0=従来どおり、
+  // iPad等の広い画面では線・文字・ノードも比例して大きく表示する）。
+  const uiScale = useMemo(() => uiScaleForWidth(size.w), [size.w])
   const GRID_GAP = useMemo(() => gridGapForWidth(size.w), [size.w])
 
   // ジェスチャ状態
@@ -465,8 +478,16 @@ export function DrawingCanvas({
         continue
       const mx = (s.start.x + s.end.x) / 2
       const my = (s.start.y + s.end.y) / 2
-      const w = estimateTextWidth(eff.size, 12) + 8
-      jobs.push({ key: `seg-${s.id}`, cx: mx, cy: my - 10, w, h: 18, pushX: 0, pushY: -1 })
+      const w = estimateTextWidth(eff.size, 12 * uiScale) + 8 * uiScale
+      jobs.push({
+        key: `seg-${s.id}`,
+        cx: mx,
+        cy: my - 10 * uiScale,
+        w,
+        h: 18 * uiScale,
+        pushX: 0,
+        pushY: -1,
+      })
     }
     // 2) 寸法2段表記（もっとも重要な情報のため優先度を高くする）
     for (const s of segments) {
@@ -500,10 +521,13 @@ export function DrawingCanvas({
               ? `レジューサー H=${c.reducerH}（継手直結）`
               : 'パイプ0（継手直結）'
             : '継手不足'
-      const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
+      const fs2 =
+        (c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11) *
+        uiScale
       const w = isNumbered
-        ? ASSEMBLY_BADGE_R * 2 + 4
-        : Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
+        ? (ASSEMBLY_BADGE_R * 2 + 4) * uiScale
+        : Math.max(estimateTextWidth(line1, 10.5 * uiScale), estimateTextWidth(line2, fs2)) +
+          6 * uiScale
       // 押し出す向きはセグメントに対して垂直な向きに固定する（セグメントの向き
       // なりに押すと、切り立った斜め/縦の配管では押し出しがほぼ線に沿った方向に
       // なってしまい、ラベルが自分の区間を越えて隣の区間の場所までズレて、
@@ -530,10 +554,10 @@ export function DrawingCanvas({
       }
       jobs.push({
         key: `dim-${s.id}`,
-        cx: mx + perpX * 22,
-        cy: my + perpY * 22,
+        cx: mx + perpX * 22 * uiScale,
+        cy: my + perpY * 22 * uiScale,
         w,
-        h: isNumbered ? ASSEMBLY_BADGE_R * 2 + 4 : 32,
+        h: isNumbered ? (ASSEMBLY_BADGE_R * 2 + 4) * uiScale : 32 * uiScale,
         pushX: perpX,
         pushY: perpY,
       })
@@ -546,8 +570,16 @@ export function DrawingCanvas({
       if (denom == null) continue
       const mx = (s.start.x + s.end.x) / 2
       const my = (s.start.y + s.end.y) / 2
-      const w = estimateTextWidth(`勾配1/${denom}`, 11) + 6
-      jobs.push({ key: `slope-${s.id}`, cx: mx, cy: my + 16, w, h: 18, pushX: 0, pushY: 1 })
+      const w = estimateTextWidth(`勾配1/${denom}`, 11 * uiScale) + 6 * uiScale
+      jobs.push({
+        key: `slope-${s.id}`,
+        cx: mx,
+        cy: my + 16 * uiScale,
+        w,
+        h: 18 * uiScale,
+        pushX: 0,
+        pushY: 1,
+      })
     }
     // 4) 末端の呼び径ラベル（寸法表記を避ける向きへ、必要ならさらに押し出す）
     for (const s of segments) {
@@ -571,12 +603,20 @@ export function DrawingCanvas({
         // 端点(=新しい線を引き始めるタップ位置)にラベルの当たり判定が近すぎると、
         // 続けて線を引こうとしたタップがラベル選択として拾われてしまう。
         // 元の位置から格子1マス分さらに離して、近すぎず遠すぎない位置にする。
-        const along = 20 + latticeStep(s.angle, GRID_GAP)
-        const perp = 14
+        const along = 20 * uiScale + latticeStep(s.angle, GRID_GAP)
+        const perp = 14 * uiScale
         const cx = pt.x + ox * along + nx * perp
         const cy = pt.y + oy * along + ny * perp
-        const w = estimateTextWidth(eff.size, 13) + 14
-        jobs.push({ key: `term-${s.id}-${at}`, cx, cy, w, h: 26, pushX: nx, pushY: ny })
+        const w = estimateTextWidth(eff.size, 13 * uiScale) + 14 * uiScale
+        jobs.push({
+          key: `term-${s.id}-${at}`,
+          cx,
+          cy,
+          w,
+          h: 26 * uiScale,
+          pushX: nx,
+          pushY: ny,
+        })
       }
     }
     // データ上つながっていない線どうしが視覚的に交差する箇所は、複数のラベルの
@@ -590,8 +630,8 @@ export function DrawingCanvas({
         crossObstacles.push({
           cx: s.start.x + (s.end.x - s.start.x) * t,
           cy: s.start.y + (s.end.y - s.start.y) * t,
-          w: 40,
-          h: 40,
+          w: 40 * uiScale,
+          h: 40 * uiScale,
         })
       }
     }
@@ -612,13 +652,13 @@ export function DrawingCanvas({
         const dy = (other.y - pt.y) / len
         const nx = -dy
         const ny = dx
-        const gap = 20
-        const off = 11
+        const gap = 20 * uiScale
+        const off = 11 * uiScale
         elbow45Obstacles.push({
           cx: pt.x + dx * gap + nx * off,
           cy: pt.y + dy * gap + ny * off,
-          w: 34,
-          h: 22,
+          w: 34 * uiScale,
+          h: 22 * uiScale,
         })
       }
     }
@@ -629,6 +669,7 @@ export function DrawingCanvas({
     effectiveById,
     crossoverGaps,
     GRID_GAP,
+    uiScale,
     baseSlopeDenom,
     assemblyNumberActive,
     assemblyNumberById,
@@ -839,6 +880,10 @@ export function DrawingCanvas({
     <svg
       ref={svgRef}
       className={`canvas${eraserMode ? ' eraser-active' : ''}`}
+      // CSS変数として渡し、寸法ラベル等の共有スタイル(styles.css)側で
+      // calc(基準px * var(--ui-scale, 1)) の形で参照する。PrintIsometric
+      // (PDF出力)側はこの変数を持たないため既定値1のまま影響を受けない。
+      style={{ '--ui-scale': uiScale } as React.CSSProperties}
       onPointerDown={handlePointerDown}
       onPointerMove={handlePointerMove}
       onPointerUp={handlePointerUp}
@@ -882,13 +927,13 @@ export function DrawingCanvas({
                 x2={pc.b.x}
                 y2={pc.b.y}
                 stroke={stroke}
-                strokeWidth={selected ? 5 : 3}
+                strokeWidth={(selected ? 5 : 3) * uiScale}
                 strokeLinecap="round"
                 strokeDasharray={dashed ? '6 5' : undefined}
               />
             ))}
-            <circle cx={s.start.x} cy={s.start.y} r={4} fill="var(--seg-dot)" />
-            <circle cx={s.end.x} cy={s.end.y} r={4} fill="var(--seg-dot)" />
+            <circle cx={s.start.x} cy={s.start.y} r={4 * uiScale} fill="var(--seg-dot)" />
+            <circle cx={s.end.x} cy={s.end.y} r={4 * uiScale} fill="var(--seg-dot)" />
             {s.startFlange && flangeMarker(s, 'start', s.startFlange)}
             {s.endFlange && flangeMarker(s, 'end', s.endFlange)}
             {/* レジューサーのシンボル（同心=二等辺 / 偏心=直角三角形） */}
@@ -967,7 +1012,7 @@ export function DrawingCanvas({
               if (assemblyNum != null) {
                 return (
                   <g className="assembly-badge">
-                    <circle cx={cx} cy={cCenter} r={ASSEMBLY_BADGE_R} />
+                    <circle cx={cx} cy={cCenter} r={ASSEMBLY_BADGE_R * uiScale} />
                     <text x={cx} y={cCenter} textAnchor="middle" dominantBaseline="central">
                       {assemblyNum}
                     </text>
@@ -1044,7 +1089,7 @@ export function DrawingCanvas({
           x2={preview.end.x}
           y2={preview.end.y}
           stroke="var(--seg-preview)"
-          strokeWidth={3}
+          strokeWidth={3 * uiScale}
           strokeDasharray="8 6"
           strokeLinecap="round"
           pointerEvents="none"
