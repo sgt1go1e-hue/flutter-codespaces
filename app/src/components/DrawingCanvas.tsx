@@ -97,9 +97,13 @@ function gridGapForWidth(w: number): number {
 const CROSS_GAP = 9
 // 描画開始点を既存線上の格子点へ吸着する距離(px)。分岐の接続を確実にする。
 const START_SNAP = 18
-// ピンチズームの拡大率の範囲
-const MIN_SCALE = 0.5
+// ズームの拡大率の範囲（ピンチ操作・後述のズームボタン共通）。
+// 密集した図面を全体表示したい場面向けに、最小値(最大縮小率)を
+// 従来(0.5)よりさらに縮小できるよう拡張している。
+const MIN_SCALE = 0.25
 const MAX_SCALE = 3
+// ズームボタン1回あたりの変化幅（ピンチより小刻みに調整したい場面向け）。
+const ZOOM_BUTTON_STEP = 0.05
 
 // アイソメ図上に実際に表示される「45°」マークの位置を全て求める
 // （DrawingCanvasの描画条件と同じ: 継手が elbow45_long のセグメント自身の
@@ -876,7 +880,28 @@ export function DrawingCanvas({
     )
   }
 
+  // ズームボタン(－/＋)。ピンチ操作は連続的だが指先での微調整が難しいため、
+  // 密集した図面を少しだけ縮小して全体を見渡したい、といった細かい調整を
+  // 確実に行えるようにする（ピンチと同じ MIN_SCALE/MAX_SCALE の範囲・
+  // 画面中央を基準にズームする点も共通）。
+  function zoomByStep(dir: 1 | -1) {
+    const newScale = Math.min(
+      MAX_SCALE,
+      Math.max(MIN_SCALE, view.scale + dir * ZOOM_BUTTON_STEP),
+    )
+    if (newScale === view.scale) return
+    const anchor = { x: size.w / 2, y: size.h / 2 }
+    const logicalX = (anchor.x - view.tx) / view.scale
+    const logicalY = (anchor.y - view.ty) / view.scale
+    onViewChange({
+      scale: newScale,
+      tx: anchor.x - logicalX * newScale,
+      ty: anchor.y - logicalY * newScale,
+    })
+  }
+
   return (
+    <>
     <svg
       ref={svgRef}
       className={`canvas${eraserMode ? ' eraser-active' : ''}`}
@@ -1019,8 +1044,13 @@ export function DrawingCanvas({
                   </g>
                 )
               }
-              const y1 = cCenter - 8
-              const y2 = cCenter + 8
+              // 2行のラベル(1行目=芯々/芯先, 2行目=切り寸法)の行間は、文字サイズの
+              // 拡大(uiScale、iPad等の広い画面向け)に必ず比例させる。ここが固定
+              // pxのままだと、文字だけ大きくなって行間が追いつかず2行が重なって
+              // しまう(iPad対応で顕在化した不具合)。
+              const lineHalfGap = 8 * uiScale
+              const y1 = cCenter - lineHalfGap
+              const y2 = cCenter + lineHalfGap
               return (
                 <>
                   <text className="dim-center" x={cx} y={y1} textAnchor="middle">
@@ -1097,5 +1127,27 @@ export function DrawingCanvas({
       )}
       </g>
     </svg>
+    {/* ズームボタン(－/＋)。ピンチでの微調整が難しい場面向けの保険。
+        表示専用で、寸法・計算結果には一切影響しない。 */}
+    <div className="zoom-controls">
+      <button
+        type="button"
+        onClick={() => zoomByStep(-1)}
+        disabled={view.scale <= MIN_SCALE}
+        aria-label="縮小"
+      >
+        －
+      </button>
+      <span className="zoom-percent">{Math.round(view.scale * 100)}%</span>
+      <button
+        type="button"
+        onClick={() => zoomByStep(1)}
+        disabled={view.scale >= MAX_SCALE}
+        aria-label="拡大"
+      >
+        ＋
+      </button>
+    </div>
+    </>
   )
 }

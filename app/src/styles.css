@@ -637,6 +637,53 @@ body {
   font-size: 11px;
 }
 
+/* ズームボタン(－/＋)。キャンバス右下に浮かせて常設する（作図設定＝左上、
+   選択時の詳細パネル＝下、と重ならない位置）。ピンチ操作の保険として、
+   密集した図面を少しずつ縮小・拡大したい場面向けの細かい調整用。 */
+.zoom-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px var(--shadow);
+  padding: 4px;
+}
+
+.zoom-controls button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.zoom-controls button:disabled {
+  opacity: 0.35;
+}
+
+.zoom-controls button:active:not(:disabled) {
+  background: var(--accent);
+  color: #04222e;
+}
+
+.zoom-percent {
+  min-width: 42px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+}
+
 /* 芯々寸法欄は連続入力の主役なので少し強調 */
 .dim-field .num-input {
   border-color: #0ea5e9;
