@@ -15,7 +15,6 @@ import {
   connectionMethods,
 } from '../data/masters'
 import { isSlopeEligible, effectiveSlopeDenom, SLOPE_DENOM_OPTIONS } from '../lib/slope'
-import type { ElevationCheckResult } from '../lib/elevationCheck'
 
 const round1 = (x: number) => Math.round(x * 10) / 10
 
@@ -121,8 +120,6 @@ interface SegmentPanelProps {
   }
   /** レジューサーのメイン側/先端側の芯々寸法をまとめて更新する */
   onChangeReducerPair: (mainId: string, tipId: string, patch: { main?: number; tip?: number }) => void
-  /** このセグメントのフリー端に設定した基準高さが関わる、高低差の整合チェック結果 */
-  elevationChecks?: ElevationCheckResult[]
   /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
   baseSlopeDenom?: number
   /** 切り寸法の丸め方（全体設定・既定=四捨五入） */
@@ -160,7 +157,6 @@ export function SegmentPanel({
   onSetTeeSize,
   reducerPartner,
   onChangeReducerPair,
-  elevationChecks,
   baseSlopeDenom,
   roundMode,
   onRoundModeChange,
@@ -845,72 +841,6 @@ export function SegmentPanel({
               </div>
             )}
           </div>
-        )}
-
-        {/* フリー端(未接続の端)には、配管ルートのスタート/ゴールの基準高さを
-            入力できる。二段階に分けて配管を落としても、この2点の高さだけは
-            絶対に変えられないという制約の検算用の指標。控え寸法の内訳と同じく
-            「寸法の裏付け」情報のためここに置く。 */}
-        {cut && (!cut.startConnected || !cut.endConnected) && (
-          <div className="field round-field elevation-field">
-            <span className="field-label">
-              基準高さ(mm)
-              <span className="field-note">フリー端のみ・任意の基準面からの相対値</span>
-            </span>
-            <div className="elevation-inputs">
-              {!cut.startConnected && (
-                <label>
-                  <span className="field-note">始点側</span>
-                  <input
-                    className="num-input"
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="例: 2500"
-                    value={segment.startRefElevation ?? ''}
-                    onChange={(e) =>
-                      onChange({
-                        startRefElevation:
-                          e.target.value === '' ? undefined : Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-              )}
-              {!cut.endConnected && (
-                <label>
-                  <span className="field-note">終点側</span>
-                  <input
-                    className="num-input"
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="例: 2450"
-                    value={segment.endRefElevation ?? ''}
-                    onChange={(e) =>
-                      onChange({
-                        endRefElevation:
-                          e.target.value === '' ? undefined : Number(e.target.value),
-                      })
-                    }
-                  />
-                </label>
-              )}
-            </div>
-          </div>
-        )}
-
-        {/* 基準高さを入力した2点間で、実際のルート(縦区間+勾配)から計算した
-            高低差が入力値と一致しない場合の警告。差分のみ表示し、自動調整はしない。 */}
-        {elevationChecks?.map((c, i) =>
-          c.diff !== 0 ? (
-            <div className="socket-gap-warn" key={i}>
-              <p>
-                基準高さと実際のルートの高低差が一致しません（入力値どうしの差:
-                {c.expectedDelta}mm / ルートから計算した高低差: {c.actualDelta}mm
-                ／ 差分: {c.diff > 0 ? '+' : ''}
-                {c.diff}mm）。
-              </p>
-            </div>
-          ) : null,
         )}
 
         {/* ⑥ 管種・サイズ。分岐や口径変更があるときだけ重要なため、継承のままなら
