@@ -1842,18 +1842,32 @@ body {
   }
 }
 
-/* --- クイック計算（芯引き）画面 --- */
+/* --- クイック計算（芯引き）画面 ---
+   以前は外側(.qc-screen)を overflow:hidden にし、内側(.qc-body)だけを
+   overflow-y:auto でスクロールさせる「入れ子スクロール」構成だったが、
+   この構成だと「ページ全体をキャプチャする」系のスクリーンショット
+   ツール（ブラウザの全ページキャプチャ機能等、ビューポートを一時的に
+   コンテンツの高さまで拡張して撮る方式）が内側スクロール位置とうまく
+   整合を取れず、ヘッダーと本文が二重に見える描画崩れを起こしていた
+   （実際のスクロール操作では発生しない、キャプチャ方式特有の不整合）。
+   スクロール領域を.qc-screen側1箇所に統一し、ヘッダーはposition:sticky
+   で追従させることで、入れ子スクロールそのものを無くして解消する。 */
 .qc-screen {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+.qc-screen .topbar {
+  position: sticky;
+  top: 0;
+  z-index: 5;
 }
 
 .qc-body {
-  flex: 1;
-  overflow-y: auto;
-  -webkit-overflow-scrolling: touch;
   padding: 14px;
   padding-bottom: max(14px, env(safe-area-inset-bottom));
   display: flex;
