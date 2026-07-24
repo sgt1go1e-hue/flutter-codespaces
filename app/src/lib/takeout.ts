@@ -6,6 +6,25 @@ import { getReducerLengthVpDv } from '../data/reducerLengthsVpDv'
 // ノード同一判定の許容誤差(px)
 const NODE_EPS = 1
 
+// 45°オフセット計算: 現場の標準手法として「オフセット量×1.414」を斜め区間の
+// 芯々寸法として使う(AttributePanel.tsxのオフセット入力欄と同じ係数)。
+const OFFSET_45_FACTOR = 1.414
+
+// 45°系継手(45°エルボ・45°Y等)のid。この継手を含む短い連結区間は、実長
+// (芯々寸法)が直角二等辺三角形の斜辺(オフセット量×1.414)になる「キック区間」
+// として扱う必要がある(下の畳み込み処理で使用)。
+function isFortyFiveFitting(id?: string): boolean {
+  return (
+    id === 'elbow45_long' ||
+    id === 'elbow45_socket' ||
+    id === 'elbow45_thread' ||
+    id === 'elbow45_vp_dv' ||
+    id === 'elbow45_vp_ts' ||
+    id === 'y45_vp_dv' ||
+    id === 'y45_reducing_vp_dv'
+  )
+}
+
 // このファイルの関数は実効属性のうち size しか参照しないため、
 // inheritance.ts の Effective 全体ではなくこの最小限の形で受け取る
 // （inheritance.ts 側からも sizeのみのマップで安全に呼べるようにするため）。
@@ -623,7 +642,7 @@ export function computeEnds(
   // エルボtoエルボの短い「オフセットのキック」区間（45°等でオフセットを取るための
   // 短い連結配管）を、隣接する長い区間の芯先/芯々計算へ自動的に畳み込む。
   // 現場では「1000」等の寸法を手前の基準点（本来1本エルボだった位置）から
-  // 先端まで測るため、途中に挟まる短いキック区間の全長も先端側の取り出し
+  // 先端まで測るため、途中に挟まる短いキック区間の分も先端側の取り出し
   // 寸法へ合算しないと、切り寸が実際より長く出てしまう。キック区間自体に
   // オフセット寸法欄などで独自の切り寸（正の値）が付いていても、その区間は
   // あくまで基準点〜先端の一連の測り方の途中にすぎないため、畳み込みは
@@ -632,6 +651,16 @@ export function computeEnds(
   // elbow45_long のとき）。90°エルボ側は、キックが挟まる前と変わらない
   // ごく普通の基準点として扱い、そちら側の隣接区間まで畳み込むと、90°側の
   // 区間の寸法が意図せず縮んでしまう（90°側は元々どおり単独の取り出しのみでよい）。
+  //
+  // 畳み込む量は「基準点(本来1本エルボだった位置)から見て、元の軸方向に
+  // どれだけ進んだか」であって、キック区間自身の実長(斜辺)ではない。
+  // キック区間が45°系継手を含む(=直角二等辺三角形の斜辺として
+  // オフセット量×1.414で芯々が算出されている)場合、実長のまま畳み込むと
+  // 1:1:√2の「√2」(斜辺の実長)を「1」(軸方向の進み=オフセット量)の代わりに
+  // 使ってしまい、控除しすぎて切り寸が短く出てしまう。そのためこの場合は
+  // 1.414で割り戻し、軸方向の進み(オフセット量)だけを畳み込む。45°系を
+  // 含まない(斜めではない)短い連結区間は、実長がそのまま軸方向の進みと
+  // 一致するため、従来通り実長をそのまま畳み込む。
   for (const s of segments) {
     if (s.fitting !== 'elbow45_long') continue
     for (const end of ['start', 'end'] as const) {
@@ -645,7 +674,13 @@ export function computeEnds(
       if (!nbEnds) continue
       const nbOtherEnd = nb.end === 'start' ? 'end' : 'start'
       if (nbEnds[nb.end].role !== 'elbow' || nbEnds[nbOtherEnd].role !== 'elbow') continue
-      out[s.id][end] = { ...result, mm: result.mm + nb.seg.centerLength }
+      const nbIsDiagonalKick =
+        isFortyFiveFitting(nbEnds[nb.end].fittingId) ||
+        isFortyFiveFitting(nbEnds[nbOtherEnd].fittingId)
+      const foldLen = nbIsDiagonalKick
+        ? nb.seg.centerLength / OFFSET_45_FACTOR
+        : nb.seg.centerLength
+      out[s.id][end] = { ...result, mm: result.mm + foldLen }
     }
   }
 
