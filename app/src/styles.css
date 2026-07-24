@@ -1741,6 +1741,69 @@ fieldset.panel-grid:disabled {
   .bom-print-only.a3-landscape .a3-iso-col .print-iso-svg {
     height: 230mm;
   }
+
+  /* 「詳細（複数ページ）」モード全般の用紙サイズ・向き選択。A3横1ページ
+     レイアウト(.a3-landscape、常にcompact)とは独立に、通常の複数ページ
+     出力(!compact)でも選んだ用紙サイズ・向きを実際の@pageに反映する
+     （反映しないと、A3を選んで1ページの目安本数を増やしても、実際の
+     用紙はA4のままで結局はみ出してしまうため）。 */
+  @page a4-landscape {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+  @page a3-portrait {
+    size: A3 portrait;
+    margin: 10mm;
+  }
+  .bom-print-only.paper-a4-landscape {
+    page: a4-landscape;
+  }
+  .bom-print-only.paper-a3-portrait {
+    page: a3-portrait;
+  }
+  .bom-print-only.paper-a3-landscape {
+    page: a3-landscape;
+  }
+
+  /* 詳細（複数ページ）モードのアイソメ図: 従来は高さ固定(620px相当)の
+     箱の下に無条件で改ページしていたため、実際のページ高さとの差分が
+     大きな空白として残っていた。用紙サイズ・向きごとの印刷可能領域の
+     高さいっぱいに(安全に収まる範囲でやや控えめに)スケーリングする。
+     1ページ目だけは表題(h1/日付)と同じページを共有するため、その分
+     低めにする。あふれて意図しない位置で改ページする方が「線の途中で
+     切れる」実害につながるため、余白が残る側に倒して見積もる。 */
+  .bom-print-only:not(.compact) .print-iso-wrap .print-iso-svg {
+    width: 100%;
+    height: 250mm;
+  }
+  .bom-print-only:not(.compact) .print-iso-wrap:first-of-type .print-iso-svg {
+    height: 225mm;
+  }
+  .bom-print-only.paper-a4-landscape:not(.compact) .print-iso-wrap .print-iso-svg {
+    height: 155mm;
+  }
+  .bom-print-only.paper-a4-landscape:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-svg {
+    height: 130mm;
+  }
+  .bom-print-only.paper-a3-portrait:not(.compact) .print-iso-wrap .print-iso-svg {
+    height: 370mm;
+  }
+  .bom-print-only.paper-a3-portrait:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-svg {
+    height: 345mm;
+  }
+  .bom-print-only.paper-a3-landscape:not(.compact) .print-iso-wrap .print-iso-svg {
+    height: 250mm;
+  }
+  .bom-print-only.paper-a3-landscape:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-svg {
+    height: 225mm;
+  }
+
   /* アプリ本体(#root)は fixed/absolute配置と 100vh 固定+overflow:hidden の
      1画面レイアウトなので、これを印刷対象に含めると1ページ分の高さで
      切り取られてしまう。印刷時は#root自体を非表示にし、.bom-print-only は

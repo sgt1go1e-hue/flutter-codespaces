@@ -1,6 +1,7 @@
 import { Fragment, useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { bomToCsv, computeAssemblyTable, type Bom } from '../lib/bom'
+import { chunkSegmentsForPrint, segmentsPerIsoPage } from '../lib/isoPagination'
 import { PrintIsometric } from './PrintIsometric'
 import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
@@ -310,7 +311,7 @@ export function BomModal({
         画面には出さず、画面プレビュー(preview)または印刷/PDF化のときだけ表示する。 */}
     {createPortal(
       <div
-        className={`bom-print-only${compact ? ' compact' : ''}${previewOpen ? ' preview' : ''}${a3Landscape1Page ? ' a3-landscape' : ''}`}
+        className={`bom-print-only${compact ? ' compact' : ''}${previewOpen ? ' preview' : ''}${a3Landscape1Page ? ' a3-landscape' : ''} paper-${paperSize}-${orientation}`}
       >
         <div className="preview-toolbar">
           <button className="preview-print-btn" onClick={printAsPdf}>
@@ -328,17 +329,35 @@ export function BomModal({
           // アイソメ図・各明細表のJSXは、通常レイアウト(縦積み・複数ページ)と
           // A3横1ページレイアウト(左2/3アイソメ図・右1/3明細)の両方で共通の
           // ものを使う（データ・計算ロジックは一切変えず、配置だけを分ける）。
-          const isoBlock = segments.length > 0 && (
-            <div className="print-iso-wrap">
-              <h2>アイソメ図</h2>
-              <PrintIsometric
-                segments={segments}
-                effectiveById={effectiveById}
-                crossoverGaps={crossoverGaps}
-                cutById={cutById}
-                baseSlopeDenom={baseSlopeDenom}
-              />
-            </div>
+          //
+          // 「詳細（複数ページ）」モード(!compact)だけ、アイソメ図を区間数の
+          // 目安(A4=10本・A3=20本)でページ単位に分割する。線(セグメント)の
+          // 途中では絶対に切れないよう、必ずセグメント単位でまとめる
+          // （chunkSegmentsForPrint）。「1ページに集約」(compact)や
+          // A3横1ページレイアウトは、これまで通り1枚のSVGに全体を収める。
+          const isoPages = compact
+            ? segments.length > 0
+              ? [segments]
+              : []
+            : chunkSegmentsForPrint(segments, segmentsPerIsoPage(paperSize))
+          const isoBlock = isoPages.length > 0 && (
+            <>
+              {isoPages.map((pageSegments, i) => (
+                <div className="print-iso-wrap" key={i}>
+                  <h2>
+                    アイソメ図
+                    {isoPages.length > 1 ? `（${i + 1}/${isoPages.length}）` : ''}
+                  </h2>
+                  <PrintIsometric
+                    segments={pageSegments}
+                    effectiveById={effectiveById}
+                    crossoverGaps={crossoverGaps}
+                    cutById={cutById}
+                    baseSlopeDenom={baseSlopeDenom}
+                  />
+                </div>
+              ))}
+            </>
           )
 
           const pipesBlock = bom.pipes.length > 0 && (
