@@ -1210,6 +1210,18 @@ fieldset.panel-grid:disabled {
   color: var(--text);
 }
 
+/* 日替わり挨拶メッセージ(disclaimer-*と同じ枠組みを流用) */
+.daily-greeting-body {
+  text-align: center;
+  font-size: 17px;
+  font-weight: 700;
+  padding-top: 28px;
+}
+
+.daily-greeting-body p {
+  margin: 0 0 6px;
+}
+
 /* --- メニューの並び替え設定 --- */
 .menu-order-list {
   list-style: none;

@@ -3,6 +3,7 @@ import { DrawingCanvas } from './components/DrawingCanvas'
 import { SegmentPanel, DrawSettingsPanel } from './components/AttributePanel'
 import { PartsPalette } from './components/PartsPalette'
 import { DisclaimerModal } from './components/DisclaimerModal'
+import { DailyGreetingModal } from './components/DailyGreetingModal'
 import { BomModal } from './components/BomModal'
 import { MenuOrderModal } from './components/MenuOrderModal'
 import { DEFAULT_MENU_ORDER, sanitizeMenuOrder, type MenuItemId } from './lib/menuOrder'
@@ -59,6 +60,15 @@ const CONSENT_VERSION = 1
 
 function makeId(): string {
   return `seg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+}
+
+// 日替わり挨拶メッセージの判定に使う「今日の日付」キー(端末のローカル日付、
+// YYYY-MM-DD)。toISOString()はUTCに変換されるため、日本時間の深夜前後で
+// 日付がずれることがあり使わない。
+function todayDateKey(): string {
+  const d = new Date()
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}`
 }
 
 // 両フランジ: 対象セグメントを投影点で前後2本に分割する。
@@ -243,6 +253,13 @@ export default function App() {
   }>('piping-iso:consent', {})
   // 免責事項の再確認モーダル（設定からいつでも表示）
   const [reviewDisclaimer, setReviewDisclaimer] = useState(false)
+  // 日替わり挨拶メッセージ。最後に表示した日付(端末保存)と今日の日付が
+  // 違えば、その日まだ見せていないので1回だけ表示する。
+  const [lastGreetingDate, setLastGreetingDate] = useLocalStorage(
+    'piping-iso:dailyGreeting:lastShown',
+    '',
+  )
+  const [showDailyGreeting, setShowDailyGreeting] = useState(false)
   // 材料集計(BOM)モーダルの表示
   const [showBom, setShowBom] = useState(false)
   // 図面共有(権限付きファイル共有)モーダルの表示
@@ -742,6 +759,21 @@ export default function App() {
     setConsent({ version: CONSENT_VERSION, agreedAt: new Date().toISOString() })
   }
 
+  // 初回同意(ベータロックとは独立)が済み、通常のアプリ画面が表示される
+  // タイミングで、今日まだ挨拶メッセージを見せていなければ1回だけ出す。
+  useEffect(() => {
+    if (needConsent) return
+    if (lastGreetingDate !== todayDateKey()) {
+      setShowDailyGreeting(true)
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [needConsent])
+
+  function closeDailyGreeting() {
+    setLastGreetingDate(todayDateKey())
+    setShowDailyGreeting(false)
+  }
+
   // --- パーツ ドラッグ&ドロップ ---
   function dropPart(partId: string, clientX: number, clientY: number) {
     if (!canEditStructure) return
@@ -1126,6 +1158,10 @@ export default function App() {
           onAgree={() => setReviewDisclaimer(false)}
           onClose={() => setReviewDisclaimer(false)}
         />
+      )}
+      {/* 日替わり挨拶（初回同意が済んでいる通常画面でのみ、その日1回だけ表示） */}
+      {!needConsent && showDailyGreeting && (
+        <DailyGreetingModal onClose={closeDailyGreeting} />
       )}
     </div>
   )
