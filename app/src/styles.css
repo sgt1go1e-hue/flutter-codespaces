@@ -1920,31 +1920,35 @@ fieldset.panel-grid:disabled {
 }
 
 /* --- クイック計算（芯引き）画面 ---
-   以前は外側(.qc-screen)を overflow:hidden にし、内側(.qc-body)だけを
-   overflow-y:auto でスクロールさせる「入れ子スクロール」構成だったが、
-   この構成だと「ページ全体をキャプチャする」系のスクリーンショット
-   ツール（ブラウザの全ページキャプチャ機能等、ビューポートを一時的に
-   コンテンツの高さまで拡張して撮る方式）が内側スクロール位置とうまく
-   整合を取れず、ヘッダーと本文が二重に見える描画崩れを起こしていた
-   （実際のスクロール操作では発生しない、キャプチャ方式特有の不整合）。
-   スクロール領域を.qc-screen側1箇所に統一し、ヘッダーはposition:sticky
-   で追従させることで、入れ子スクロールそのものを無くして解消する。 */
+   以前は外側(.qc-screen)をoverflow:hiddenにし、内側(.qc-body)だけを
+   overflow-y:autoでスクロールさせる「入れ子スクロール」構成だったが、
+   一度この構成を「ヘッダーをposition:stickyにして.qc-screen側1箇所の
+   スクロールに統一する」形に変更したことがあった。しかしposition:sticky
+   は、数値入力欄が多いこの画面で端末のソフトウェアキーボードが
+   開閉してビューポート高さが変わるたびに、Safari等で古い位置の
+   ヘッダーが再描画されず残ってしまう（本文と重なって見える）不具合が
+   実機で再現したため撤回する。
+   代わりに、作図画面(.app/.stage)と同じ「ヘッダーは通常のフローに
+   固定表示(flex-shrink:0)、本文側だけをflex:1のスクロール領域にする」
+   構成にする。ヘッダーにposition:sticky/fixedを一切使わないため、
+   ビューポート変化時の再描画不整合そのものが起こり得ない。 */
 .qc-screen {
   display: flex;
   flex-direction: column;
   height: 100%;
-  overflow-y: auto;
-  overflow-x: hidden;
-  -webkit-overflow-scrolling: touch;
+  overflow: hidden;
 }
 
 .qc-screen .topbar {
-  position: sticky;
-  top: 0;
-  z-index: 5;
+  flex-shrink: 0;
 }
 
 .qc-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
   padding: 14px;
   padding-bottom: max(14px, env(safe-area-inset-bottom));
   display: flex;
