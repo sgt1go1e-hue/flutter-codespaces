@@ -778,6 +778,20 @@ body {
   gap: 8px 12px;
 }
 
+/* panel-grid を <fieldset> として使う箇所（図面共有の「寸法のみ編集可」で
+   継手・管種等の構成項目をまとめて編集不可にするため）。ブラウザ既定の
+   fieldset の枠線・余白をリセットし、通常の div と同じ見た目にする。 */
+fieldset.panel-grid {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+fieldset.panel-grid:disabled {
+  opacity: 0.55;
+}
+
 /* パネル内の field は上下の余白を詰める */
 .panel-body .field {
   padding: 4px 0;
@@ -2114,4 +2128,241 @@ body {
     margin: 0 auto;
     width: 100%;
   }
+}
+
+/* ============================================================
+   図面共有機能（権限付きファイル共有）
+   ============================================================ */
+
+.note-panel-hint {
+  margin-top: 10px;
+}
+
+.note-panel-dim {
+  font-weight: 700;
+  color: var(--text);
+  margin: 4px 2px 12px;
+}
+
+.note-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-empty {
+  color: var(--hint);
+  font-size: 13px;
+  padding: 4px 2px;
+}
+
+.note-item {
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.note-item-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.note-item-date {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.note-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-input {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.note-add-btn {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.note-add-btn:disabled {
+  opacity: 0.5;
+}
+
+/* 共有(エクスポート)モーダル・権限選択 */
+.share-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 60;
+}
+
+@media (min-width: 700px) {
+  .share-modal-backdrop {
+    align-items: center;
+  }
+}
+
+.share-modal {
+  background: var(--panel);
+  color: var(--text);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (min-width: 700px) {
+  .share-modal {
+    border-radius: 16px;
+  }
+}
+
+.share-modal h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.share-modal-desc {
+  margin: 0;
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.share-permission-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-permission-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.share-permission-option.active {
+  border-color: var(--accent);
+  background: var(--field-bg);
+}
+
+.share-permission-option input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.share-permission-option-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.share-permission-option-desc {
+  font-size: 12px;
+  color: var(--hint);
+  margin-top: 2px;
+}
+
+.share-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.share-modal-actions button {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.share-modal-cancel {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.share-modal-submit {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+}
+
+.share-modal-error {
+  color: var(--label-over);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ランチャーの共有ファイルを開くボタン */
+.launcher-import {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 10px;
+}
+
+/* 共有図面を開いているときの権限バナー（トップバー下・常設） */
+.share-permission-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: #1e1509;
+  border-bottom: 1px solid #9a3412;
+  color: var(--text);
+}
+
+.share-permission-banner b {
+  color: var(--accent);
+}
+
+.share-permission-banner button {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text);
+  font-size: 12px;
 }

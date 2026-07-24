@@ -8,6 +8,16 @@ import { MenuOrderModal } from './components/MenuOrderModal'
 import { DEFAULT_MENU_ORDER, sanitizeMenuOrder, type MenuItemId } from './lib/menuOrder'
 import { DrawingLauncher } from './components/DrawingLauncher'
 import { QuickCalc } from './components/QuickCalc'
+import { ShareExportModal } from './components/ShareExportModal'
+import { NotePanel } from './components/NotePanel'
+import {
+  parseShareFile,
+  makeNoteId,
+  SHARE_PERMISSION_LABELS,
+  type SharePermission,
+  type SegmentNote,
+} from './lib/shareFile'
+import { loadShareMeta, saveShareMeta } from './lib/shareStore'
 import { computeBom } from './lib/bom'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
@@ -235,6 +245,15 @@ export default function App() {
   const [reviewDisclaimer, setReviewDisclaimer] = useState(false)
   // 材料集計(BOM)モーダルの表示
   const [showBom, setShowBom] = useState(false)
+  // 図面共有(権限付きファイル共有)モーダルの表示
+  const [showShareExport, setShowShareExport] = useState(false)
+  // 現在開いている図面の共有権限。共有ファイルから受け取った図面だけ
+  // 'full'以外になる（自分で作った/開いた通常の図面は常にフル編集）。
+  const [sharePermission, setSharePermission] = useState<SharePermission>('full')
+  // 共有図面(注記のみ)で線ごとに追加したメモ
+  const [notes, setNotes] = useState<SegmentNote[]>([])
+  // 現在の図面が共有ファイルから受け取ったものかどうか（notesの永続化要否の判定に使う）
+  const [isImportedDrawing, setIsImportedDrawing] = useState(false)
   // 画面下段メニューの並び順（端末に保存。並び替え設定でいつでも変更・
   // 初期順序に戻せる）。将来項目が増減しても壊れないよう、読み込み時に
   // sanitizeMenuOrder で必ず全項目が揃った状態に補修する。
@@ -245,6 +264,12 @@ export default function App() {
   const menuOrder = useMemo(() => sanitizeMenuOrder(menuOrderRaw), [menuOrderRaw])
   const [showMenuOrder, setShowMenuOrder] = useState(false)
   const needConsent = consent.version !== CONSENT_VERSION
+  // 図面共有機能の権限フラグ。'full'(通常の自分の図面、または共有元がフル編集を
+  // 許可した図面)のときだけ、作図・削除・全消去・部材配置・配管設定の変更ができる。
+  // 'dimensions'は芯々/芯先の寸法値の入力欄だけ、'annotate'は線ごとのメモ追加だけ、
+  // 'view'は一切の編集ができない。
+  const canEditStructure = sharePermission === 'full'
+  const canAnnotate = sharePermission === 'annotate'
   // これから描く線に適用する初期設定（線を選択せず通常画面で入力）
   const [defaults, setDefaults] = useLocalStorage<{
     pipeType?: string
@@ -354,6 +379,13 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments, drawingId])
 
+  // 共有ファイルから受け取った図面のメモを自動保存する（通常のローカル図面には
+  // このキー自体を作らない）。
+  useEffect(() => {
+    if (!drawingId || !isImportedDrawing) return
+    saveShareMeta(drawingId, { permission: sharePermission, notes })
+  }, [drawingId, isImportedDrawing, sharePermission, notes])
+
   function createNewDrawing() {
     setHistory([])
     setDrawingId(makeDrawingId())
@@ -361,6 +393,9 @@ export default function App() {
     setSelectedId(null)
     setEraserMode(false)
     setView({ scale: 1, tx: 0, ty: 0 })
+    setSharePermission('full')
+    setNotes([])
+    setIsImportedDrawing(false)
     setScreen('drawing')
   }
 
@@ -371,7 +406,52 @@ export default function App() {
     setSelectedId(null)
     setEraserMode(false)
     setView({ scale: 1, tx: 0, ty: 0 })
+    // 共有ファイルから受け取った図面だけ、保存済みの権限・メモを読み込む
+    // （通常のローカル図面にはこのキー自体が存在せず、常にフル編集になる）。
+    const shareMeta = loadShareMeta(id)
+    setSharePermission(shareMeta?.permission ?? 'full')
+    setNotes(shareMeta?.notes ?? [])
+    setIsImportedDrawing(shareMeta != null)
     setScreen('drawing')
+  }
+
+  // 共有ファイル(LINE・AirDrop等で受け取ったもの)を選んで新しい図面として開く。
+  // サーバーは使わず、選んだファイルをその場で読み込むだけ。
+  async function importShareFile(file: File) {
+    const text = await file.text()
+    const parsed = parseShareFile(text)
+    if (!parsed) {
+      alert('共有ファイルを読み込めませんでした。ファイルが壊れているか、対応していない形式です。')
+      return
+    }
+    const id = makeDrawingId()
+    saveDrawingSegments(id, parsed.segments)
+    saveShareMeta(id, { permission: parsed.permission, notes: parsed.notes })
+    const now = Date.now()
+    setDrawingIndex((prev) => {
+      const meta: DrawingMeta = {
+        id,
+        createdAt: now,
+        updatedAt: now,
+        segCount: parsed.segments.length,
+        name: parsed.drawingName ? `${parsed.drawingName}（受信）` : '共有で受信した図面',
+      }
+      const next = [...prev, meta]
+      saveIndex(next)
+      return next
+    })
+    openDrawing(id)
+  }
+
+  // 「注記のみ」権限の図面で、選択中の線にメモを追加する
+  function addNote(segmentId: string, text: string) {
+    const note: SegmentNote = {
+      id: makeNoteId(),
+      segmentId,
+      text,
+      createdAt: new Date().toISOString(),
+    }
+    setNotes((prev) => [...prev, note])
   }
 
   function goToLauncher() {
@@ -531,6 +611,7 @@ export default function App() {
   }
 
   function addSegment(seg: Omit<Segment, 'id'>) {
+    if (!canEditStructure) return
     const parentId = findParentId(seg.start)
     const applied: Segment = { ...seg, id: makeId(), parentId }
     // 接続方法は継承対象外なので、全ての新規線に初期設定を適用
@@ -615,7 +696,7 @@ export default function App() {
   }
 
   function deleteSelected() {
-    if (!selectedId) return
+    if (!selectedId || !canEditStructure) return
     if (confirm('このセグメントを削除しますか？')) {
       mutateSegments((prev) => prev.filter((s) => s.id !== selectedId))
     }
@@ -627,6 +708,7 @@ export default function App() {
   // ものなので、1本ずつ確認ダイアログを出すと本来の目的を損なう（「元に戻す」で
   // 復元できるため安全性は確保している）。
   function eraseSegment(id: string) {
+    if (!canEditStructure) return
     mutateSegments((prev) => prev.filter((s) => s.id !== id))
     if (selectedId === id) setSelectedId(null)
   }
@@ -641,7 +723,7 @@ export default function App() {
   }
 
   function clearAll() {
-    if (segments.length === 0) return
+    if (segments.length === 0 || !canEditStructure) return
     if (confirm('図面をすべて消去しますか？')) {
       // 「元に戻す」履歴も一緒に消す。mutateSegments経由だと消去前の
       // segmentsが履歴に積まれてしまい、全消去の直後に元に戻すを押すと
@@ -662,6 +744,7 @@ export default function App() {
 
   // --- パーツ ドラッグ&ドロップ ---
   function dropPart(partId: string, clientX: number, clientY: number) {
+    if (!canEditStructure) return
     const rect = stageRef.current?.getBoundingClientRect()
     if (!rect) return
     // キャンバスがピンチズーム・パンされていると、画面座標をそのまま論理座標として
@@ -764,12 +847,16 @@ export default function App() {
       </button>
     ),
     undo: (
-      <button key="undo" onClick={undo} disabled={history.length === 0}>
+      <button key="undo" onClick={undo} disabled={history.length === 0 || !canEditStructure}>
         元に戻す
       </button>
     ),
     clearAll: (
-      <button key="clearAll" onClick={clearAll} disabled={segments.length === 0}>
+      <button
+        key="clearAll"
+        onClick={clearAll}
+        disabled={segments.length === 0 || !canEditStructure}
+      >
         全消去
       </button>
     ),
@@ -778,10 +865,11 @@ export default function App() {
         key="eraser"
         className={`eraser-toggle${eraserMode ? ' active' : ''}`}
         onClick={() => {
+          if (!canEditStructure) return
           setEraserMode((m) => !m)
           setSelectedId(null)
         }}
-        disabled={segments.length === 0}
+        disabled={segments.length === 0 || !canEditStructure}
         title="オンの間は線をタップするとその場で即削除します"
       >
         🧹 消しゴム{eraserMode ? '中' : ''}
@@ -798,6 +886,18 @@ export default function App() {
         disabled={segments.length === 0}
       >
         集計・拾い出し
+      </button>
+    ),
+    share: (
+      <button
+        key="share"
+        onClick={() => {
+          setEraserMode(false)
+          setShowShareExport(true)
+        }}
+        disabled={segments.length === 0}
+      >
+        📤 共有
       </button>
     ),
     disclaimer: (
@@ -835,6 +935,7 @@ export default function App() {
           onRename={renameDrawing}
           onDelete={deleteDrawing}
           onQuickCalc={openQuickCalc}
+          onImportFile={importShareFile}
         />
       )}
 
@@ -842,13 +943,26 @@ export default function App() {
 
       {screen === 'drawing' && (
         <>
+      {/* 図面共有機能で権限が制限されているとき、常に見える位置で権限を明示する
+          （なぜ編集できないか分かるように）。 */}
+      {sharePermission !== 'full' && (
+        <div className="share-permission-banner">
+          共有権限: <b>{SHARE_PERMISSION_LABELS[sharePermission]}</b>
+          <button type="button" onClick={() => setShowShareExport(true)}>
+            送り返す
+          </button>
+        </div>
+      )}
+
       {/* パーツ(両フランジ・レジューサー等)は画面上部に常設（親指の届く下部は
           「元に戻す」等の頻用メニューに譲る。ドラッグして配管上へ配置する
-          操作自体は位置に関係なく機能する）。 */}
-      <PartsPalette
-        onDragStart={(partId, x, y) => setPartDrag({ partId, x, y })}
-        draggingId={partDrag?.partId ?? null}
-      />
+          操作自体は位置に関係なく機能する）。フル編集権限のときだけ表示する。 */}
+      {canEditStructure && (
+        <PartsPalette
+          onDragStart={(partId, x, y) => setPartDrag({ partId, x, y })}
+          draggingId={partDrag?.partId ?? null}
+        />
+      )}
 
       <main className="stage" ref={stageRef}>
         <DrawingCanvas
@@ -861,10 +975,11 @@ export default function App() {
           crossoverGaps={crossoverGaps}
           cutById={cutById}
           inputDisabled={partDrag !== null}
+          disableDraw={!canEditStructure}
           view={view}
           onViewChange={setView}
           baseSlopeDenom={defaults.slopeDenom}
-          eraserMode={eraserMode}
+          eraserMode={eraserMode && canEditStructure}
           onEraseSegment={eraseSegment}
           assemblyNumberActive={assemblyNumberActive}
           assemblyNumberById={assemblyNumberById}
@@ -888,11 +1003,24 @@ export default function App() {
           onToggle={() => setSettingsOpen((v) => !v)}
           segmentCount={segments.length}
           onOpenMenuOrder={() => setShowMenuOrder(true)}
+          disabled={!canEditStructure}
         />
       </main>
 
-      {/* 寸法・属性の編集パネル（線を選択したときだけ表示。作図設定とは独立） */}
-      {selected && (
+      {/* 寸法・属性の編集パネル（線を選択したときだけ表示。作図設定とは独立）。
+          共有権限が「注記のみ」なら通常のパネルの代わりにメモ専用パネルを、
+          「閲覧のみ」ならどちらも表示しない。 */}
+      {selected && canAnnotate && (
+        <NotePanel
+          segment={selected}
+          effective={effectiveById[selected.id]}
+          cut={cutById[selected.id]}
+          notes={notes.filter((n) => n.segmentId === selected.id)}
+          onAddNote={(text) => addNote(selected.id, text)}
+          onClose={closeSelection}
+        />
+      )}
+      {selected && sharePermission !== 'view' && !canAnnotate && (
         <SegmentPanel
           segment={selected}
           effective={effectiveById[selected.id]}
@@ -922,6 +1050,7 @@ export default function App() {
           onChange={updateSelected}
           onDelete={deleteSelected}
           onClose={closeSelection}
+          canEditStructure={canEditStructure}
         />
       )}
 
@@ -956,7 +1085,7 @@ export default function App() {
           cutById={cutById}
           baseSlopeDenom={defaults.slopeDenom}
           assemblyNumberById={assemblyNumberById}
-          onRenumber={setAssemblyNumberOverride}
+          onRenumber={canEditStructure ? setAssemblyNumberOverride : () => {}}
           onClose={() => setShowBom(false)}
         />
       )}
@@ -967,6 +1096,19 @@ export default function App() {
           order={menuOrder}
           onChange={setMenuOrderRaw}
           onClose={() => setShowMenuOrder(false)}
+        />
+      )}
+
+      {/* 図面共有(エクスポート)。フル編集権限で自分の図面から新規共有する場合と、
+          制限付き権限で受け取った図面を編集後に送り返す場合の両方で使う
+          （送り返す場合は現在の権限を初期選択にしておく）。 */}
+      {showShareExport && (
+        <ShareExportModal
+          segments={segments}
+          notes={notes}
+          initialPermission={isImportedDrawing ? sharePermission : undefined}
+          drawingName={drawingIndex.find((d) => d.id === drawingId)?.name}
+          onClose={() => setShowShareExport(false)}
         />
       )}
         </>

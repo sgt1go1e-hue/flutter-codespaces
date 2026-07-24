@@ -51,6 +51,12 @@ interface Props {
   eraserMode?: boolean
   onEraseSegment?: (id: string) => void
   /**
+   * 図面共有機能で「閲覧のみ／注記のみ／寸法のみ編集可」で開いているとき、
+   * 新しい線の作図(ドラッグ)だけを無効化する。inputDisabledと違い、タップに
+   * よる選択やピンチズーム・パンはそのまま使える（読む・確認する用途のため）。
+   */
+  disableDraw?: boolean
+  /**
    * 相番(合番)表示が有効か（セグメント数による自動判定 or 手動ON/OFF）。
    * 有効な区間は、芯々/切り寸法の2段表記の代わりに番号だけを表示する
    * （既存の芯々/切り寸法の計算結果自体は変えない。表示の切り替えのみ）。
@@ -167,6 +173,7 @@ export function DrawingCanvas({
   baseSlopeDenom,
   eraserMode = false,
   onEraseSegment,
+  disableDraw = false,
   assemblyNumberActive = false,
   assemblyNumberById = {},
 }: Props) {
@@ -375,10 +382,11 @@ export function DrawingCanvas({
     const start = startLocalRef.current
     const s = snappedStartRef.current
     if (!start || !s) return
-    if (eraserMode) {
-      // 消しゴムモード中は新しい線のプレビュー(＝描画)を出さない。タップ判定
-      // 自体(タップ/ドラッグの区別)は handlePointerUp 側でそのまま使い、
-      // ドラッグと判定された場合は「何もしない」に倒す（誤って線を描かない）。
+    if (eraserMode || disableDraw) {
+      // 消しゴムモード中、または共有権限で作図が無効化されているときは、
+      // 新しい線のプレビュー(＝描画)を出さない。タップ判定自体(タップ/ドラッグ
+      // の区別)は handlePointerUp 側でそのまま使い、ドラッグと判定された場合は
+      // 「何もしない」に倒す（誤って線を描かない）。
       return
     }
     const pScreen = toScreenLocal(e.clientX, e.clientY)
@@ -450,8 +458,10 @@ export function DrawingCanvas({
         }
       } else if (!isTap) {
         // ドラッグ = 描画（呼び径ラベルの上から描き始めていても、動かした以上は
-        // 常に新しい線の描画として扱う。タップは発生させない）
-        onAddSegment({ start: s, end, angle })
+        // 常に新しい線の描画として扱う。タップは発生させない）。共有権限で
+        // 作図が無効化されているときは何もしない（プレビューも出していないため
+        // 実害はないが、念のためここでも確実に弾く）。
+        if (!disableDraw) onAddSegment({ start: s, end, angle })
       } else {
         // タップ（動かさず離す）= 呼び径ラベルの上で押していればそれを優先、
         // なければ通常どおり線上の当たり判定で選択。どちらもなければ選択解除。

@@ -143,6 +143,14 @@ interface SegmentPanelProps {
   onDelete: () => void
   /** パネルを閉じる（選択解除）。常に押しやすい固定位置のボタンとして用意。 */
   onClose: () => void
+  /**
+   * 図面共有機能で「寸法のみ編集可」で開いているときは false。継手・管種・
+   * サイズ・接続方法・フランジ・相番など、芯々/芯先の寸法値以外の全項目を
+   * 編集不可にする（削除・自動採番の上書き・エルボ振り分け提案の適用も含む）。
+   * 芯々寸法・オフセット寸法・レジューサーのメイン側/先端側寸法の入力欄
+   * だけは、この値によらず常に編集可能。
+   */
+  canEditStructure?: boolean
 }
 
 export function SegmentPanel({
@@ -172,6 +180,7 @@ export function SegmentPanel({
   onChange,
   onDelete,
   onClose,
+  canEditStructure = true,
 }: SegmentPanelProps) {
   const dimRef = useRef<HTMLInputElement>(null)
   const offsetRef = useRef<HTMLInputElement>(null)
@@ -260,9 +269,11 @@ export function SegmentPanel({
           <b>{sizeText}</b>
           <span className="sum-fit">{fittingName}</span>
         </span>
-        <span className="panel-delete" role="button" onClick={onDelete}>
-          削除
-        </span>
+        {canEditStructure && (
+          <span className="panel-delete" role="button" onClick={onDelete}>
+            削除
+          </span>
+        )}
         {/* 常に押しやすい固定位置のクローズボタン（キーボード表示中もここは隠れない） */}
         <button type="button" className="panel-close" onClick={onClose} aria-label="閉じる">
           ✕
@@ -273,7 +284,7 @@ export function SegmentPanel({
             区間だけ表示する。既定値は配管の接続順で自動採番された番号。ここで
             数値を変えると、その値が優先され(手動上書き)、自動採番のやり直しでも
             上書きされなくなる。空にすると自動採番へ戻る。 */}
-        {assemblyNumberActive && cut && cut.status !== 'none' && (
+        {assemblyNumberActive && cut && cut.status !== 'none' && canEditStructure && (
           <div className="assembly-number-row">
             <span className="field-label">相番</span>
             <input
@@ -303,7 +314,7 @@ export function SegmentPanel({
           </div>
         )}
         {/* ① 継手・分岐タイプ選択（最重要・スクロール不要で見える最上部） */}
-        <div className="panel-grid">
+        <fieldset className="panel-grid" disabled={!canEditStructure}>
           <label className="field">
             <span className="field-label">継手</span>
             <select
@@ -376,7 +387,7 @@ export function SegmentPanel({
               </select>
             </label>
           )}
-        </div>
+        </fieldset>
 
         {cut?.needsWyeRole && (
           <div className="socket-gap-warn">
@@ -388,7 +399,7 @@ export function SegmentPanel({
 
         {/* レジューサー / 径違いチーズ: 相手径・合わせ面 */}
         {needsCounterpart && (
-          <div className="panel-grid reducer-grid">
+          <fieldset className="panel-grid reducer-grid" disabled={!canEditStructure}>
             <label className="field">
               <span className="field-label">
                 相手径
@@ -428,7 +439,7 @@ export function SegmentPanel({
                 </select>
               </label>
             )}
-          </div>
+          </fieldset>
         )}
 
         {/* レジューサーの面間寸法(H)がマスタ(reducerLengths.ts)に無い組み合わせのとき、
@@ -448,6 +459,7 @@ export function SegmentPanel({
                 type="number"
                 inputMode="decimal"
                 placeholder="例: 101.6"
+                disabled={!canEditStructure}
                 value={segment.reducerLengthOverride ?? ''}
                 onChange={(e) =>
                   onChange({
@@ -704,7 +716,7 @@ export function SegmentPanel({
           )}
 
           {/* エルボtoエルボの間隔不足の提案は、切り寸法のすぐ下（目に入りやすい位置）に出す。 */}
-          {cut?.status === 'over' && elbowClash && onApplyElbowClash && (
+          {cut?.status === 'over' && elbowClash && onApplyElbowClash && canEditStructure && (
             <div className="elbow-clash-suggest">
               <p>
                 {elbowClash.suggestion === 'double45'
@@ -733,7 +745,7 @@ export function SegmentPanel({
         )}
 
         {/* ④ 接続方法 */}
-        <div className="panel-grid">
+        <fieldset className="panel-grid" disabled={!canEditStructure}>
           <label className="field">
             <span className="field-label">接続方法</span>
             <select
@@ -793,7 +805,7 @@ export function SegmentPanel({
                 )}
               </>
             )}
-        </div>
+        </fieldset>
 
         {/* 角ニップルは個体差・材質でねじ込み量が変わり芯々を一定に算出できない
             ため、本アプリでは扱わない旨を接続方法=ねじ込み選択時に明示する。 */}
@@ -845,7 +857,10 @@ export function SegmentPanel({
 
         {/* ⑥ 管種・サイズ。分岐や口径変更があるときだけ重要なため、継承のままなら
             控えめに、この区間で個別に上書きしているときだけ枠色とバッジで強調する。 */}
-        <div className={`panel-grid pipe-size-group${pipeSizeOverridden ? ' overridden' : ''}`}>
+        <fieldset
+          className={`panel-grid pipe-size-group${pipeSizeOverridden ? ' overridden' : ''}`}
+          disabled={!canEditStructure}
+        >
           {pipeSizeOverridden && <span className="pipe-size-badge">個別変更あり</span>}
           <label className="field">
             <span className="field-label">管種</span>
@@ -894,13 +909,13 @@ export function SegmentPanel({
               </select>
             </label>
           )}
-        </div>
+        </fieldset>
 
         {/* ⑦ パーツ（フランジ・レジューサー等） */}
         {/* ルートギャップ（接続方法が溶接のときだけ表示・全溶接箇所共通）。
             突き合わせ溶接で裏波を出すために設ける隙間分、切り寸法から追加で控除する。 */}
         {segment.connection === 'weld' && (
-          <div className="panel-grid">
+          <fieldset className="panel-grid" disabled={!canEditStructure}>
             <label className="field round-field">
               <span className="field-label">
                 ルートギャップ(mm)
@@ -918,13 +933,13 @@ export function SegmentPanel({
                 }
               />
             </label>
-          </div>
+          </fieldset>
         )}
 
         {/* フランジ引きしろ（フランジが付いた端があるときだけ表示・全フランジ共通）。
             溶接フランジ等は引きしろが任意のため手入力する。 */}
         {(segment.startFlange || segment.endFlange) && (
-          <div className="panel-grid">
+          <fieldset className="panel-grid" disabled={!canEditStructure}>
             <label className="field round-field">
               <span className="field-label">
                 フランジ引きしろ(mm)
@@ -975,12 +990,12 @@ export function SegmentPanel({
                 </div>
               )}
             </div>
-          </div>
+          </fieldset>
         )}
 
         <details className="panel-more">
           <summary>フランジ（始点 / 終点）</summary>
-          <div className="panel-grid">
+          <fieldset className="panel-grid" disabled={!canEditStructure}>
             <label className="field">
               <span className="field-label">始点側</span>
               <select
@@ -1011,11 +1026,11 @@ export function SegmentPanel({
                 <option value="single">片フランジ</option>
               </select>
             </label>
-          </div>
+          </fieldset>
         </details>
 
         {/* ⑧ 切り寸法の丸め（最下部・スクロールしないと見えない位置） */}
-        <div className="panel-grid">
+        <fieldset className="panel-grid" disabled={!canEditStructure}>
           <div className="field round-field">
             <span className="field-label">切り寸法の丸め</span>
             <div className="round-toggle">
@@ -1035,7 +1050,7 @@ export function SegmentPanel({
               </button>
             </div>
           </div>
-        </div>
+        </fieldset>
       </div>
     </section>
   )
@@ -1053,6 +1068,8 @@ interface DrawSettingsPanelProps {
   segmentCount: number
   /** 画面下段メニューの並び替え設定を開く */
   onOpenMenuOrder: () => void
+  /** 図面共有機能でフル編集以外の権限のとき true。作図設定の変更を封じる。 */
+  disabled?: boolean
 }
 
 export function DrawSettingsPanel({
@@ -1062,6 +1079,7 @@ export function DrawSettingsPanel({
   onToggle,
   segmentCount,
   onOpenMenuOrder,
+  disabled = false,
 }: DrawSettingsPanelProps) {
   const sizes = sizesForPipeType(defaults.pipeType)
   const od = getSizeInfo(defaults.size)?.od
@@ -1085,6 +1103,12 @@ export function DrawSettingsPanel({
       </button>
       {open && (
         <div className="panel-body">
+          {disabled ? (
+            <p className="panel-hint">
+              この図面は共有元の権限により、作図・配管設定を変更できません。
+            </p>
+          ) : (
+          <>
           <p className="panel-hint">これから描く線に適用する初期値です（線の選択は不要）。</p>
           <div className="panel-grid">
             <label className="field">
@@ -1227,6 +1251,8 @@ export function DrawSettingsPanel({
               </select>
             </label>
           </div>
+          </>
+          )}
 
           {/* 画面下段メニューの並び順を変更する設定への入り口。
               ボタン自体は独立した操作なので管種・サイズ等のグリッドとは

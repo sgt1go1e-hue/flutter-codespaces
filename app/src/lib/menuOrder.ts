@@ -5,6 +5,7 @@ export type MenuItemId =
   | 'eraser'
   | 'clearAll'
   | 'bom'
+  | 'share'
   | 'quickCalc'
   | 'newDrawing'
   | 'openLauncher'
@@ -19,6 +20,7 @@ export const DEFAULT_MENU_ORDER: MenuItemId[] = [
   'eraser',
   'clearAll',
   'bom',
+  'share',
   'quickCalc',
   'newDrawing',
   'openLauncher',
@@ -32,6 +34,7 @@ export const MENU_ITEM_LABELS: Record<MenuItemId, string> = {
   eraser: '消しゴム',
   clearAll: '全消去',
   bom: '集計・拾い出し',
+  share: '共有',
   quickCalc: 'クイック計算',
   newDrawing: '新規作成',
   openLauncher: '過去の図面',

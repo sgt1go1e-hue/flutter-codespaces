@@ -1,3 +1,4 @@
+import { useRef } from 'react'
 import type { DrawingMeta } from '../lib/drawingStore'
 
 interface Props {
@@ -7,6 +8,8 @@ interface Props {
   onRename: (id: string, currentName: string) => void
   onDelete: (id: string) => void
   onQuickCalc: () => void
+  /** 共有ファイル(LINE・AirDrop等で受け取ったもの)を選んで開く */
+  onImportFile: (file: File) => void
 }
 
 function formatDateTime(ms: number): string {
@@ -29,8 +32,10 @@ export function DrawingLauncher({
   onRename,
   onDelete,
   onQuickCalc,
+  onImportFile,
 }: Props) {
   const sorted = [...drawings].sort((a, b) => b.updatedAt - a.updatedAt)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   return (
     <div className="launcher">
       <div className="launcher-title">配管アイソメ図</div>
@@ -40,6 +45,22 @@ export function DrawingLauncher({
       <button className="launcher-quickcalc" onClick={onQuickCalc}>
         🧮 クイック計算（芯引き）
       </button>
+      {/* 他の人から共有された図面ファイル(LINE・AirDrop等で受け取ったもの)を
+          開く。サーバーは使わず、端末に保存済みのファイルを選ぶだけ。 */}
+      <button className="launcher-import" onClick={() => fileInputRef.current?.click()}>
+        📥 共有ファイルを開く
+      </button>
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept=".json,.pipeiso.json,application/json"
+        style={{ display: 'none' }}
+        onChange={(e) => {
+          const file = e.target.files?.[0]
+          if (file) onImportFile(file)
+          e.target.value = ''
+        }}
+      />
 
       {sorted.length > 0 && (
         <>
