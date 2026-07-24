@@ -1765,43 +1765,49 @@ fieldset.panel-grid:disabled {
     page: a3-landscape;
   }
 
-  /* 詳細（複数ページ）モードのアイソメ図: 従来は高さ固定(620px相当)の
-     箱の下に無条件で改ページしていたため、実際のページ高さとの差分が
-     大きな空白として残っていた。用紙サイズ・向きごとの印刷可能領域の
-     高さいっぱいに(安全に収まる範囲でやや控えめに)スケーリングする。
-     1ページ目だけは表題(h1/日付)と同じページを共有するため、その分
-     低めにする。あふれて意図しない位置で改ページする方が「線の途中で
-     切れる」実害につながるため、余白が残る側に倒して見積もる。 */
+  /* 詳細（複数ページ）モードのアイソメ図。
+     経緯: 元々は高さ固定(620px相当)の箱の下に無条件で改ページしていたため、
+     実際のページ高さとの差分が大きな空白として残る不具合があった。それを
+     「印刷可能領域の高さいっぱいに」近い値(A4縦で250mm/225mm等)まで
+     拡大したところ、今度は逆に一部の環境(実機のブラウザの印刷エンジン、
+     用紙サイズの丸め・実際の余白の差など)で見積もりを超えてあふれ、
+     空白ページの発生・材料明細ページの消失という、あふれ由来のより
+     深刻な不具合を引き起こしてしまった。
+     「余白が残るのは問題ない。あふれて壊れる方が絶対に避けるべき実害」
+     という原則に立ち返り、印刷可能領域に対してかなり余裕を持たせた
+     (実際に収まる保証を優先する)控えめな値に変更する。ページが完全には
+     埋まらず余白が残ることを許容するかわりに、どんな環境でも確実に
+     1ページに収まる方を優先する。 */
   .bom-print-only:not(.compact) .print-iso-wrap .print-iso-svg {
     width: 100%;
-    height: 250mm;
+    height: 180mm;
   }
   .bom-print-only:not(.compact) .print-iso-wrap:first-of-type .print-iso-svg {
-    height: 225mm;
+    height: 150mm;
   }
   .bom-print-only.paper-a4-landscape:not(.compact) .print-iso-wrap .print-iso-svg {
-    height: 155mm;
+    height: 110mm;
   }
   .bom-print-only.paper-a4-landscape:not(.compact)
     .print-iso-wrap:first-of-type
     .print-iso-svg {
-    height: 130mm;
+    height: 85mm;
   }
   .bom-print-only.paper-a3-portrait:not(.compact) .print-iso-wrap .print-iso-svg {
-    height: 370mm;
+    height: 280mm;
   }
   .bom-print-only.paper-a3-portrait:not(.compact)
     .print-iso-wrap:first-of-type
     .print-iso-svg {
-    height: 345mm;
+    height: 240mm;
   }
   .bom-print-only.paper-a3-landscape:not(.compact) .print-iso-wrap .print-iso-svg {
-    height: 250mm;
+    height: 180mm;
   }
   .bom-print-only.paper-a3-landscape:not(.compact)
     .print-iso-wrap:first-of-type
     .print-iso-svg {
-    height: 225mm;
+    height: 145mm;
   }
 
   /* アプリ本体(#root)は fixed/absolute配置と 100vh 固定+overflow:hidden の
