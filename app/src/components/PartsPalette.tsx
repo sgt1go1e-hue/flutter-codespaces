@@ -6,6 +6,10 @@ interface Props {
   onDragStart: (partId: string, clientX: number, clientY: number) => void
   /** ドラッグ中のパーツ id（ハイライト用） */
   draggingId: string | null
+  /** チップをタップして選択したパーツid（配管をタップして配置するのを待っている状態） */
+  selectedId: string | null
+  /** チップをタップ（動かさず離す）したとき。同じ部材を再タップすると選択解除する想定 */
+  onSelect: (partId: string) => void
 }
 
 // 動きが「横スクロール」か「上へドラッグ」かを判定するまでの移動量(px)
@@ -13,12 +17,15 @@ const GESTURE_THRESHOLD = 10
 
 /**
  * 画面下部に常設するパーツパレット。
- * チップを配管上へドラッグ&ドロップして特殊部材（フランジ等）を配置する。
- * 定義は data/parts.ts の partsPalette 配列。増やせば同じ仕組みで他部材も追加できる。
+ * チップをタップして選択し、配管上のタップした位置に配置する方式(選択→タップ)
+ * を基本としつつ、従来からのドラッグ&ドロップ操作も残している。位置決めが
+ * シビアなレジューサー等でも、タップは指でドラッグ中の対象を隠さないぶん
+ * 狙った場所に置きやすい。定義は data/parts.ts の partsPalette 配列。
  */
-export function PartsPalette({ onDragStart, draggingId }: Props) {
-  // 押した瞬間はまだ「ドラッグ配置」か「横スクロールで他の候補を見る」か分からないため、
-  // 動きを見てから判定する（横に動けばスクロールに任せ、上下に動けばドラッグ開始）。
+export function PartsPalette({ onDragStart, draggingId, selectedId, onSelect }: Props) {
+  // 押した瞬間はまだ「タップ選択」か「ドラッグ配置」か「横スクロールで他の候補を
+  // 見る」か分からないため、動きを見てから判定する（横に動けばスクロールに任せ、
+  // 上下に動けばドラッグ開始、動かさずに離せばタップ選択）。
   // これをしないと、チップに触れた時点で即ドラッグ扱いになり画面外の候補まで
   // 横スクロールでたどり着けなくなる。
   const gestureRef = useRef<{
@@ -59,6 +66,12 @@ export function PartsPalette({ onDragStart, draggingId }: Props) {
   }
 
   function handleWindowUp() {
+    const g = gestureRef.current
+    // ここまで「ドラッグ」にも「横スクロール」にも判定されていなければ、
+    // 動かさずに指を離した=タップ選択。
+    if (g && !g.decided) {
+      onSelect(g.partId)
+    }
     cleanup()
   }
 
@@ -75,14 +88,16 @@ export function PartsPalette({ onDragStart, draggingId }: Props) {
         {partsPalette.map((p) => (
           <button
             key={p.id}
-            className={`palette-chip${draggingId === p.id ? ' dragging' : ''}`}
+            className={`palette-chip${draggingId === p.id ? ' dragging' : ''}${selectedId === p.id ? ' selected' : ''}`}
             onPointerDown={(e) => handlePointerDown(e, p.id)}
           >
             <span className="chip-icon">{p.icon}</span>
             <span className="chip-name">{p.name}</span>
           </button>
         ))}
-        <span className="palette-hint">↑ 配管上へドラッグして配置</span>
+        <span className="palette-hint">
+          {selectedId ? '↓ 配管をタップして配置（タップで解除）' : 'タップして選択→配管をタップで配置（またはドラッグ）'}
+        </span>
       </div>
     </div>
   )

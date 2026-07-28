@@ -45,6 +45,17 @@ interface Props {
   cutById: Record<string, CutResult>
   /** パーツドラッグ中など、キャンバス入力を一時無効化する */
   inputDisabled: boolean
+  /**
+   * パーツパレットで部材(フランジ・レジューサー等)を選択中(タップ配置待ち)か。
+   * 有効な間は、新しい線の描画(ドラッグ)を無効化し、タップは通常の選択では
+   * なくパーツ配置(onPlacePartTap)に振り替える。inputDisabledと異なり、
+   * ポインタ操作自体は通常通り受け付ける(タップ判定を使うため)。
+   */
+  partPlaceMode?: boolean
+  /** partPlaceMode中、線の上をタップしたときに呼ぶ（論理座標のタップ位置） */
+  onPlacePartTap?: (point: Point) => void
+  /** partPlaceMode中、何もない場所をタップしたとき（配置をキャンセルする用） */
+  onCancelPartPlace?: () => void
   /** 表示の拡大縮小・平行移動（ピンチズーム）。パーツパレットのドロップ位置
       判定(App側)でも同じ変換が要るため、状態を親へ持ち上げて共有する。 */
   view: { scale: number; tx: number; ty: number }
@@ -175,6 +186,9 @@ export function DrawingCanvas({
   crossoverGaps,
   cutById,
   inputDisabled,
+  partPlaceMode,
+  onPlacePartTap,
+  onCancelPartPlace,
   view,
   onViewChange,
   baseSlopeDenom,
@@ -389,11 +403,12 @@ export function DrawingCanvas({
     const start = startLocalRef.current
     const s = snappedStartRef.current
     if (!start || !s) return
-    if (eraserMode || disableDraw) {
-      // 消しゴムモード中、または共有権限で作図が無効化されているときは、
-      // 新しい線のプレビュー(＝描画)を出さない。タップ判定自体(タップ/ドラッグ
-      // の区別)は handlePointerUp 側でそのまま使い、ドラッグと判定された場合は
-      // 「何もしない」に倒す（誤って線を描かない）。
+    if (eraserMode || disableDraw || partPlaceMode) {
+      // 消しゴムモード中、共有権限で作図が無効化されているとき、またはパーツ
+      // 配置待ち(パレットで選択中)のときは、新しい線のプレビュー(＝描画)を
+      // 出さない。タップ判定自体(タップ/ドラッグの区別)は handlePointerUp 側で
+      // そのまま使い、ドラッグと判定された場合は「何もしない」に倒す
+      // （誤って線を描かない・誤ってパーツを配置しない）。
       return
     }
     const pScreen = toScreenLocal(e.clientX, e.clientY)
@@ -453,7 +468,19 @@ export function DrawingCanvas({
       const p = toLocal(e.clientX, e.clientY)
       const { end, angle } = snapEndFromStart(s, p, GRID_GAP)
       const isTap = inDeadzone || samePoint(s, end)
-      if (eraserMode) {
+      if (partPlaceMode) {
+        // パーツ配置待ち中は、ドラッグしても新しい線は描かない。タップだった
+        // 場合だけ、線上ならそこへ配置(onPlacePartTap)、何もない場所なら
+        // 配置をキャンセルする(onCancelPartPlace)。ラベル(呼び径表示)の上を
+        // タップした場合も、その下にある線として扱う。
+        if (isTap) {
+          const seg = labelSegId
+            ? segments.find((sg) => sg.id === labelSegId)
+            : hitSegment(start)
+          if (seg) onPlacePartTap?.(start)
+          else onCancelPartPlace?.()
+        }
+      } else if (eraserMode) {
         // 消しゴムモード中は新しい線を描かない。タップだった場合のみ、その場の
         // 線を確認なしで即削除する（ドラッグはタップ/ドラッグ判定はそのまま
         // 使うが、結果を「何もしない」に倒す誤操作防止）。

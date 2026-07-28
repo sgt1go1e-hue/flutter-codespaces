@@ -409,6 +409,7 @@ export default function App() {
     setSegments([])
     setSelectedId(null)
     setEraserMode(false)
+    setSelectedPartId(null)
     setView({ scale: 1, tx: 0, ty: 0 })
     setSharePermission('full')
     setNotes([])
@@ -422,6 +423,7 @@ export default function App() {
     setSegments(loadDrawingSegments(id))
     setSelectedId(null)
     setEraserMode(false)
+    setSelectedPartId(null)
     setView({ scale: 1, tx: 0, ty: 0 })
     // 共有ファイルから受け取った図面だけ、保存済みの権限・メモを読み込む
     // （通常のローカル図面にはこのキー自体が存在せず、常にフル編集になる）。
@@ -774,17 +776,15 @@ export default function App() {
     setShowDailyGreeting(false)
   }
 
-  // --- パーツ ドラッグ&ドロップ ---
-  function dropPart(partId: string, clientX: number, clientY: number) {
+  // --- パーツ配置（ドラッグ&ドロップ / 選択→タップ の両方から使う共通処理） ---
+  // 論理座標（キャンバスのセグメントと同じ座標系）の1点を受け取り、そこに
+  // 最も近い区間へパーツを配置する。ドラッグ&ドロップ(dropPart, 画面座標→
+  // 論理座標へ変換してから呼ぶ)と、選択→タップ(placePartTap, DrawingCanvas
+  // 側で既に論理座標へ変換済みの点をそのまま渡す)の両方から同じロジックを
+  // 使うことで、配置の計算(スプリット位置・レジューサーのサイズ決め等)を
+  // 完全に共通化し、操作方法によって挙動が変わらないようにする。
+  function placePartAtPoint(partId: string, p: Point) {
     if (!canEditStructure) return
-    const rect = stageRef.current?.getBoundingClientRect()
-    if (!rect) return
-    // キャンバスがピンチズーム・パンされていると、画面座標をそのまま論理座標として
-    // 使うとずれてしまう（キャンバス内部の <g transform> と同じ逆変換が必要）。
-    const p = {
-      x: (clientX - rect.left - view.tx) / view.scale,
-      y: (clientY - rect.top - view.ty) / view.scale,
-    }
     let best: Segment | null = null
     let bestDist = DROP_HIT
     for (const s of segments) {
@@ -836,6 +836,27 @@ export default function App() {
     }
     // 分割後は選択状態をリセット（前後が別データになるため）
     setSelectedId(null)
+  }
+
+  // ドラッグ&ドロップ用: 画面座標(client)をキャンバスと同じ論理座標へ変換してから
+  // placePartAtPoint を呼ぶ（キャンバスがピンチズーム・パンされていると、画面座標を
+  // そのまま論理座標として使うとずれてしまうため、<g transform>と同じ逆変換が必要）。
+  function dropPart(partId: string, clientX: number, clientY: number) {
+    const rect = stageRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const p = {
+      x: (clientX - rect.left - view.tx) / view.scale,
+      y: (clientY - rect.top - view.ty) / view.scale,
+    }
+    placePartAtPoint(partId, p)
+  }
+  // 選択→タップ用: パーツパレットでタップ選択したパーツid。ドラッグ中(partDrag)とは
+  // 独立に管理し、キャンバス側のタップを配置操作として扱うかどうかを切り替える。
+  const [selectedPartId, setSelectedPartId] = useState<string | null>(null)
+  function placePartTap(point: Point) {
+    if (!selectedPartId) return
+    placePartAtPoint(selectedPartId, point)
+    setSelectedPartId(null)
   }
   // 最新の dropPart / segments を参照するための ref
   const dropRef = useRef(dropPart)
@@ -900,6 +921,7 @@ export default function App() {
           if (!canEditStructure) return
           setEraserMode((m) => !m)
           setSelectedId(null)
+          setSelectedPartId(null)
         }}
         disabled={segments.length === 0 || !canEditStructure}
         title="オンの間は線をタップするとその場で即削除します"
@@ -991,8 +1013,16 @@ export default function App() {
           操作自体は位置に関係なく機能する）。フル編集権限のときだけ表示する。 */}
       {canEditStructure && (
         <PartsPalette
-          onDragStart={(partId, x, y) => setPartDrag({ partId, x, y })}
+          onDragStart={(partId, x, y) => {
+            setSelectedPartId(null)
+            setPartDrag({ partId, x, y })
+          }}
           draggingId={partDrag?.partId ?? null}
+          selectedId={selectedPartId}
+          onSelect={(partId) => {
+            setEraserMode(false)
+            setSelectedPartId((cur) => (cur === partId ? null : partId))
+          }}
         />
       )}
 
@@ -1007,6 +1037,9 @@ export default function App() {
           crossoverGaps={crossoverGaps}
           cutById={cutById}
           inputDisabled={partDrag !== null}
+          partPlaceMode={selectedPartId != null}
+          onPlacePartTap={placePartTap}
+          onCancelPartPlace={() => setSelectedPartId(null)}
           disableDraw={!canEditStructure}
           view={view}
           onViewChange={setView}

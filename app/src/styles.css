@@ -1141,6 +1141,15 @@ fieldset.panel-grid:disabled {
   opacity: 0.4;
 }
 
+/* 選択→タップ配置で選択中のパーツ。配管をタップするまで維持されるため、
+   ドラッグ中(一時的・薄く)とは違い、はっきり分かる強調にする。 */
+.palette-chip.selected {
+  border-color: #0ea5e9;
+  background: #0ea5e9;
+  color: #04222e;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.35);
+}
+
 .chip-icon {
   display: inline-flex;
   align-items: center;
