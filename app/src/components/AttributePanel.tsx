@@ -32,6 +32,13 @@ interface DimTextInputProps {
 // 操作感は既存のnumber入力のままにしたいが、+/-を含む式を打てる必要が
 // あるため type="text" にし、入力中は文字列をそのまま保持して、確定
 // (blur / Enter)した時点でだけ式を評価してセグメントへ反映する。
+//
+// inputMode="text"にすると、iPad等では数字用テンキーの代わりに通常の
+// (日本語)フルキーボードが立ち上がってしまい、「電卓」どころかただの
+// 文字入力になってしまう不具合があった。inputMode="decimal"で数字用の
+// テンキーに戻しつつ、テンキーには無い+/-だけを小さな専用ボタンで
+// 入力できるようにする(全く新しいテンキーUIを作るのではなく、既存の
+// 数字入力欄に2つの小さな演算子ボタンを添えるだけに留める)。
 const DimTextInput = forwardRef<HTMLInputElement, DimTextInputProps>(function DimTextInput(
   { className, placeholder, value, onCommit },
   ref,
@@ -66,28 +73,54 @@ const DimTextInput = forwardRef<HTMLInputElement, DimTextInputProps>(function Di
     if (v !== value) onCommit(v)
   }
 
+  function insertOp(op: '+' | '-') {
+    setText((t) => t + op)
+  }
+
   return (
     <>
-      <input
-        ref={ref}
-        className={className}
-        type="text"
-        inputMode="text"
-        autoComplete="off"
-        placeholder={placeholder}
-        value={text}
-        onFocus={() => {
-          focusedRef.current = true
-        }}
-        onChange={(e) => setText(e.target.value)}
-        onBlur={() => {
-          focusedRef.current = false
-          commit()
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter') e.currentTarget.blur()
-        }}
-      />
+      <span className="dim-input-row">
+        <input
+          ref={ref}
+          className={className}
+          type="text"
+          inputMode="decimal"
+          autoComplete="off"
+          placeholder={placeholder}
+          value={text}
+          onFocus={() => {
+            focusedRef.current = true
+          }}
+          onChange={(e) => setText(e.target.value)}
+          onBlur={() => {
+            focusedRef.current = false
+            commit()
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+        />
+        <span className="dim-op-buttons">
+          <button
+            type="button"
+            className="dim-op-btn"
+            tabIndex={-1}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => insertOp('+')}
+          >
+            +
+          </button>
+          <button
+            type="button"
+            className="dim-op-btn"
+            tabIndex={-1}
+            onPointerDown={(e) => e.preventDefault()}
+            onClick={() => insertOp('-')}
+          >
+            −
+          </button>
+        </span>
+      </span>
       {error && <span className="dim-calc-error">{error}</span>}
     </>
   )

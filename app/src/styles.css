@@ -714,6 +714,43 @@ body {
   border-color: #0ea5e9;
 }
 
+/* 寸法入力欄(DimTextInput)は、数字はテンキー(inputMode="decimal")で
+   入力しつつ、テンキーには無い+/-だけを横に添えた小さなボタンで入力する
+   ("180+20"のような式を電卓ロジックで評価するため)。inputMode="text"に
+   すると通常のフルキーボードになってしまい数字入力が却って不便になる
+   ため、テンキーは維持し、必要な演算子だけボタンで補う形にしている。 */
+.dim-input-row {
+  display: flex;
+  align-items: stretch;
+  gap: 4px;
+  width: 100%;
+}
+.dim-input-row .num-input {
+  flex: 1;
+  width: auto;
+  min-width: 0;
+}
+.dim-op-buttons {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+.dim-op-btn {
+  min-width: 40px;
+  min-height: 48px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: var(--field-bg);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 700;
+  touch-action: manipulation;
+}
+.dim-op-btn:active {
+  background: #0ea5e9;
+  color: #04222e;
+}
+
 /* 寸法入力欄で「180+20」のような式を電卓ロジック(calcExpr.ts)で確定
    できなかったとき(5桁超過・不正な文字等)だけ表示するエラー表示。
    クイック計算の.qc-calc-errorと同じ色を使う。通常時は表示されないため
