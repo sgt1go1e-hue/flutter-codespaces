@@ -21,13 +21,7 @@ import {
   type LabelBox,
   type LabelJob,
 } from '../lib/labelLayout'
-import {
-  chooseDimSide,
-  dimExtensionLine,
-  dimLaneGeometry,
-  DIM_OUTER_STANDOFF,
-  DIM_INNER_STANDOFF,
-} from '../lib/dimensionLine'
+import { chooseDimSide, dimExtensionLine, dimGeometry, DIM_STANDOFF } from '../lib/dimensionLine'
 
 interface Props {
   segments: Segment[]
@@ -574,8 +568,8 @@ export function DrawingCanvas({
         // 出す（別表(BOM対応表)で芯々/切り寸法を確認する運用のため）。
         jobs.push({
           key: `dim-${s.id}`,
-          cx: mx + side.nx * DIM_OUTER_STANDOFF * uiScale,
-          cy: my + side.ny * DIM_OUTER_STANDOFF * uiScale,
+          cx: mx + side.nx * DIM_STANDOFF * uiScale,
+          cy: my + side.ny * DIM_STANDOFF * uiScale,
           w: (ASSEMBLY_BADGE_R * 2 + 4) * uiScale,
           h: (ASSEMBLY_BADGE_R * 2 + 4) * uiScale,
           pushX: side.nx,
@@ -584,9 +578,11 @@ export function DrawingCanvas({
         continue
       }
       // ISOGEN流(海外の配管業界で広く使われる自動アイソメ生成ソフトのスタイル)を
-      // 参考に、芯々/芯先(外側レーン)と切り寸法(内側レーン、参照寸法を示す
-      // 括弧書き)を、パイプ本体から離した別々の寸法線上に表示する。ここでは
-      // その2つのレーンの文字位置を重なり回避の対象ジョブとして登録するだけで、
+      // 参考に、パイプ本体から離した1本の寸法線の上に、芯々/芯先(1行目)と
+      // 切り寸法(2行目、参照寸法を示す括弧書き)を2行で表示する。当初は外側/
+      // 内側の2レーンに分けて別々の寸法線で表示していたが、2本の線・矢印が
+      // 近接して重なって見づらいというフィードバックを受け、線は1本にまとめた。
+      // ここではその2行の文字位置を重なり回避の対象ジョブとして登録するだけで、
       // 実際の寸法線・矢羽根・補助線の描画はレンダー側(下のsegments.map)で
       // segment自身の座標から都度計算する(このジョブの位置はテキストの
       // 「基準位置／押し出し先」としてのみ使う)。
@@ -607,31 +603,29 @@ export function DrawingCanvas({
       const fs2 =
         (c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11) *
         uiScale
-      const outerGeom = dimLaneGeometry(s.start, s.end, side, DIM_OUTER_STANDOFF, uiScale)
-      const innerGeom = dimLaneGeometry(s.start, s.end, side, DIM_INNER_STANDOFF, uiScale)
+      const geom = dimGeometry(s.start, s.end, side, uiScale)
       const w1 = estimateTextWidth(line1, fs1) + 6 * uiScale
       const w2 = estimateTextWidth(line2, fs2) + 6 * uiScale
       const lineBoxH = 16 * uiScale
       // 文字が縦向き(±90度寄り)に回転しているときは、当たり判定の箱もw/hを
       // 入れ替える(縦長の箱として扱う)。斜め(±30度)はおおむね元の箱のままで
-      // 妥当な近似として扱う。
-      const rotated1 = Math.abs(outerGeom.textRotateDeg) > 45
-      const rotated2 = Math.abs(innerGeom.textRotateDeg) > 45
+      // 妥当な近似として扱う。1本の線に2行を積んでいるため、行の回転角は共通。
+      const rotated = Math.abs(geom.textRotateDeg) > 45
       jobs.push({
-        key: `dim-outer-${s.id}`,
-        cx: outerGeom.textX,
-        cy: outerGeom.textY,
-        w: rotated1 ? lineBoxH : w1,
-        h: rotated1 ? w1 : lineBoxH,
+        key: `dim-line1-${s.id}`,
+        cx: geom.text1X,
+        cy: geom.text1Y,
+        w: rotated ? lineBoxH : w1,
+        h: rotated ? w1 : lineBoxH,
         pushX: side.nx,
         pushY: side.ny,
       })
       jobs.push({
-        key: `dim-inner-${s.id}`,
-        cx: innerGeom.textX,
-        cy: innerGeom.textY,
-        w: rotated2 ? lineBoxH : w2,
-        h: rotated2 ? w2 : lineBoxH,
+        key: `dim-line2-${s.id}`,
+        cx: geom.text2X,
+        cy: geom.text2Y,
+        w: rotated ? lineBoxH : w2,
+        h: rotated ? w2 : lineBoxH,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -1092,11 +1086,13 @@ export function DrawingCanvas({
               cutById[s.id] &&
               !cutById[s.id].endConnected &&
               terminusSize(s, 'end', eff.size)}
-            {/* 寸法表記(ISOGEN流): 外側レーン=芯々/芯先(パイプからDIM_OUTER_STANDOFF分離す)、
-                内側レーン=切り寸法(参照寸法を示す括弧書き、DIM_INNER_STANDOFF分離す)。
-                各レーンは専用の寸法線+補助線+矢羽根を持ち、文字はその区間の
-                向きに沿って傾ける。表示位置は重なり回避で押し出された最終位置
-                （無ければ幾何計算どおりの基準位置）を使う。 */}
+            {/* 寸法表記(ISOGEN流): パイプから離した1本の寸法線の上に、芯々/芯先
+                (1行目)と切り寸法(2行目、参照寸法を示す括弧書き)を2行で表示する。
+                当初は外側/内側の2レーンに分けて別々の寸法線を引いていたが、
+                2本の線・矢印が近接して重なって見づらいため、線は1本にまとめた。
+                補助線+矢羽根は1組のみ。文字はその区間の向きに沿って傾ける。
+                表示位置は重なり回避で押し出された最終位置（無ければ幾何計算
+                どおりの基準位置）を使う。 */}
             {(() => {
               const c = cutById[s.id]
               if (!c || c.status === 'none') return null
@@ -1112,7 +1108,7 @@ export function DrawingCanvas({
               if (assemblyNum != null) {
                 const resolved = resolvedLabels.get(`dim-${s.id}`)
                 const cx = resolved?.cx ?? mx
-                const cCenter = resolved?.cy ?? my + DIM_OUTER_STANDOFF * uiScale
+                const cCenter = resolved?.cy ?? my + DIM_STANDOFF * uiScale
                 return (
                   <g className="assembly-badge">
                     <circle cx={cx} cy={cCenter} r={ASSEMBLY_BADGE_R * uiScale} />
@@ -1124,16 +1120,15 @@ export function DrawingCanvas({
               }
               const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
               const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-              const outerGeom = dimLaneGeometry(s.start, s.end, side, DIM_OUTER_STANDOFF, uiScale)
-              const innerGeom = dimLaneGeometry(s.start, s.end, side, DIM_INNER_STANDOFF, uiScale)
-              const extStart = dimExtensionLine(s.start, side, DIM_OUTER_STANDOFF, uiScale)
-              const extEnd = dimExtensionLine(s.end, side, DIM_OUTER_STANDOFF, uiScale)
-              const outerResolved = resolvedLabels.get(`dim-outer-${s.id}`)
-              const outerX = outerResolved?.cx ?? outerGeom.textX
-              const outerY = outerResolved?.cy ?? outerGeom.textY
-              const innerResolved = resolvedLabels.get(`dim-inner-${s.id}`)
-              const innerX = innerResolved?.cx ?? innerGeom.textX
-              const innerY = innerResolved?.cy ?? innerGeom.textY
+              const geom = dimGeometry(s.start, s.end, side, uiScale)
+              const extStart = dimExtensionLine(s.start, side, uiScale)
+              const extEnd = dimExtensionLine(s.end, side, uiScale)
+              const line1Resolved = resolvedLabels.get(`dim-line1-${s.id}`)
+              const line1X = line1Resolved?.cx ?? geom.text1X
+              const line1Y = line1Resolved?.cy ?? geom.text1Y
+              const line2Resolved = resolvedLabels.get(`dim-line2-${s.id}`)
+              const line2X = line2Resolved?.cx ?? geom.text2X
+              const line2Y = line2Resolved?.cy ?? geom.text2Y
               return (
                 <g className="dim-group">
                   <line
@@ -1150,42 +1145,33 @@ export function DrawingCanvas({
                     x2={extEnd.x2}
                     y2={extEnd.y2}
                   />
-                  {/* 外側レーン: 芯々/芯先(入力値そのまま) */}
                   <line
-                    className="dim-line-outer"
-                    x1={outerGeom.line.x1}
-                    y1={outerGeom.line.y1}
-                    x2={outerGeom.line.x2}
-                    y2={outerGeom.line.y2}
+                    className="dim-line"
+                    x1={geom.line.x1}
+                    y1={geom.line.y1}
+                    x2={geom.line.x2}
+                    y2={geom.line.y2}
                   />
-                  <polygon className="dim-arrow-outer" points={outerGeom.arrowStart} />
-                  <polygon className="dim-arrow-outer" points={outerGeom.arrowEnd} />
+                  <polygon className="dim-arrow" points={geom.arrowStart} />
+                  <polygon className="dim-arrow" points={geom.arrowEnd} />
+                  {/* 1行目: 芯々/芯先(入力値そのまま) */}
                   <text
                     className="dim-center"
-                    x={outerX}
-                    y={outerY}
+                    x={line1X}
+                    y={line1Y}
                     textAnchor="middle"
-                    transform={`rotate(${outerGeom.textRotateDeg} ${outerX} ${outerY})`}
+                    transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
                   >
                     {c.mode} {c.center}
                   </text>
-                  {/* 内側レーン: 切り寸法(計算後の参照寸法。括弧書きで示す) */}
-                  <line
-                    className="dim-line-inner"
-                    x1={innerGeom.line.x1}
-                    y1={innerGeom.line.y1}
-                    x2={innerGeom.line.x2}
-                    y2={innerGeom.line.y2}
-                  />
-                  <polygon className="dim-arrow-inner" points={innerGeom.arrowStart} />
-                  <polygon className="dim-arrow-inner" points={innerGeom.arrowEnd} />
+                  {/* 2行目: 切り寸法(計算後の参照寸法。括弧書きで示す) */}
                   {c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe && (
                     <text
                       className={`dim-cut${c.socketWeldGapWarning || c.threadNearMinNipple ? ' tight' : ''}`}
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       (切 {c.cut}
                       {c.socketWeldGapWarning ? '（溶接代不足）' : ''}
@@ -1195,10 +1181,10 @@ export function DrawingCanvas({
                   {c.status === 'ok' && c.threadTooShortForPipe && (
                     <text
                       className="dim-cut over"
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       加工不可能（丸ニップル使用）
                     </text>
@@ -1206,10 +1192,10 @@ export function DrawingCanvas({
                   {c.status === 'ok' && c.vpTsTooShortForPipe && (
                     <text
                       className="dim-cut over"
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       加工不可能（差込み代不足）
                     </text>
@@ -1217,10 +1203,10 @@ export function DrawingCanvas({
                   {c.status === 'zero' && (
                     <text
                       className="dim-cut zero"
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       {c.reducerH != null
                         ? `レジューサー H=${c.reducerH}（継手直結）`
@@ -1230,10 +1216,10 @@ export function DrawingCanvas({
                   {c.status === 'over' && (
                     <text
                       className="dim-cut over"
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       継手不足
                     </text>

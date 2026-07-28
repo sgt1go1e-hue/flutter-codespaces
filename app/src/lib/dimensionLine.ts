@@ -2,39 +2,43 @@ import type { Point } from '../types'
 
 // ISOGEN流(海外の配管業界で広く使われる自動アイソメ生成ソフトのスタイル)を
 // 参考にした寸法線のジオメトリ計算。パイプ本体に直接くっつけず、一定距離
-// (スタンドオフ)離した位置に、パイプと平行な専用の寸法線を引く。芯々/芯先
-// (外側レーン)と切り寸法(内側レーン)を別レーンに分離することで、密集した
-// 図面でも寸法同士・寸法とパイプ本体が重なりにくくする。
+// (スタンドオフ)離した位置に、パイプと平行な専用の寸法線を1本引く。
+// 芯々/芯先(1行目、通常表記)と切り寸法(2行目、括弧書き)は、当初は外側/
+// 内側の2レーンに分けて別々の寸法線で表示していたが、実際に使ってみると
+// 2本の線・矢印が近接して重なって見づらいというフィードバックがあったため、
+// 線は1本にまとめ、その線の上に2行のテキストを積む形に統合した。
 // DrawingCanvas(画面表示)とPrintIsometric(印刷用)の両方から同じジオメトリを
 // 使う(以前ラベル重なり回避ロジックを2ファイルに複製していた反省を踏まえ、
 // 今回は最初から共通化する)。あくまで表示専用のジオメトリであり、寸法・
 // 切り寸法そのものの計算結果(cutlength.ts/takeout.ts)には一切関与しない。
 
-/** 外側レーン(芯々/芯先)のパイプからの基準距離(px)。実際はscale倍して使う。 */
-export const DIM_OUTER_STANDOFF = 21
-/** 内側レーン(切り寸法)のパイプからの基準距離(px)。実際はscale倍して使う。 */
-export const DIM_INNER_STANDOFF = 14
+/** 寸法線のパイプからの基準距離(px)。実際はscale倍して使う。以前の外側レーンの位置を踏襲。 */
+export const DIM_STANDOFF = 21
 
 const EXT_LINE_GAP = 2 // パイプ本体からの隙間(基準値, px)
 const EXT_LINE_OVERSHOOT = 3 // 寸法線を少し超えて伸ばす量(基準値, px)
 const ARROW_LEN = 6 // 矢羽根の長さ(基準値, px)
 const ARROW_WIDTH = 2.6 // 矢羽根の半幅(基準値, px)
-const TEXT_GAP = 5 // 寸法線から文字までの隙間(基準値, px。寸法線の「上側」)
+const TEXT_GAP = 5 // 寸法線から1行目の文字までの隙間(基準値, px。寸法線の「上側」)
+const LINE_STACK = 13 // 1行目から2行目までの行間(基準値, px)
 
 export interface DimSide {
   nx: number
   ny: number
 }
 
-export interface DimLaneGeometry {
+export interface DimGeometry {
   /** 寸法線本体(パイプと平行、スタンドオフ分離れた位置) */
   line: { x1: number; y1: number; x2: number; y2: number }
   /** 始点側・終点側の矢羽根(polygon points文字列、寸法線の内側を向く) */
   arrowStart: string
   arrowEnd: string
-  /** 文字の基準位置(寸法線からさらにわずかに離した「上側」) */
-  textX: number
-  textY: number
+  /** 1行目(芯々/芯先)の文字位置(寸法線からわずかに離した「上側」) */
+  text1X: number
+  text1Y: number
+  /** 2行目(切り寸法、括弧書き)の文字位置。1行目よりさらにパイプから離れた位置 */
+  text2X: number
+  text2Y: number
   /** 文字の回転角(度)。上下逆さまにならないよう±90度以内に正規化済み。 */
   textRotateDeg: number
 }
@@ -86,16 +90,10 @@ function arrowPoints(tip: Point, dir: Point, len: number, width: number): string
   return `${tip.x},${tip.y} ${b1.x},${b1.y} ${b2.x},${b2.y}`
 }
 
-/** 指定レーン(標準距離standoffPx×scale)の寸法線・矢羽根・文字位置ジオメトリを求める。 */
-export function dimLaneGeometry(
-  start: Point,
-  end: Point,
-  side: DimSide,
-  standoffPx: number,
-  scale: number,
-): DimLaneGeometry {
+/** 寸法線(1本)・矢羽根・2行分の文字位置ジオメトリを求める。 */
+export function dimGeometry(start: Point, end: Point, side: DimSide, scale: number): DimGeometry {
   const { nx, ny } = side
-  const s = standoffPx * scale
+  const s = DIM_STANDOFF * scale
   const p1 = { x: start.x + nx * s, y: start.y + ny * s }
   const p2 = { x: end.x + nx * s, y: end.y + ny * s }
   const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1
@@ -107,27 +105,29 @@ export function dimLaneGeometry(
   const arrowEnd = arrowPoints(p2, { x: -ux, y: -uy }, arrowLen, arrowW)
   const mx = (p1.x + p2.x) / 2
   const my = (p1.y + p2.y) / 2
-  const gap = TEXT_GAP * scale
+  const gap1 = TEXT_GAP * scale
+  const gap2 = (TEXT_GAP + LINE_STACK) * scale
   const rawDeg = (Math.atan2(uy, ux) * 180) / Math.PI
   return {
     line: { x1: p1.x, y1: p1.y, x2: p2.x, y2: p2.y },
     arrowStart,
     arrowEnd,
-    textX: mx + nx * gap,
-    textY: my + ny * gap,
+    text1X: mx + nx * gap1,
+    text1Y: my + ny * gap1,
+    text2X: mx + nx * gap2,
+    text2Y: my + ny * gap2,
     textRotateDeg: normalizeRotation(rawDeg),
   }
 }
 
-/** パイプ端点から、最も外側のレーン(dim outer standoff)まで伸びる寸法補助線。 */
+/** パイプ端点から、寸法線(dim standoff)まで伸びる寸法補助線。 */
 export function dimExtensionLine(
   point: Point,
   side: DimSide,
-  outerStandoffPx: number,
   scale: number,
 ): { x1: number; y1: number; x2: number; y2: number } {
   const gap = EXT_LINE_GAP * scale
-  const to = (outerStandoffPx + EXT_LINE_OVERSHOOT) * scale
+  const to = (DIM_STANDOFF + EXT_LINE_OVERSHOOT) * scale
   return {
     x1: point.x + side.nx * gap,
     y1: point.y + side.ny * gap,

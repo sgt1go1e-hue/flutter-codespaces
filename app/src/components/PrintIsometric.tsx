@@ -11,13 +11,7 @@ import {
   type LabelBox,
   type LabelJob,
 } from '../lib/labelLayout'
-import {
-  chooseDimSide,
-  dimExtensionLine,
-  dimLaneGeometry,
-  DIM_OUTER_STANDOFF,
-  DIM_INNER_STANDOFF,
-} from '../lib/dimensionLine'
+import { chooseDimSide, dimExtensionLine, dimGeometry } from '../lib/dimensionLine'
 
 interface Props {
   segments: Segment[]
@@ -110,8 +104,8 @@ export function PrintIsometric({
       jobs.push({ key: `seg-${s.id}`, cx: mx, cy: my - 10, w, h: 18, pushX: 0, pushY: -1 })
     }
     // ISOGEN流(海外の配管業界で広く使われる自動アイソメ生成ソフトのスタイル)を
-    // 参考に、芯々/芯先(外側レーン)と切り寸法(内側レーン、参照寸法を示す括弧
-    // 書き)を、パイプ本体から離した別々の寸法線上に表示する(画面表示の
+    // 参考に、パイプ本体から離した1本の寸法線の上に、芯々/芯先(1行目)と
+    // 切り寸法(2行目、参照寸法を示す括弧書き)を2行で表示する(画面表示の
     // DrawingCanvas.tsxと同じジオメトリ・同じ考え方。印刷はuiScaleを持たない
     // ため常に等倍=1として扱う)。
     for (const s of segments) {
@@ -138,27 +132,25 @@ export function PrintIsometric({
       const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
       const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
       const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-      const outerGeom = dimLaneGeometry(s.start, s.end, side, DIM_OUTER_STANDOFF, 1)
-      const innerGeom = dimLaneGeometry(s.start, s.end, side, DIM_INNER_STANDOFF, 1)
+      const geom = dimGeometry(s.start, s.end, side, 1)
       const w1 = estimateTextWidth(line1, 10.5) + 6
       const w2 = estimateTextWidth(line2, fs2) + 6
-      const rotated1 = Math.abs(outerGeom.textRotateDeg) > 45
-      const rotated2 = Math.abs(innerGeom.textRotateDeg) > 45
+      const rotated = Math.abs(geom.textRotateDeg) > 45
       jobs.push({
-        key: `dim-outer-${s.id}`,
-        cx: outerGeom.textX,
-        cy: outerGeom.textY,
-        w: rotated1 ? 16 : w1,
-        h: rotated1 ? w1 : 16,
+        key: `dim-line1-${s.id}`,
+        cx: geom.text1X,
+        cy: geom.text1Y,
+        w: rotated ? 16 : w1,
+        h: rotated ? w1 : 16,
         pushX: side.nx,
         pushY: side.ny,
       })
       jobs.push({
-        key: `dim-inner-${s.id}`,
-        cx: innerGeom.textX,
-        cy: innerGeom.textY,
-        w: rotated2 ? 18 : w2,
-        h: rotated2 ? w2 : 18,
+        key: `dim-line2-${s.id}`,
+        cx: geom.text2X,
+        cy: geom.text2Y,
+        w: rotated ? 18 : w2,
+        h: rotated ? w2 : 18,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -497,16 +489,15 @@ export function PrintIsometric({
               const my = s.start.y + (s.end.y - s.start.y) * t
               const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
               const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-              const outerGeom = dimLaneGeometry(s.start, s.end, side, DIM_OUTER_STANDOFF, 1)
-              const innerGeom = dimLaneGeometry(s.start, s.end, side, DIM_INNER_STANDOFF, 1)
-              const extStart = dimExtensionLine(s.start, side, DIM_OUTER_STANDOFF, 1)
-              const extEnd = dimExtensionLine(s.end, side, DIM_OUTER_STANDOFF, 1)
-              const outerResolved = resolvedLabels.get(`dim-outer-${s.id}`)
-              const outerX = outerResolved?.cx ?? outerGeom.textX
-              const outerY = outerResolved?.cy ?? outerGeom.textY
-              const innerResolved = resolvedLabels.get(`dim-inner-${s.id}`)
-              const innerX = innerResolved?.cx ?? innerGeom.textX
-              const innerY = innerResolved?.cy ?? innerGeom.textY
+              const geom = dimGeometry(s.start, s.end, side, 1)
+              const extStart = dimExtensionLine(s.start, side, 1)
+              const extEnd = dimExtensionLine(s.end, side, 1)
+              const line1Resolved = resolvedLabels.get(`dim-line1-${s.id}`)
+              const line1X = line1Resolved?.cx ?? geom.text1X
+              const line1Y = line1Resolved?.cy ?? geom.text1Y
+              const line2Resolved = resolvedLabels.get(`dim-line2-${s.id}`)
+              const line2X = line2Resolved?.cx ?? geom.text2X
+              const line2Y = line2Resolved?.cy ?? geom.text2Y
               return (
                 <g className="dim-group">
                   <line
@@ -524,39 +515,30 @@ export function PrintIsometric({
                     y2={extEnd.y2}
                   />
                   <line
-                    className="dim-line-outer"
-                    x1={outerGeom.line.x1}
-                    y1={outerGeom.line.y1}
-                    x2={outerGeom.line.x2}
-                    y2={outerGeom.line.y2}
+                    className="dim-line"
+                    x1={geom.line.x1}
+                    y1={geom.line.y1}
+                    x2={geom.line.x2}
+                    y2={geom.line.y2}
                   />
-                  <polygon className="dim-arrow-outer" points={outerGeom.arrowStart} />
-                  <polygon className="dim-arrow-outer" points={outerGeom.arrowEnd} />
+                  <polygon className="dim-arrow" points={geom.arrowStart} />
+                  <polygon className="dim-arrow" points={geom.arrowEnd} />
                   <text
                     className="dim-center"
-                    x={outerX}
-                    y={outerY}
+                    x={line1X}
+                    y={line1Y}
                     textAnchor="middle"
-                    transform={`rotate(${outerGeom.textRotateDeg} ${outerX} ${outerY})`}
+                    transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
                   >
                     {c.mode} {c.center}
                   </text>
-                  <line
-                    className="dim-line-inner"
-                    x1={innerGeom.line.x1}
-                    y1={innerGeom.line.y1}
-                    x2={innerGeom.line.x2}
-                    y2={innerGeom.line.y2}
-                  />
-                  <polygon className="dim-arrow-inner" points={innerGeom.arrowStart} />
-                  <polygon className="dim-arrow-inner" points={innerGeom.arrowEnd} />
                   {c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe && (
                     <text
                       className={`dim-cut${c.socketWeldGapWarning || c.threadNearMinNipple ? ' tight' : ''}`}
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       (切 {c.cut}
                       {c.socketWeldGapWarning ? '（溶接代不足）' : ''}
@@ -566,10 +548,10 @@ export function PrintIsometric({
                   {c.status === 'ok' && c.threadTooShortForPipe && (
                     <text
                       className="dim-cut over"
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       加工不可能（丸ニップル使用）
                     </text>
@@ -577,10 +559,10 @@ export function PrintIsometric({
                   {c.status === 'ok' && c.vpTsTooShortForPipe && (
                     <text
                       className="dim-cut over"
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       加工不可能（差込み代不足）
                     </text>
@@ -588,10 +570,10 @@ export function PrintIsometric({
                   {c.status === 'zero' && (
                     <text
                       className="dim-cut zero"
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       {c.reducerH != null
                         ? `レジューサー H=${c.reducerH}（継手直結）`
@@ -601,10 +583,10 @@ export function PrintIsometric({
                   {c.status === 'over' && (
                     <text
                       className="dim-cut over"
-                      x={innerX}
-                      y={innerY}
+                      x={line2X}
+                      y={line2Y}
                       textAnchor="middle"
-                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                      transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
                     >
                       継手不足
                     </text>

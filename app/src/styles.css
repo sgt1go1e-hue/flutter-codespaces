@@ -495,7 +495,7 @@ body {
    「縁取り専用レイヤー」がstroke+underlineの競合なく直接指定できるように
    なった(.dim-cut-outlineは廃止し、paint-orderで縁取りを直接かける)。 */
 .dim-cut {
-  fill: var(--label-cut); /* 内側レーン: 切り寸（強調・現場で使う数値・括弧書き） */
+  fill: var(--label-cut); /* 寸法線の2行目: 切り寸（強調・現場で使う数値・括弧書き） */
   font-size: calc(12.5px * var(--ui-scale, 1));
   font-weight: 800;
   paint-order: stroke;
@@ -525,7 +525,7 @@ body {
   fill: var(--label-tight);
 }
 
-/* 寸法補助線(パイプ端点から外側レーンまで伸ばす短い線)。目立たせすぎない
+/* 寸法補助線(パイプ端点から寸法線まで伸ばす短い線)。目立たせすぎない
    よう細く控えめな色にする。 */
 .dim-ext-line {
   stroke: var(--label-sub);
@@ -533,26 +533,19 @@ body {
   opacity: 0.55;
 }
 
-/* 外側レーン(芯々/芯先)の寸法線・矢羽根。.dim-centerと同系色(控えめ)。 */
-.dim-line-outer {
+/* 寸法線・矢羽根(1本にまとめたもの)。以前は芯々/芯先用(外側)と切り寸法用
+   (内側)の2本を別々に引いていたが、近接して重なって見づらいという
+   フィードバックにより1本へ統合した。.dim-centerと同系色(控えめ)にし、
+   その上に乗る1行目(芯々/芯先)・2行目(切り寸法、強調色)の2行のテキストは
+   従来どおり区別できるようにする。 */
+.dim-line {
   stroke: var(--label-sub);
   stroke-width: calc(1px * var(--ui-scale, 1));
   opacity: 0.75;
 }
-.dim-arrow-outer {
+.dim-arrow {
   fill: var(--label-sub);
   opacity: 0.75;
-}
-
-/* 内側レーン(切り寸法)の寸法線・矢羽根。.dim-cutと同系色(強調)。 */
-.dim-line-inner {
-  stroke: var(--label-cut);
-  stroke-width: calc(1.1px * var(--ui-scale, 1));
-  opacity: 0.85;
-}
-.dim-arrow-inner {
-  fill: var(--label-cut);
-  opacity: 0.85;
 }
 
 /* 相番(合番)バッジ。密集した図面では芯々/切り寸法を直書きせず番号だけを
