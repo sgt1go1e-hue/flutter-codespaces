@@ -1,4 +1,5 @@
 import { forwardRef, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
@@ -15,113 +16,102 @@ import {
   connectionMethods,
 } from '../data/masters'
 import { isSlopeEligible, effectiveSlopeDenom, SLOPE_DENOM_OPTIONS } from '../lib/slope'
-import { evaluateTypedExpression } from '../lib/calcExpr'
+import {
+  initialCalcState,
+  calcStateFromValue,
+  calcCurrentTotal,
+  calcEvaluate,
+  type CalcState,
+} from '../lib/calcExpr'
+import { CalcKeypad } from './CalcKeypad'
 
 const round1 = (x: number) => Math.round(x * 10) / 10
 
-interface DimTextInputProps {
+interface DimCalcInputProps {
   className?: string
   placeholder?: string
   value: number | undefined
   onCommit: (value: number | undefined) => void
 }
 
-// 芯々寸法などの寸法入力欄を、クイック計算(芯引き)の「全体寸法」欄と同じ
-// 電卓ロジック(calcExpr.ts、専用テンキーは持たない・calcPress*系をそのまま
-// 再利用)で「180+20」のような式をその場で入力できるようにする。見た目・
-// 操作感は既存のnumber入力のままにしたいが、+/-を含む式を打てる必要が
-// あるため type="text" にし、入力中は文字列をそのまま保持して、確定
-// (blur / Enter)した時点でだけ式を評価してセグメントへ反映する。
-//
-// inputMode="text"にすると、iPad等では数字用テンキーの代わりに通常の
-// (日本語)フルキーボードが立ち上がってしまい、「電卓」どころかただの
-// 文字入力になってしまう不具合があった。inputMode="decimal"で数字用の
-// テンキーに戻しつつ、テンキーには無い+/-だけを小さな専用ボタンで
-// 入力できるようにする(全く新しいテンキーUIを作るのではなく、既存の
-// 数字入力欄に2つの小さな演算子ボタンを添えるだけに留める)。
-const DimTextInput = forwardRef<HTMLInputElement, DimTextInputProps>(function DimTextInput(
+// 芯々寸法などの寸法入力欄。クイック計算(芯引き)の「全体寸法」欄と全く
+// 同じテンキー(CalcKeypad、calcExpr.tsの電卓ロジックをそのまま使用)で
+// 「180+20」のような式を入力できるようにする。クイック計算は専用画面に
+// テンキーを常時表示するが、こちらは詳細パネルの1項目でしかないため、
+// 見た目・操作感はこれまで通り「タップして入力する欄」のままにし、
+// タップした時だけテンキーをポップアップ表示、入力が終わったら閉じられる
+// ようにする(＝キー、閉じるボタン、または欄の外側タップで閉じる)。
+const DimCalcInput = forwardRef<HTMLButtonElement, DimCalcInputProps>(function DimCalcInput(
   { className, placeholder, value, onCommit },
   ref,
 ) {
-  const [text, setText] = useState(value != null ? String(value) : '')
-  const [error, setError] = useState<string | undefined>(undefined)
-  const focusedRef = useRef(false)
+  const [open, setOpen] = useState(false)
+  const [calc, setCalc] = useState<CalcState>(initialCalcState)
 
-  // 外部要因（別の区間を選んだ、レジューサー相方側の入力で値が変わった等）で
-  // value が変わったときは表示文字列を追従させる。編集中(focus中)はユーザーの
-  // 入力途中の文字列を上書きしない。
-  useEffect(() => {
-    if (focusedRef.current) return
-    setText(value != null ? String(value) : '')
-    setError(undefined)
-  }, [value])
-
-  function commit() {
-    const raw = text.trim()
-    if (raw === '') {
-      setError(undefined)
-      if (value != null) onCommit(undefined)
-      return
-    }
-    const { value: v, error: err } = evaluateTypedExpression(raw)
-    if (err || v == null) {
-      setError(err ?? '入力が正しくありません')
-      return
-    }
-    setError(undefined)
-    setText(String(v))
-    if (v !== value) onCommit(v)
+  function openKeypad() {
+    setCalc(value != null ? calcStateFromValue(value) : initialCalcState)
+    setOpen(true)
   }
 
-  function insertOp(op: '+' | '-') {
-    setText((t) => t + op)
+  // ポップアップを閉じる（＝キー・閉じるボタン・外側タップの共通処理）。
+  // その時点までに入力された式を確定してから閉じる。空にして閉じれば
+  // 未入力に戻り、無効な式のまま閉じようとした場合は変更を反映しない
+  // （直前の値を保持する。既存の切り寸法計算を壊れた値で汚さないため）。
+  function commitAndClose() {
+    if (!calc.error) {
+      if (calc.display === '') {
+        if (value != null) onCommit(undefined)
+      } else {
+        const total = calcCurrentTotal(calc)
+        if (total != null && total !== value) onCommit(total)
+      }
+    }
+    setOpen(false)
+  }
+
+  function pressEqual() {
+    const { value: v, error } = calcEvaluate(calc)
+    if (error) {
+      setCalc((s) => ({ ...s, error }))
+      return
+    }
+    if (v != null && v !== value) onCommit(v)
+    setOpen(false)
   }
 
   return (
     <>
-      <span className="dim-input-row">
-        <input
-          ref={ref}
-          className={className}
-          type="text"
-          inputMode="decimal"
-          autoComplete="off"
-          placeholder={placeholder}
-          value={text}
-          onFocus={() => {
-            focusedRef.current = true
-          }}
-          onChange={(e) => setText(e.target.value)}
-          onBlur={() => {
-            focusedRef.current = false
-            commit()
-          }}
-          onKeyDown={(e) => {
-            if (e.key === 'Enter') e.currentTarget.blur()
-          }}
-        />
-        <span className="dim-op-buttons">
-          <button
-            type="button"
-            className="dim-op-btn"
-            tabIndex={-1}
-            onPointerDown={(e) => e.preventDefault()}
-            onClick={() => insertOp('+')}
-          >
-            +
-          </button>
-          <button
-            type="button"
-            className="dim-op-btn"
-            tabIndex={-1}
-            onPointerDown={(e) => e.preventDefault()}
-            onClick={() => insertOp('-')}
-          >
-            −
-          </button>
-        </span>
-      </span>
-      {error && <span className="dim-calc-error">{error}</span>}
+      <button
+        ref={ref}
+        type="button"
+        className={`${className ?? ''} dim-calc-trigger`}
+        onFocus={openKeypad}
+        onClick={openKeypad}
+      >
+        {value != null ? (
+          value
+        ) : (
+          <span className="dim-calc-placeholder">{placeholder}</span>
+        )}
+      </button>
+      {open &&
+        createPortal(
+          <div className="dim-calc-backdrop" onClick={commitAndClose}>
+            <div className="dim-calc-popup" onClick={(e) => e.stopPropagation()}>
+              <div className="dim-calc-popup-header">
+                <span className={calc.error ? 'dim-calc-error' : ''}>
+                  {calc.error ?? '寸法を入力(mm)'}
+                </span>
+                <button type="button" className="dim-calc-close" onClick={commitAndClose}>
+                  閉じる
+                </button>
+              </div>
+              <div className="qc-overall-display">{calc.display || '0'}</div>
+              <CalcKeypad calc={calc} onChange={setCalc} onEqual={pressEqual} />
+            </div>
+          </div>,
+          document.body,
+        )}
     </>
   )
 })
@@ -290,7 +280,7 @@ export function SegmentPanel({
   onClose,
   canEditStructure = true,
 }: SegmentPanelProps) {
-  const dimRef = useRef<HTMLInputElement>(null)
+  const dimRef = useRef<HTMLButtonElement>(null)
   const offsetRef = useRef<HTMLInputElement>(null)
 
   // 45°の継手(45°エルボ・45°Y等)に挟まれた斜めのキック区間かどうか。現場では
@@ -308,11 +298,17 @@ export function SegmentPanel({
     (isFortyFiveFitting(cut?.endFittingId) || isNinetyIshFitting(cut?.endFittingId))
 
   // 別の線を選ぶたびに、キック区間ならオフセット欄へ、それ以外は芯々寸法欄へ
-  // フォーカス（連続入力を最短タップに）。
+  // フォーカス（連続入力を最短タップに）。芯々寸法欄(DimCalcInput)は、
+  // フォーカスされるとテンキーのポップアップを自動で開くようになっている
+  // ため、これだけで従来の「フォーカス+全選択」と同じ「すぐ入力できる」
+  // 体験になる。
   useEffect(() => {
-    const target = isKickSegment ? offsetRef.current : dimRef.current
-    target?.focus()
-    target?.select()
+    if (isKickSegment) {
+      offsetRef.current?.focus()
+      offsetRef.current?.select()
+    } else {
+      dimRef.current?.focus()
+    }
   }, [segment.id, isKickSegment])
 
   const effPipe = segment.pipeType ?? inheritedPipeType
@@ -623,7 +619,7 @@ export function SegmentPanel({
                       メイン側寸法(mm)
                       <span className="field-note">継手〜レジューサー太い方</span>
                     </span>
-                    <DimTextInput
+                    <DimCalcInput
                       className="num-input"
                       placeholder={
                         mainCut?.derivedCenter != null
@@ -639,7 +635,7 @@ export function SegmentPanel({
                       先端側寸法(mm)
                       <span className="field-note">レジューサー細い方〜先</span>
                     </span>
-                    <DimTextInput
+                    <DimCalcInput
                       className="num-input"
                       placeholder={
                         tipCut?.derivedCenter != null
@@ -665,7 +661,7 @@ export function SegmentPanel({
                 <span className="field-label">
                   {isKickSegment ? '芯々寸法(自動計算, mm)' : '芯々寸法(mm)'}
                 </span>
-                <DimTextInput
+                <DimCalcInput
                   ref={dimRef}
                   className="num-input"
                   placeholder="例: 1200"

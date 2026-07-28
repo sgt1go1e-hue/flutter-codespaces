@@ -16,15 +16,10 @@ import {
   initialCalcState,
   calcCurrentTotal,
   calcStateFromValue,
-  calcPressDigit,
-  calcPressDot,
-  calcPressOp,
-  calcPressSign,
-  calcPressClear,
-  calcPressBackspace,
   calcEvaluate,
   type CalcState,
 } from '../lib/calcExpr'
+import { CalcKeypad } from './CalcKeypad'
 
 interface Props {
   onClose: () => void
@@ -50,36 +45,6 @@ interface HistoryEntry {
   id: string
   summary: string
   cut: number
-}
-
-// 電卓の各キーの当たり判定を大きめに（手袋操作を想定）
-function KeyButton({
-  label,
-  onClick,
-  variant,
-  gridColumn,
-  gridRow,
-}: {
-  label: string
-  onClick: () => void
-  variant?: 'op' | 'equal' | 'clear'
-  gridColumn?: string
-  gridRow?: string
-}) {
-  const style =
-    gridColumn || gridRow
-      ? { gridColumn: gridColumn, gridRow: gridRow }
-      : undefined
-  return (
-    <button
-      type="button"
-      className={`qc-key${variant ? ` qc-key-${variant}` : ''}`}
-      style={style}
-      onClick={onClick}
-    >
-      {label}
-    </button>
-  )
 }
 
 function EndFittingEditor({
@@ -210,12 +175,6 @@ export function QuickCalc({ onClose }: Props) {
     setRight((prev) => ({ ...prev, ...patch }))
   }
 
-  function pressDigit(d: string) {
-    setCalc((s) => calcPressDigit(s, d))
-  }
-  function pressOp(op: '+' | '-') {
-    setCalc((s) => calcPressOp(s, op))
-  }
   function pressEqual() {
     setCalc((s) => {
       const { value, error } = calcEvaluate(s)
@@ -384,78 +343,14 @@ export function QuickCalc({ onClose }: Props) {
           <div className="qc-overall-display">{calc.display || '0'}</div>
         </div>
 
-        <div className="qc-keypad">
-          <KeyButton label="7" onClick={() => pressDigit('7')} gridColumn="1" gridRow="1" />
-          <KeyButton label="8" onClick={() => pressDigit('8')} gridColumn="2" gridRow="1" />
-          <KeyButton label="9" onClick={() => pressDigit('9')} gridColumn="3" gridRow="1" />
-          <KeyButton
-            label="±"
-            variant="op"
-            onClick={() => setCalc((s) => calcPressSign(s))}
-            gridColumn="4"
-            gridRow="1"
-          />
-
-          <KeyButton label="4" onClick={() => pressDigit('4')} gridColumn="1" gridRow="2" />
-          <KeyButton label="5" onClick={() => pressDigit('5')} gridColumn="2" gridRow="2" />
-          <KeyButton label="6" onClick={() => pressDigit('6')} gridColumn="3" gridRow="2" />
-          <KeyButton
-            label="＋"
-            variant="op"
-            onClick={() => pressOp('+')}
-            gridColumn="4"
-            gridRow="2"
-          />
-
-          <KeyButton label="1" onClick={() => pressDigit('1')} gridColumn="1" gridRow="3" />
-          <KeyButton label="2" onClick={() => pressDigit('2')} gridColumn="2" gridRow="3" />
-          <KeyButton label="3" onClick={() => pressDigit('3')} gridColumn="3" gridRow="3" />
-          <KeyButton
-            label="－"
-            variant="op"
-            onClick={() => pressOp('-')}
-            gridColumn="4"
-            gridRow="3"
-          />
-
-          <KeyButton
-            label="0"
-            onClick={() => pressDigit('0')}
-            gridColumn="1 / span 2"
-            gridRow="4"
-          />
-          <KeyButton
-            label="."
-            onClick={() => setCalc((s) => calcPressDot(s))}
-            gridColumn="3"
-            gridRow="4"
-          />
-          <KeyButton
-            label="＝"
-            variant="equal"
-            onClick={() => {
-              pressEqual()
-              recordHistory()
-            }}
-            gridColumn="4"
-            gridRow="4 / span 2"
-          />
-
-          <KeyButton
-            label="C"
-            variant="clear"
-            onClick={() => setCalc(calcPressClear())}
-            gridColumn="1"
-            gridRow="5"
-          />
-          <KeyButton
-            label="BS"
-            variant="clear"
-            onClick={() => setCalc((s) => calcPressBackspace(s))}
-            gridColumn="2 / span 2"
-            gridRow="5"
-          />
-        </div>
+        <CalcKeypad
+          calc={calc}
+          onChange={setCalc}
+          onEqual={() => {
+            pressEqual()
+            recordHistory()
+          }}
+        />
 
         {history.length > 0 && (
           <div className="qc-history">
