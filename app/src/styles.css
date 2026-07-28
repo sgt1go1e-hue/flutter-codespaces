@@ -714,6 +714,17 @@ body {
   border-color: #0ea5e9;
 }
 
+/* 寸法入力欄で「180+20」のような式を電卓ロジック(calcExpr.ts)で確定
+   できなかったとき(5桁超過・不正な文字等)だけ表示するエラー表示。
+   クイック計算の.qc-calc-errorと同じ色を使う。通常時は表示されないため
+   見た目は変わらない。 */
+.dim-calc-error {
+  display: block;
+  color: var(--label-over);
+  font-size: 11px;
+  margin-top: 2px;
+}
+
 .panel-summary {
   flex: 1;
   display: flex;

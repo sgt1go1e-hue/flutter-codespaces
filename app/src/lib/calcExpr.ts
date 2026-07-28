@@ -158,3 +158,31 @@ export function calcEvaluate(state: CalcState): { value?: number; error?: string
   if (Math.abs(total) > MAX_VALUE) return { error: '5桁を超えました' }
   return { value: total }
 }
+
+/**
+ * 通常のテキスト入力欄（クイック計算のような専用テンキーではなく、
+ * キーボードで「180+20」のようにそのまま打てる欄）向けに、入力済みの
+ * 文字列を丸ごと評価する。ボタン操作を1文字ずつ再現してcalcPress*系に
+ * 流し込むことで、桁数制限(5桁)・上限(99999)・演算子の扱いなど、
+ * クイック計算と全く同じ電卓ロジック（この上の関数群）をそのまま使う。
+ * 新しい計算ロジックは持たない。
+ */
+export function evaluateTypedExpression(raw: string): { value?: number; error?: string } {
+  // 全角数字・全角＋－（日本語キーボードでの入力を考慮）を半角に正規化
+  const normalized = raw.normalize('NFKC').replace(/\s+/g, '')
+  if (normalized === '') return {}
+  let state: CalcState = initialCalcState
+  for (const ch of normalized) {
+    if (ch >= '0' && ch <= '9') {
+      state = calcPressDigit(state, ch)
+    } else if (ch === '.') {
+      state = calcPressDot(state)
+    } else if (ch === '+' || ch === '-') {
+      state = calcPressOp(state, ch)
+    } else {
+      return { error: '入力が正しくありません' }
+    }
+    if (state.error) return { error: state.error }
+  }
+  return calcEvaluate(state)
+}

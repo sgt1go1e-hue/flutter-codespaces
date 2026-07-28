@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react'
+import { forwardRef, useEffect, useRef, useState } from 'react'
 import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
@@ -15,8 +15,83 @@ import {
   connectionMethods,
 } from '../data/masters'
 import { isSlopeEligible, effectiveSlopeDenom, SLOPE_DENOM_OPTIONS } from '../lib/slope'
+import { evaluateTypedExpression } from '../lib/calcExpr'
 
 const round1 = (x: number) => Math.round(x * 10) / 10
+
+interface DimTextInputProps {
+  className?: string
+  placeholder?: string
+  value: number | undefined
+  onCommit: (value: number | undefined) => void
+}
+
+// 芯々寸法などの寸法入力欄を、クイック計算(芯引き)の「全体寸法」欄と同じ
+// 電卓ロジック(calcExpr.ts、専用テンキーは持たない・calcPress*系をそのまま
+// 再利用)で「180+20」のような式をその場で入力できるようにする。見た目・
+// 操作感は既存のnumber入力のままにしたいが、+/-を含む式を打てる必要が
+// あるため type="text" にし、入力中は文字列をそのまま保持して、確定
+// (blur / Enter)した時点でだけ式を評価してセグメントへ反映する。
+const DimTextInput = forwardRef<HTMLInputElement, DimTextInputProps>(function DimTextInput(
+  { className, placeholder, value, onCommit },
+  ref,
+) {
+  const [text, setText] = useState(value != null ? String(value) : '')
+  const [error, setError] = useState<string | undefined>(undefined)
+  const focusedRef = useRef(false)
+
+  // 外部要因（別の区間を選んだ、レジューサー相方側の入力で値が変わった等）で
+  // value が変わったときは表示文字列を追従させる。編集中(focus中)はユーザーの
+  // 入力途中の文字列を上書きしない。
+  useEffect(() => {
+    if (focusedRef.current) return
+    setText(value != null ? String(value) : '')
+    setError(undefined)
+  }, [value])
+
+  function commit() {
+    const raw = text.trim()
+    if (raw === '') {
+      setError(undefined)
+      if (value != null) onCommit(undefined)
+      return
+    }
+    const { value: v, error: err } = evaluateTypedExpression(raw)
+    if (err || v == null) {
+      setError(err ?? '入力が正しくありません')
+      return
+    }
+    setError(undefined)
+    setText(String(v))
+    if (v !== value) onCommit(v)
+  }
+
+  return (
+    <>
+      <input
+        ref={ref}
+        className={className}
+        type="text"
+        inputMode="text"
+        autoComplete="off"
+        placeholder={placeholder}
+        value={text}
+        onFocus={() => {
+          focusedRef.current = true
+        }}
+        onChange={(e) => setText(e.target.value)}
+        onBlur={() => {
+          focusedRef.current = false
+          commit()
+        }}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') e.currentTarget.blur()
+        }}
+      />
+      {error && <span className="dim-calc-error">{error}</span>}
+    </>
+  )
+})
 
 export interface DrawDefaults {
   pipeType?: string
@@ -515,22 +590,15 @@ export function SegmentPanel({
                       メイン側寸法(mm)
                       <span className="field-note">継手〜レジューサー太い方</span>
                     </span>
-                    <input
+                    <DimTextInput
                       className="num-input"
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
                       placeholder={
                         mainCut?.derivedCenter != null
                           ? `自動算出 ${mainCut.derivedCenter}`
                           : '例: 800'
                       }
-                      value={mainSeg.centerLength ?? ''}
-                      onChange={(e) =>
-                        onChangeReducerPair(mainSeg.id, tipSeg.id, {
-                          main: e.target.value === '' ? undefined : Number(e.target.value),
-                        })
-                      }
+                      value={mainSeg.centerLength}
+                      onCommit={(v) => onChangeReducerPair(mainSeg.id, tipSeg.id, { main: v })}
                     />
                   </label>
                   <label className="field dim-field">
@@ -538,22 +606,15 @@ export function SegmentPanel({
                       先端側寸法(mm)
                       <span className="field-note">レジューサー細い方〜先</span>
                     </span>
-                    <input
+                    <DimTextInput
                       className="num-input"
-                      type="number"
-                      inputMode="numeric"
-                      min={0}
                       placeholder={
                         tipCut?.derivedCenter != null
                           ? `自動算出 ${tipCut.derivedCenter}`
                           : '例: 300'
                       }
-                      value={tipSeg.centerLength ?? ''}
-                      onChange={(e) =>
-                        onChangeReducerPair(mainSeg.id, tipSeg.id, {
-                          tip: e.target.value === '' ? undefined : Number(e.target.value),
-                        })
-                      }
+                      value={tipSeg.centerLength}
+                      onCommit={(v) => onChangeReducerPair(mainSeg.id, tipSeg.id, { tip: v })}
                     />
                   </label>
                   {(mainCut?.needsReducerSpanInput || tipCut?.needsReducerSpanInput) && (
@@ -571,19 +632,12 @@ export function SegmentPanel({
                 <span className="field-label">
                   {isKickSegment ? '芯々寸法(自動計算, mm)' : '芯々寸法(mm)'}
                 </span>
-                <input
+                <DimTextInput
                   ref={dimRef}
                   className="num-input"
-                  type="number"
-                  inputMode="numeric"
-                  min={0}
                   placeholder="例: 1200"
-                  value={segment.centerLength ?? ''}
-                  onChange={(e) =>
-                    onChange({
-                      centerLength: e.target.value === '' ? undefined : Number(e.target.value),
-                    })
-                  }
+                  value={segment.centerLength}
+                  onCommit={(v) => onChange({ centerLength: v })}
                 />
               </label>
             )
