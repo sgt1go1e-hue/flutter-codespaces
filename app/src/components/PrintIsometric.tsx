@@ -11,6 +11,13 @@ import {
   type LabelBox,
   type LabelJob,
 } from '../lib/labelLayout'
+import {
+  chooseDimSide,
+  dimExtensionLine,
+  dimLaneGeometry,
+  DIM_OUTER_STANDOFF,
+  DIM_INNER_STANDOFF,
+} from '../lib/dimensionLine'
 
 interface Props {
   segments: Segment[]
@@ -82,9 +89,16 @@ export function PrintIsometric({
   cutById,
   baseSlopeDenom,
 }: Props) {
+  // 実際に描かれる45°マークの位置（寸法線を出す側の判定に使う。重なり回避の
+  // 対象位置計算(resolvedLabels)と実際の寸法線描画(レンダー側)の両方で同じ
+  // 値を参照する）。
+  const elbow45Marks = useMemo(
+    () => allElbow45MarkPositions(segments, effectiveById, cutById),
+    [segments, effectiveById, cutById],
+  )
+
   const resolvedLabels = useMemo(() => {
     const jobs: LabelJob[] = []
-    const elbow45Marks = allElbow45MarkPositions(segments, effectiveById, cutById)
     for (const s of segments) {
       const eff = effectiveById[s.id]
       const c = cutById[s.id]
@@ -95,6 +109,11 @@ export function PrintIsometric({
       const w = estimateTextWidth(eff.size, 12) + 8
       jobs.push({ key: `seg-${s.id}`, cx: mx, cy: my - 10, w, h: 18, pushX: 0, pushY: -1 })
     }
+    // ISOGEN流(海外の配管業界で広く使われる自動アイソメ生成ソフトのスタイル)を
+    // 参考に、芯々/芯先(外側レーン)と切り寸法(内側レーン、参照寸法を示す括弧
+    // 書き)を、パイプ本体から離した別々の寸法線上に表示する(画面表示の
+    // DrawingCanvas.tsxと同じジオメトリ・同じ考え方。印刷はuiScaleを持たない
+    // ため常に等倍=1として扱う)。
     for (const s of segments) {
       const c = cutById[s.id]
       if (!c || c.status === 'none') continue
@@ -110,40 +129,38 @@ export function PrintIsometric({
             ? '加工不可能（丸ニップル使用）'
             : c.vpTsTooShortForPipe
               ? '加工不可能（差込み代不足）'
-              : `切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}`
+              : `(切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''})`
           : c.status === 'zero'
             ? c.reducerH != null
               ? `レジューサー H=${c.reducerH}（継手直結）`
               : 'パイプ0（継手直結）'
             : '継手不足'
       const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
-      const w =
-        Math.max(estimateTextWidth(line1, 10.5), estimateTextWidth(line2, fs2)) + 6
-      const len = distance(s.start, s.end) || 1
-      const dx = (s.end.x - s.start.x) / len
-      const dy = (s.end.y - s.start.y) / len
-      let perpX = -dy
-      let perpY = dx
       const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
-      if (markPos) {
-        const toMarkX = markPos.x - mx
-        const toMarkY = markPos.y - my
-        if (perpX * toMarkX + perpY * toMarkY > 0) {
-          perpX = -perpX
-          perpY = -perpY
-        }
-      } else if (perpY < 0) {
-        perpX = -perpX
-        perpY = -perpY
-      }
+      const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
+      const outerGeom = dimLaneGeometry(s.start, s.end, side, DIM_OUTER_STANDOFF, 1)
+      const innerGeom = dimLaneGeometry(s.start, s.end, side, DIM_INNER_STANDOFF, 1)
+      const w1 = estimateTextWidth(line1, 10.5) + 6
+      const w2 = estimateTextWidth(line2, fs2) + 6
+      const rotated1 = Math.abs(outerGeom.textRotateDeg) > 45
+      const rotated2 = Math.abs(innerGeom.textRotateDeg) > 45
       jobs.push({
-        key: `dim-${s.id}`,
-        cx: mx + perpX * 22,
-        cy: my + perpY * 22,
-        w,
-        h: 32,
-        pushX: perpX,
-        pushY: perpY,
+        key: `dim-outer-${s.id}`,
+        cx: outerGeom.textX,
+        cy: outerGeom.textY,
+        w: rotated1 ? 16 : w1,
+        h: rotated1 ? w1 : 16,
+        pushX: side.nx,
+        pushY: side.ny,
+      })
+      jobs.push({
+        key: `dim-inner-${s.id}`,
+        cx: innerGeom.textX,
+        cy: innerGeom.textY,
+        w: rotated2 ? 18 : w2,
+        h: rotated2 ? w2 : 18,
+        pushX: side.nx,
+        pushY: side.ny,
       })
     }
     for (const s of segments) {
@@ -478,51 +495,121 @@ export function PrintIsometric({
               else if (c.startConnected && !c.endConnected) t = 0.7
               const mx = s.start.x + (s.end.x - s.start.x) * t
               const my = s.start.y + (s.end.y - s.start.y) * t
-              const resolvedPos = resolvedLabels.get(`dim-${s.id}`)
-              const cx = resolvedPos?.cx ?? mx
-              const cCenter = resolvedPos?.cy ?? my + 22
-              const y1 = cCenter - 8
-              const y2 = cCenter + 8
+              const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
+              const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
+              const outerGeom = dimLaneGeometry(s.start, s.end, side, DIM_OUTER_STANDOFF, 1)
+              const innerGeom = dimLaneGeometry(s.start, s.end, side, DIM_INNER_STANDOFF, 1)
+              const extStart = dimExtensionLine(s.start, side, DIM_OUTER_STANDOFF, 1)
+              const extEnd = dimExtensionLine(s.end, side, DIM_OUTER_STANDOFF, 1)
+              const outerResolved = resolvedLabels.get(`dim-outer-${s.id}`)
+              const outerX = outerResolved?.cx ?? outerGeom.textX
+              const outerY = outerResolved?.cy ?? outerGeom.textY
+              const innerResolved = resolvedLabels.get(`dim-inner-${s.id}`)
+              const innerX = innerResolved?.cx ?? innerGeom.textX
+              const innerY = innerResolved?.cy ?? innerGeom.textY
               return (
-                <>
-                  <text className="dim-center" x={cx} y={y1} textAnchor="middle">
+                <g className="dim-group">
+                  <line
+                    className="dim-ext-line"
+                    x1={extStart.x1}
+                    y1={extStart.y1}
+                    x2={extStart.x2}
+                    y2={extStart.y2}
+                  />
+                  <line
+                    className="dim-ext-line"
+                    x1={extEnd.x1}
+                    y1={extEnd.y1}
+                    x2={extEnd.x2}
+                    y2={extEnd.y2}
+                  />
+                  <line
+                    className="dim-line-outer"
+                    x1={outerGeom.line.x1}
+                    y1={outerGeom.line.y1}
+                    x2={outerGeom.line.x2}
+                    y2={outerGeom.line.y2}
+                  />
+                  <polygon className="dim-arrow-outer" points={outerGeom.arrowStart} />
+                  <polygon className="dim-arrow-outer" points={outerGeom.arrowEnd} />
+                  <text
+                    className="dim-center"
+                    x={outerX}
+                    y={outerY}
+                    textAnchor="middle"
+                    transform={`rotate(${outerGeom.textRotateDeg} ${outerX} ${outerY})`}
+                  >
                     {c.mode} {c.center}
                   </text>
+                  <line
+                    className="dim-line-inner"
+                    x1={innerGeom.line.x1}
+                    y1={innerGeom.line.y1}
+                    x2={innerGeom.line.x2}
+                    y2={innerGeom.line.y2}
+                  />
+                  <polygon className="dim-arrow-inner" points={innerGeom.arrowStart} />
+                  <polygon className="dim-arrow-inner" points={innerGeom.arrowEnd} />
                   {c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe && (
                     <text
                       className={`dim-cut${c.socketWeldGapWarning || c.threadNearMinNipple ? ' tight' : ''}`}
-                      x={cx}
-                      y={y2}
+                      x={innerX}
+                      y={innerY}
                       textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
                     >
-                      切 {c.cut}
+                      (切 {c.cut}
                       {c.socketWeldGapWarning ? '（溶接代不足）' : ''}
-                      {c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}
+                      {c.threadNearMinNipple ? '（丸ニップル推奨）' : ''})
                     </text>
                   )}
                   {c.status === 'ok' && c.threadTooShortForPipe && (
-                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className="dim-cut over"
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
                       加工不可能（丸ニップル使用）
                     </text>
                   )}
                   {c.status === 'ok' && c.vpTsTooShortForPipe && (
-                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className="dim-cut over"
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
                       加工不可能（差込み代不足）
                     </text>
                   )}
                   {c.status === 'zero' && (
-                    <text className="dim-cut zero" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className="dim-cut zero"
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
                       {c.reducerH != null
                         ? `レジューサー H=${c.reducerH}（継手直結）`
                         : 'パイプ0（継手直結）'}
                     </text>
                   )}
                   {c.status === 'over' && (
-                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className="dim-cut over"
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
                       継手不足
                     </text>
                   )}
-                </>
+                </g>
               )
             })()}
           </g>

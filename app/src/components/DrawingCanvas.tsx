@@ -21,6 +21,13 @@ import {
   type LabelBox,
   type LabelJob,
 } from '../lib/labelLayout'
+import {
+  chooseDimSide,
+  dimExtensionLine,
+  dimLaneGeometry,
+  DIM_OUTER_STANDOFF,
+  DIM_INNER_STANDOFF,
+} from '../lib/dimensionLine'
 
 interface Props {
   segments: Segment[]
@@ -475,15 +482,19 @@ export function DrawingCanvas({
     setPreview(null)
   }
 
-  // 末端の呼び径ラベル・寸法2段表記(dim block)の基準位置(重なり回避の押し出し前)を
+  // 実際に描かれる45°マークの位置（寸法線を出す側の判定に使う。マークを
+  // 持つセグメント自身だけでなく、ノードを共有する隣接セグメント側からも
+  // 近さで判定するため、レンダー側(寸法線の実描画)でも同じ値を参照する）。
+  const elbow45Marks = useMemo(
+    () => allElbow45MarkPositions(segments, effectiveById, cutById),
+    [segments, effectiveById, cutById],
+  )
+
+  // 末端の呼び径ラベル・寸法(外側/内側レーン)の基準位置(重なり回避の押し出し前)を
   // 全セグメント分まとめて求め、重なりを解消した最終位置を得る。
   // ズーム・パン(view)には依存しない（すべて論理座標＝segment座標系で計算するため）。
   const resolvedLabels = useMemo(() => {
     const jobs: LabelJob[] = []
-    // 実際に描かれる45°マークの位置を先に全部集めておく（寸法ラベルの
-    // 押し出し方向の判定に使う。マークを持つセグメント自身だけでなく、
-    // ノードを共有する隣接セグメント側からも近さで判定するため）。
-    const elbow45Marks = allElbow45MarkPositions(segments, effectiveById, cutById)
     // 1) 中間の径変化ラベル（セグメント中点の上側）
     for (const s of segments) {
       const eff = effectiveById[s.id]
@@ -522,6 +533,36 @@ export function DrawingCanvas({
       // 表示専用データ（App側でassemblyNumberByIdとして都度算出）。
       const assemblyNum = assemblyNumberActive ? assemblyNumberById[s.id] : undefined
       const isNumbered = assemblyNum != null
+      // 寸法線を出す側(パイプに垂直な単位ベクトル)は、セグメントに対して固定
+      // する（セグメントの向きなりに押すと、切り立った斜め/縦の配管では押し出しが
+      // ほぼ線に沿った方向になってしまい、ラベルが自分の区間を越えて隣の区間の
+      // 場所までズレて、どちらの配管の寸法か分からなくなる事故があったため）。
+      // 45°マークがこの区間にあるときは、マークと反対側に寄せる（「次の配管が
+      // 曲がった先の進行方向の逆」に出すと重ならず収まりやすいという現場の
+      // 感覚に合わせたもの）。マークが無ければ従来どおり画面下側を既定にする。
+      const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
+      const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
+      if (isNumbered) {
+        // 相番(合番)表示が有効な区間は、寸法線ではなく番号だけの小さな丸バッジを
+        // 出す（別表(BOM対応表)で芯々/切り寸法を確認する運用のため）。
+        jobs.push({
+          key: `dim-${s.id}`,
+          cx: mx + side.nx * DIM_OUTER_STANDOFF * uiScale,
+          cy: my + side.ny * DIM_OUTER_STANDOFF * uiScale,
+          w: (ASSEMBLY_BADGE_R * 2 + 4) * uiScale,
+          h: (ASSEMBLY_BADGE_R * 2 + 4) * uiScale,
+          pushX: side.nx,
+          pushY: side.ny,
+        })
+        continue
+      }
+      // ISOGEN流(海外の配管業界で広く使われる自動アイソメ生成ソフトのスタイル)を
+      // 参考に、芯々/芯先(外側レーン)と切り寸法(内側レーン、参照寸法を示す
+      // 括弧書き)を、パイプ本体から離した別々の寸法線上に表示する。ここでは
+      // その2つのレーンの文字位置を重なり回避の対象ジョブとして登録するだけで、
+      // 実際の寸法線・矢羽根・補助線の描画はレンダー側(下のsegments.map)で
+      // segment自身の座標から都度計算する(このジョブの位置はテキストの
+      // 「基準位置／押し出し先」としてのみ使う)。
       const line1 = `${c.mode} ${c.center}`
       const line2 =
         c.status === 'ok'
@@ -529,51 +570,43 @@ export function DrawingCanvas({
             ? '加工不可能（丸ニップル使用）'
             : c.vpTsTooShortForPipe
               ? '加工不可能（差込み代不足）'
-              : `切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}`
+              : `(切 ${c.cut}${c.socketWeldGapWarning ? '（溶接代不足）' : ''}${c.threadNearMinNipple ? '（丸ニップル推奨）' : ''})`
           : c.status === 'zero'
             ? c.reducerH != null
               ? `レジューサー H=${c.reducerH}（継手直結）`
               : 'パイプ0（継手直結）'
             : '継手不足'
+      const fs1 = 10.5 * uiScale
       const fs2 =
         (c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11) *
         uiScale
-      const w = isNumbered
-        ? (ASSEMBLY_BADGE_R * 2 + 4) * uiScale
-        : Math.max(estimateTextWidth(line1, 10.5 * uiScale), estimateTextWidth(line2, fs2)) +
-          6 * uiScale
-      // 押し出す向きはセグメントに対して垂直な向きに固定する（セグメントの向き
-      // なりに押すと、切り立った斜め/縦の配管では押し出しがほぼ線に沿った方向に
-      // なってしまい、ラベルが自分の区間を越えて隣の区間の場所までズレて、
-      // どちらの配管の寸法か分からなくなる事故があったため）。
-      const len = distance(s.start, s.end) || 1
-      const dx = (s.end.x - s.start.x) / len
-      const dy = (s.end.y - s.start.y) / len
-      let perpX = -dy
-      let perpY = dx
-      // 45°マークがこの区間にあるときは、マークと反対側に寄せる（「次の配管が
-      // 曲がった先の進行方向の逆」に出すと重ならず収まりやすいという現場の
-      // 感覚に合わせたもの）。マークが無ければ従来どおり画面下側を既定にする。
-      const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
-      if (markPos) {
-        const toMarkX = markPos.x - mx
-        const toMarkY = markPos.y - my
-        if (perpX * toMarkX + perpY * toMarkY > 0) {
-          perpX = -perpX
-          perpY = -perpY
-        }
-      } else if (perpY < 0) {
-        perpX = -perpX
-        perpY = -perpY
-      }
+      const outerGeom = dimLaneGeometry(s.start, s.end, side, DIM_OUTER_STANDOFF, uiScale)
+      const innerGeom = dimLaneGeometry(s.start, s.end, side, DIM_INNER_STANDOFF, uiScale)
+      const w1 = estimateTextWidth(line1, fs1) + 6 * uiScale
+      const w2 = estimateTextWidth(line2, fs2) + 6 * uiScale
+      const lineBoxH = 16 * uiScale
+      // 文字が縦向き(±90度寄り)に回転しているときは、当たり判定の箱もw/hを
+      // 入れ替える(縦長の箱として扱う)。斜め(±30度)はおおむね元の箱のままで
+      // 妥当な近似として扱う。
+      const rotated1 = Math.abs(outerGeom.textRotateDeg) > 45
+      const rotated2 = Math.abs(innerGeom.textRotateDeg) > 45
       jobs.push({
-        key: `dim-${s.id}`,
-        cx: mx + perpX * 22 * uiScale,
-        cy: my + perpY * 22 * uiScale,
-        w,
-        h: isNumbered ? (ASSEMBLY_BADGE_R * 2 + 4) * uiScale : 32 * uiScale,
-        pushX: perpX,
-        pushY: perpY,
+        key: `dim-outer-${s.id}`,
+        cx: outerGeom.textX,
+        cy: outerGeom.textY,
+        w: rotated1 ? lineBoxH : w1,
+        h: rotated1 ? w1 : lineBoxH,
+        pushX: side.nx,
+        pushY: side.ny,
+      })
+      jobs.push({
+        key: `dim-inner-${s.id}`,
+        cx: innerGeom.textX,
+        cy: innerGeom.textY,
+        w: rotated2 ? lineBoxH : w2,
+        h: rotated2 ? w2 : lineBoxH,
+        pushX: side.nx,
+        pushY: side.ny,
       })
     }
     // 3) 排水勾配の「勾配1/N」マーク（区間中点のやや下）。個別上書きが無い
@@ -1032,8 +1065,11 @@ export function DrawingCanvas({
               cutById[s.id] &&
               !cutById[s.id].endConnected &&
               terminusSize(s, 'end', eff.size)}
-            {/* 寸法2段表記: 上段=芯々(入力), 下段=切り寸(緑・下線)。芯々/芯先も表示
-                位置は重なり回避で押し出された最終位置（無ければ基準位置）を使う。 */}
+            {/* 寸法表記(ISOGEN流): 外側レーン=芯々/芯先(パイプからDIM_OUTER_STANDOFF分離す)、
+                内側レーン=切り寸法(参照寸法を示す括弧書き、DIM_INNER_STANDOFF分離す)。
+                各レーンは専用の寸法線+補助線+矢羽根を持ち、文字はその区間の
+                向きに沿って傾ける。表示位置は重なり回避で押し出された最終位置
+                （無ければ幾何計算どおりの基準位置）を使う。 */}
             {(() => {
               const c = cutById[s.id]
               if (!c || c.status === 'none') return null
@@ -1042,14 +1078,14 @@ export function DrawingCanvas({
               else if (c.startConnected && !c.endConnected) t = 0.7
               const mx = s.start.x + (s.end.x - s.start.x) * t
               const my = s.start.y + (s.end.y - s.start.y) * t
-              const resolved = resolvedLabels.get(`dim-${s.id}`)
-              const cx = resolved?.cx ?? mx
-              const cCenter = resolved?.cy ?? my + 22
-              // 相番(合番)表示が有効な区間は、寸法2段表記の代わりに番号だけの
+              // 相番(合番)表示が有効な区間は、寸法線の代わりに番号だけの
               // 丸バッジを表示する（別表(BOM対応表)で芯々/切り寸法を確認する
               // 運用のため、図面上は密集を避けて番号のみにする）。
               const assemblyNum = assemblyNumberActive ? assemblyNumberById[s.id] : undefined
               if (assemblyNum != null) {
+                const resolved = resolvedLabels.get(`dim-${s.id}`)
+                const cx = resolved?.cx ?? mx
+                const cCenter = resolved?.cy ?? my + DIM_OUTER_STANDOFF * uiScale
                 return (
                   <g className="assembly-badge">
                     <circle cx={cx} cy={cCenter} r={ASSEMBLY_BADGE_R * uiScale} />
@@ -1059,67 +1095,123 @@ export function DrawingCanvas({
                   </g>
                 )
               }
-              // 2行のラベル(1行目=芯々/芯先, 2行目=切り寸法)の行間は、文字サイズの
-              // 拡大(uiScale、iPad等の広い画面向け)に必ず比例させる。ここが固定
-              // pxのままだと、文字だけ大きくなって行間が追いつかず2行が重なって
-              // しまう(iPad対応で顕在化した不具合)。
-              const lineHalfGap = 8 * uiScale
-              const y1 = cCenter - lineHalfGap
-              const y2 = cCenter + lineHalfGap
+              const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
+              const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
+              const outerGeom = dimLaneGeometry(s.start, s.end, side, DIM_OUTER_STANDOFF, uiScale)
+              const innerGeom = dimLaneGeometry(s.start, s.end, side, DIM_INNER_STANDOFF, uiScale)
+              const extStart = dimExtensionLine(s.start, side, DIM_OUTER_STANDOFF, uiScale)
+              const extEnd = dimExtensionLine(s.end, side, DIM_OUTER_STANDOFF, uiScale)
+              const outerResolved = resolvedLabels.get(`dim-outer-${s.id}`)
+              const outerX = outerResolved?.cx ?? outerGeom.textX
+              const outerY = outerResolved?.cy ?? outerGeom.textY
+              const innerResolved = resolvedLabels.get(`dim-inner-${s.id}`)
+              const innerX = innerResolved?.cx ?? innerGeom.textX
+              const innerY = innerResolved?.cy ?? innerGeom.textY
               return (
-                <>
-                  <text className="dim-center" x={cx} y={y1} textAnchor="middle">
+                <g className="dim-group">
+                  <line
+                    className="dim-ext-line"
+                    x1={extStart.x1}
+                    y1={extStart.y1}
+                    x2={extStart.x2}
+                    y2={extStart.y2}
+                  />
+                  <line
+                    className="dim-ext-line"
+                    x1={extEnd.x1}
+                    y1={extEnd.y1}
+                    x2={extEnd.x2}
+                    y2={extEnd.y2}
+                  />
+                  {/* 外側レーン: 芯々/芯先(入力値そのまま) */}
+                  <line
+                    className="dim-line-outer"
+                    x1={outerGeom.line.x1}
+                    y1={outerGeom.line.y1}
+                    x2={outerGeom.line.x2}
+                    y2={outerGeom.line.y2}
+                  />
+                  <polygon className="dim-arrow-outer" points={outerGeom.arrowStart} />
+                  <polygon className="dim-arrow-outer" points={outerGeom.arrowEnd} />
+                  <text
+                    className="dim-center"
+                    x={outerX}
+                    y={outerY}
+                    textAnchor="middle"
+                    transform={`rotate(${outerGeom.textRotateDeg} ${outerX} ${outerY})`}
+                  >
                     {c.mode} {c.center}
                   </text>
+                  {/* 内側レーン: 切り寸法(計算後の参照寸法。括弧書きで示す) */}
+                  <line
+                    className="dim-line-inner"
+                    x1={innerGeom.line.x1}
+                    y1={innerGeom.line.y1}
+                    x2={innerGeom.line.x2}
+                    y2={innerGeom.line.y2}
+                  />
+                  <polygon className="dim-arrow-inner" points={innerGeom.arrowStart} />
+                  <polygon className="dim-arrow-inner" points={innerGeom.arrowEnd} />
                   {c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe && (
-                    <>
-                      {/* 縁取り(読みやすさ用)は下線を含めない別レイヤーで描く。
-                          同じテキストに縁取り(stroke)と下線(text-decoration)を
-                          両方かけると、下線にも縁取りが付いて二重線に見えるため分離。 */}
-                      <text
-                        className="dim-cut-outline"
-                        x={cx}
-                        y={y2}
-                        textAnchor="middle"
-                        aria-hidden="true"
-                      >
-                        切 {c.cut}
-                      </text>
-                      <text
-                        className={`dim-cut${c.socketWeldGapWarning || c.threadNearMinNipple ? ' tight' : ''}`}
-                        x={cx}
-                        y={y2}
-                        textAnchor="middle"
-                      >
-                        切 {c.cut}
-                        {c.socketWeldGapWarning ? '（溶接代不足）' : ''}
-                        {c.threadNearMinNipple ? '（丸ニップル推奨）' : ''}
-                      </text>
-                    </>
+                    <text
+                      className={`dim-cut${c.socketWeldGapWarning || c.threadNearMinNipple ? ' tight' : ''}`}
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
+                      (切 {c.cut}
+                      {c.socketWeldGapWarning ? '（溶接代不足）' : ''}
+                      {c.threadNearMinNipple ? '（丸ニップル推奨）' : ''})
+                    </text>
                   )}
                   {c.status === 'ok' && c.threadTooShortForPipe && (
-                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className="dim-cut over"
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
                       加工不可能（丸ニップル使用）
                     </text>
                   )}
                   {c.status === 'ok' && c.vpTsTooShortForPipe && (
-                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className="dim-cut over"
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
                       加工不可能（差込み代不足）
                     </text>
                   )}
                   {c.status === 'zero' && (
-                    <text className="dim-cut zero" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className="dim-cut zero"
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
                       {c.reducerH != null
                         ? `レジューサー H=${c.reducerH}（継手直結）`
                         : 'パイプ0（継手直結）'}
                     </text>
                   )}
                   {c.status === 'over' && (
-                    <text className="dim-cut over" x={cx} y={y2} textAnchor="middle">
+                    <text
+                      className="dim-cut over"
+                      x={innerX}
+                      y={innerY}
+                      textAnchor="middle"
+                      transform={`rotate(${innerGeom.textRotateDeg} ${innerX} ${innerY})`}
+                    >
                       継手不足
                     </text>
                   )}
-                </>
+                </g>
               )
             })()}
           </g>

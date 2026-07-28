@@ -477,9 +477,13 @@ body {
   stroke-width: calc(3.5px * var(--ui-scale, 1));
 }
 
-/* 寸法2段表記（セグメント下側） */
+/* 寸法表記(ISOGEN流): パイプから離した外側/内側レーンの専用寸法線上に表示する。
+   芯々/芯先(外側レーン、.dim-center)は控えめな色、切り寸法(内側レーン、
+   .dim-cut)は現場で実際に使う数値のため強調色にする。括弧書きにすることで
+   「参照寸法(計算後の値)」であることを示す製図慣習に合わせ、以前使っていた
+   下線は廃止した。 */
 .dim-center {
-  fill: var(--label-sub); /* 上段: 芯々寸法（控えめ） */
+  fill: var(--label-sub); /* 外側レーン: 芯々寸法（控えめ） */
   font-size: calc(10.5px * var(--ui-scale, 1));
   font-weight: 600;
   paint-order: stroke;
@@ -487,25 +491,16 @@ body {
   stroke-width: calc(3px * var(--ui-scale, 1));
 }
 
-/*
- * 下段(切り寸)は「縁取り(読みやすさ用)」と「本体(下線付き)」を別レイヤーに分けて描く。
- * 同じテキストに stroke(縁取り) と text-decoration:underline(下線) を両方かけると、
- * 下線にも縁取りが付いてしまい二重線に見えるため([.dim-cut-outline]は縁取り専用・
- * 下線なし、[.dim-cut]は下線付き・縁取りなし)。
- */
-.dim-cut-outline {
-  fill: none;
+/* 下線を廃止したことで、以前は下線との併用を避けるために分けていた
+   「縁取り専用レイヤー」がstroke+underlineの競合なく直接指定できるように
+   なった(.dim-cut-outlineは廃止し、paint-orderで縁取りを直接かける)。 */
+.dim-cut {
+  fill: var(--label-cut); /* 内側レーン: 切り寸（強調・現場で使う数値・括弧書き） */
   font-size: calc(12.5px * var(--ui-scale, 1));
   font-weight: 800;
+  paint-order: stroke;
   stroke: var(--label-outline);
   stroke-width: calc(3.5px * var(--ui-scale, 1));
-}
-
-.dim-cut {
-  fill: var(--label-cut); /* 下段: 切り寸（強調・現場で使う数値） */
-  font-size: calc(12.5px * var(--ui-scale, 1));
-  font-weight: 800;
-  text-decoration: underline;
 }
 
 .dim-cut.zero {
@@ -528,6 +523,36 @@ body {
 
 .dim-cut.tight {
   fill: var(--label-tight);
+}
+
+/* 寸法補助線(パイプ端点から外側レーンまで伸ばす短い線)。目立たせすぎない
+   よう細く控えめな色にする。 */
+.dim-ext-line {
+  stroke: var(--label-sub);
+  stroke-width: calc(0.8px * var(--ui-scale, 1));
+  opacity: 0.55;
+}
+
+/* 外側レーン(芯々/芯先)の寸法線・矢羽根。.dim-centerと同系色(控えめ)。 */
+.dim-line-outer {
+  stroke: var(--label-sub);
+  stroke-width: calc(1px * var(--ui-scale, 1));
+  opacity: 0.75;
+}
+.dim-arrow-outer {
+  fill: var(--label-sub);
+  opacity: 0.75;
+}
+
+/* 内側レーン(切り寸法)の寸法線・矢羽根。.dim-cutと同系色(強調)。 */
+.dim-line-inner {
+  stroke: var(--label-cut);
+  stroke-width: calc(1.1px * var(--ui-scale, 1));
+  opacity: 0.85;
+}
+.dim-arrow-inner {
+  fill: var(--label-cut);
+  opacity: 0.85;
 }
 
 /* 相番(合番)バッジ。密集した図面では芯々/切り寸法を直書きせず番号だけを
