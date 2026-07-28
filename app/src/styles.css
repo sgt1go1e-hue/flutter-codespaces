@@ -1590,6 +1590,16 @@ fieldset.panel-grid:disabled {
   break-inside: avoid;
   page-break-inside: avoid;
 }
+/* パイプはサイズ別に1グループ(切り寸法一覧+小計行)をtbodyでまとめ、
+   ページの都合でどうしても分割が必要なとき以外は同じページに収める。
+   継手・フランジは通常件数が少ないため、見出し(h2)ごとブロックとして
+   まとめて別ページへ孤立させない。相番対応表(assemblyBlock)は区間数
+   ぶんの行数になり得るため、これまで通りtr単位の分割のみ許可する。 */
+.bom-print-only .print-pipe-group,
+.bom-print-only .bom-section-block {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
 .bom-print-only th,
 .bom-print-only td {
   border: 1px solid #888;

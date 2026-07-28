@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { bomToCsv, computeAssemblyTable, type Bom } from '../lib/bom'
 import { chunkSegmentsForPrint, segmentsPerIsoPage } from '../lib/isoPagination'
@@ -372,33 +372,35 @@ export function BomModal({
                     <th>本数</th>
                   </tr>
                 </thead>
-                <tbody>
-                  {bom.pipes.map((p, i) => (
-                    <Fragment key={i}>
-                      {!compact &&
-                        p.cuts.map((c, j) => (
-                          <tr key={j}>
-                            <td>{p.pipeShort}</td>
-                            <td>{p.size ?? '—'}</td>
-                            <td>{round1(c)}</td>
-                            <td>1</td>
-                          </tr>
-                        ))}
-                      <tr className="print-subtotal">
-                        <td>{p.pipeShort}</td>
-                        <td>{p.size ?? '—'}</td>
-                        <td>{compact ? '計' : '小計'} {round1(p.totalMm)}</td>
-                        <td>{p.count}</td>
-                      </tr>
-                    </Fragment>
-                  ))}
-                </tbody>
+                {bom.pipes.map((p, i) => (
+                  // サイズごとにtbodyを分けることで、ページの都合で分割が
+                  // 必要なとき(避けきれないとき)以外は、1サイズ分の
+                  // 切り寸法一覧+小計行がまとまって同じページに収まる
+                  // ようにする(print-pipe-group, break-inside: avoid)。
+                  <tbody className="print-pipe-group" key={i}>
+                    {!compact &&
+                      p.cuts.map((c, j) => (
+                        <tr key={j}>
+                          <td>{p.pipeShort}</td>
+                          <td>{p.size ?? '—'}</td>
+                          <td>{round1(c)}</td>
+                          <td>1</td>
+                        </tr>
+                      ))}
+                    <tr className="print-subtotal">
+                      <td>{p.pipeShort}</td>
+                      <td>{p.size ?? '—'}</td>
+                      <td>{compact ? '計' : '小計'} {round1(p.totalMm)}</td>
+                      <td>{p.count}</td>
+                    </tr>
+                  </tbody>
+                ))}
               </table>
             </>
           )
 
           const fittingsBlock = bom.fittings.length > 0 && (
-            <>
+            <div className="bom-section-block">
               <h2>継手</h2>
               <table>
                 <thead>
@@ -420,11 +422,11 @@ export function BomModal({
                   ))}
                 </tbody>
               </table>
-            </>
+            </div>
           )
 
           const flangesBlock = bom.flanges.length > 0 && (
-            <>
+            <div className="bom-section-block">
               <h2>フランジ</h2>
               <table>
                 <thead>
@@ -446,7 +448,7 @@ export function BomModal({
                   ))}
                 </tbody>
               </table>
-            </>
+            </div>
           )
 
           const assemblyBlock = assemblyTable.length > 0 && (
