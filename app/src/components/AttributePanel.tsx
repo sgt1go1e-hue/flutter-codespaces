@@ -1112,58 +1112,53 @@ export function SegmentPanel({
           </fieldset>
         </details>
 
-        {/* 現場溶接マーク: 配管ライン上の1箇所に、工場加工の分割点(ここから
-            先は現場で溶接して繋ぐ)を示す三角マークを置く。継手ごとの自動
-            配置ではなく、必ずここでの操作(またはキャンバス上のマーク直接
-            タップ)で1箇所だけ手動配置する。向きの自動判定はしない。
-            表示専用の注記で、切り寸法等の計算結果には一切影響しない。 */}
-        <fieldset className="panel-grid" disabled={!canEditStructure}>
-          <div className="field round-field">
-            <span className="field-label">
-              現場溶接マーク
-              <span className="field-note">工場加工の分割点（表示のみ・キャンバス上でドラッグして移動可）</span>
-            </span>
-            {(() => {
-              const mark = segment.fieldWeldMark
-              return mark ? (
-                <div className="round-toggle">
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onChange({ fieldWeldMark: { ...mark, flipped: !mark.flipped } })
-                    }
-                  >
-                    向きを反転
-                  </button>
-                  {(mark.offsetX != null || mark.offsetY != null) && (
+        {/* 現熔マーク(現場溶接マーク): 配管ライン上の1箇所に、工場加工の
+            分割点(ここから先は現場で溶接して繋ぐ)を示す三角マークを置く。
+            配置自体はパーツパレットの「現熔マーク」チップ(選択→タップ、
+            またはドラッグ)で行う。ここではキャンバス上に既に置いてある
+            マークの向き・位置の調整のみを行う(未配置の区間には何も
+            表示しない)。表示専用の注記で、切り寸法等の計算結果には
+            一切影響しない。 */}
+        {segment.fieldWeldMark && (
+          <fieldset className="panel-grid" disabled={!canEditStructure}>
+            <div className="field round-field">
+              <span className="field-label">
+                現熔マーク
+                <span className="field-note">工場加工の分割点（表示のみ・キャンバス上でドラッグして移動可）</span>
+              </span>
+              {(() => {
+                const mark = segment.fieldWeldMark!
+                return (
+                  <div className="round-toggle">
                     <button
                       type="button"
                       onClick={() =>
-                        onChange({
-                          fieldWeldMark: { t: mark.t, flipped: mark.flipped },
-                        })
+                        onChange({ fieldWeldMark: { ...mark, flipped: !mark.flipped } })
                       }
                     >
-                      位置をリセット
+                      向きを反転
                     </button>
-                  )}
-                  <button type="button" onClick={() => onChange({ fieldWeldMark: undefined })}>
-                    削除
-                  </button>
-                </div>
-              ) : (
-                <div className="round-toggle">
-                  <button
-                    type="button"
-                    onClick={() => onChange({ fieldWeldMark: { t: 0.5, flipped: false } })}
-                  >
-                    この区間に配置
-                  </button>
-                </div>
-              )
-            })()}
-          </div>
-        </fieldset>
+                    {(mark.offsetX != null || mark.offsetY != null) && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onChange({
+                            fieldWeldMark: { t: mark.t, flipped: mark.flipped },
+                          })
+                        }
+                      >
+                        位置をリセット
+                      </button>
+                    )}
+                    <button type="button" onClick={() => onChange({ fieldWeldMark: undefined })}>
+                      削除
+                    </button>
+                  </div>
+                )
+              })()}
+            </div>
+          </fieldset>
+        )}
 
         {/* 現場合わせ区間: 現場で寸法を合わせるため、あえて長めに(遊びを
             持たせて)加工している区間であることを示す。ONにすると区間全体

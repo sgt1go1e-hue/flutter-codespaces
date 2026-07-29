@@ -20,6 +20,7 @@ export interface PartDef {
   action:
     | { type: 'flange'; flange: FlangeType }
     | { type: 'reducer'; reducer: 'concentric' | 'eccentric' }
+    | { type: 'fieldWeldMark' }
 }
 
 export const partsPalette: PartDef[] = [
@@ -46,6 +47,12 @@ export const partsPalette: PartDef[] = [
     name: '偏心レジューサー',
     icon: 'RED',
     action: { type: 'reducer', reducer: 'eccentric' },
+  },
+  {
+    id: 'field-weld-mark',
+    name: '現熔マーク',
+    icon: '熔',
+    action: { type: 'fieldWeldMark' },
   },
   // 例: 今後こう増やせる（未実装のプレースホルダは追加しない）
   // { id: 'valve', name: 'バルブ', icon: 'VLV', action: { type: 'placeInline', ... } },
