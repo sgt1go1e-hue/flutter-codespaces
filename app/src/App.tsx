@@ -983,14 +983,14 @@ export default function App() {
       // 現熔マーク: 分割はせず、タップ/ドロップ位置に最も近い点(t)へ
       // その区間の現場溶接マークとして置く（1本のセグメントにつき最大1箇所、
       // 既に置いてあれば上書き）。表示専用の注記で、切り寸法等の計算結果
-      // には一切影響しない。置いた直後は選択状態にして、詳細パネルから
-      // すぐ向き反転・位置リセット・削除ができるようにする。
+      // には一切影響しない。フランジと同様、置いた後に選択状態へは
+      // しない（選択すると寸法欄が自動フォーカスしてテンキーが開いてしまい、
+      // 「置いただけ」のつもりが詳細パネルへ強制的に飛ばされる形になって
+      // しまうため。向き反転等はキャンバス上のマーク直接タップで行える）。
       const { t } = projectOnSegment(dropPoint, best.start, best.end)
       mutateSegments((prev) =>
         prev.map((s) => (s.id === targetId ? { ...s, fieldWeldMark: { t, flipped: false } } : s)),
       )
-      setSelectedId(targetId)
-      return
     }
     // 分割後は選択状態をリセット（前後が別データになるため）
     setSelectedId(null)
