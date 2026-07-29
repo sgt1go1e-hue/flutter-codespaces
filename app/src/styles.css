@@ -664,6 +664,33 @@ body {
   fill: var(--label-tight);
 }
 
+/* 現合(現物合わせ)区間の注記表示。通常の芯々/切り寸法(.dim-center/.dim-cut)
+   の代わりに1行だけ出す。色(既存の警告色--label-zeroを流用)に加えて
+   イタリック体にもすることで、色を判別しづらい環境でも「確定値ではない」
+   と分かるよう二重に見た目を変える(誤って確定寸法として使われないため)。 */
+.dim-gengou {
+  fill: var(--label-zero);
+  font-size: calc(12px * var(--ui-scale, 1));
+  font-weight: 800;
+  font-style: italic;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
+}
+
+/* 現合区間の補足メモアイコン。既存の相番バッジ(assembly-badge)と同じ
+   「円+文字」の構成を流用し、視覚言語を増やしすぎないようにする。 */
+.gengou-note-icon circle {
+  fill: var(--label-zero);
+  stroke: var(--label-outline);
+  stroke-width: calc(1.5px * var(--ui-scale, 1));
+}
+.gengou-note-icon text {
+  fill: #04222e;
+  font-size: calc(12px * var(--ui-scale, 1));
+  font-weight: 800;
+}
+
 /* 寸法補助線(パイプ端点から寸法線まで伸ばす短い線)。目立たせすぎない
    よう細く控えめな色にする。 */
 .dim-ext-line {
@@ -1156,6 +1183,15 @@ fieldset.panel-grid:disabled {
 .color-label-field {
   grid-column: 1 / -1;
   margin-top: 8px;
+}
+
+/* 現合(現物合わせ)の概算寸法・修飾語・補足メモの入力欄。ONにしたときだけ
+   展開される(round-toggleの直下に縦に積む)。 */
+.gengou-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
 }
 
 /* 色↔系統名をまとめて編集する画面(ColorLabelsModal)。既存のモーダル

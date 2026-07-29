@@ -28,6 +28,7 @@ import {
   fieldWeldMarkGeometry,
 } from '../lib/fieldMarks'
 import { lineColorHex } from '../data/lineColors'
+import { genGouLabelText } from '../lib/genGou'
 
 interface Props {
   segments: Segment[]
@@ -1030,6 +1031,36 @@ export function DrawingCanvas({
     setFieldWeldDrag(null)
   }
 
+  // 現合(現物合わせ)区間の補足メモアイコン。常時全文表示すると画面が
+  // 煩雑になるため、メモがあるときだけ小さいアイコンを出し、タップした
+  // ときだけ内容を確認できるようにする。寸法線が出る側と重ならないよう
+  // 反対側に置く（現場溶接マーク等と同じ考え方）。
+  function genGouNoteIcon(s: Segment) {
+    if (!s.genGouNote) return null
+    const mx = (s.start.x + s.end.x) / 2
+    const my = (s.start.y + s.end.y) / 2
+    const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
+    const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
+    const off = 24 * uiScale
+    const cx = mx - side.nx * off
+    const cy = my - side.ny * off
+    const r = 10 * uiScale
+    return (
+      <g
+        className="gengou-note-icon"
+        pointerEvents="all"
+        style={{ cursor: 'pointer' }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => window.alert(s.genGouNote)}
+      >
+        <circle cx={cx} cy={cy} r={r} />
+        <text x={cx} y={cy} textAnchor="middle" dominantBaseline="central">
+          !
+        </text>
+      </g>
+    )
+  }
+
   // 45°エルボを使用した端に「45°」マークを表示（90°エルボとの区別を現場ですぐ判別できるように）
   function elbow45Mark(s: Segment, at: 'start' | 'end') {
     const pt = at === 'start' ? s.start : s.end
@@ -1208,6 +1239,8 @@ export function DrawingCanvas({
             {s.fieldFitAllowance && fieldFitEndMark(s, 'end', s.fieldFitEndFlipped ?? false)}
             {/* 現場溶接マーク: セグメント上の1点に置く三角マーク（表示専用） */}
             {fieldWeldMark(s)}
+            {/* 現合(現物合わせ)区間の補足メモアイコン（表示専用） */}
+            {s.isGenGou && genGouNoteIcon(s)}
             {/* レジューサーのシンボル（同心=二等辺 / 偏心=直角三角形） */}
             {eff?.fitting === 'reducer_concentric' &&
               reducerSymbol(s, 'concentric', undefined, cutById[s.id]?.reducerLargeAtStart ?? true)}
@@ -1332,6 +1365,21 @@ export function DrawingCanvas({
                   />
                   <polygon className="dim-arrow" points={geom.arrowStart} />
                   <polygon className="dim-arrow" points={geom.arrowEnd} />
+                  {/* 現合(現物合わせ)区間: 確定寸法として誤読されないよう、通常の
+                      芯々/切り寸法の2段表記の代わりに1行だけの注記表示にする
+                      (色も専用のものにして明確に見た目を変える)。 */}
+                  {s.isGenGou ? (
+                    <text
+                      className="dim-gengou"
+                      x={line1X}
+                      y={line1Y}
+                      textAnchor="middle"
+                      transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
+                    >
+                      {genGouLabelText(s.genGouQualifier, s.genGouDimension)}
+                    </text>
+                  ) : (
+                    <>
                   {/* 1行目: 芯々/芯先(入力値そのまま) */}
                   <text
                     className="dim-center"
@@ -1401,6 +1449,8 @@ export function DrawingCanvas({
                     >
                       継手不足
                     </text>
+                  )}
+                    </>
                   )}
                 </g>
               )

@@ -25,6 +25,7 @@ import {
 } from '../lib/calcExpr'
 import { CalcKeypad } from './CalcKeypad'
 import { LINE_COLOR_PALETTE } from '../data/lineColors'
+import { GEN_GOU_QUALIFIER_PRESETS } from '../lib/genGou'
 
 const round1 = (x: number) => Math.round(x * 10) / 10
 
@@ -1257,6 +1258,83 @@ export function SegmentPanel({
                 >
                   終点側の向きを反転
                 </button>
+              </div>
+            )}
+          </div>
+        </fieldset>
+
+        {/* 現合(現物合わせ): 工場出荷時点では寸法が確定せず、現場で実測
+            しながら切って合わせる区間であることを示す注記。ONにすると、
+            キャンバス上の寸法表示が通常の芯々/切り寸法の2段表記の代わりに
+            概算寸法・修飾語を使った1行の注記表示に切り替わる(確定寸法と
+            誤読されないようにするため)。上の「現場合わせ区間」(二重線+
+            三角マーク)とは独立した項目で、併用できる。あくまで表示専用の
+            注記で、切り寸法・BOM等の計算結果には一切影響しない。 */}
+        <fieldset className="panel-grid" disabled={!canEditStructure}>
+          <div className="field round-field">
+            <label className="gasket-check">
+              <input
+                type="checkbox"
+                checked={segment.isGenGou ?? false}
+                onChange={(e) => onChange({ isGenGou: e.target.checked })}
+              />
+              <span>現合（現場で実測して合わせる）</span>
+            </label>
+            {segment.isGenGou && (
+              <div className="gengou-fields">
+                <label className="field">
+                  <span className="field-label">
+                    概算寸法(mm)
+                    <span className="field-note">任意・自動計算なし</span>
+                  </span>
+                  <input
+                    className="num-input"
+                    type="number"
+                    inputMode="decimal"
+                    placeholder="例: 1200"
+                    value={segment.genGouDimension ?? ''}
+                    onChange={(e) =>
+                      onChange({
+                        genGouDimension: e.target.value === '' ? undefined : Number(e.target.value),
+                      })
+                    }
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">
+                    修飾語
+                    <span className="field-note">プリセットまたは自由入力</span>
+                  </span>
+                  <div className="round-toggle">
+                    {GEN_GOU_QUALIFIER_PRESETS.map((q) => (
+                      <button
+                        key={q}
+                        type="button"
+                        className={segment.genGouQualifier === q ? 'active' : ''}
+                        onClick={() => onChange({ genGouQualifier: q })}
+                      >
+                        {q}
+                      </button>
+                    ))}
+                  </div>
+                  <input
+                    className="num-input"
+                    type="text"
+                    placeholder="自由入力も可（未入力なら「現合」）"
+                    value={segment.genGouQualifier ?? ''}
+                    onChange={(e) => onChange({ genGouQualifier: e.target.value })}
+                  />
+                </label>
+                <label className="field">
+                  <span className="field-label">補足メモ</span>
+                  <input
+                    className="num-input"
+                    type="text"
+                    placeholder="例: スラブ面から実測"
+                    value={segment.genGouNote ?? ''}
+                    onChange={(e) => onChange({ genGouNote: e.target.value })}
+                  />
+                </label>
               </div>
             )}
           </div>

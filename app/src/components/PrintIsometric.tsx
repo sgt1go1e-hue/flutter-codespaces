@@ -17,6 +17,7 @@ import {
   fieldFitEndMarkGeometry,
   fieldWeldMarkGeometry,
 } from '../lib/fieldMarks'
+import { genGouLabelText } from '../lib/genGou'
 
 interface Props {
   segments: Segment[]
@@ -566,6 +567,23 @@ export function PrintIsometric({
                   />
                   <polygon className="dim-arrow" points={geom.arrowStart} />
                   <polygon className="dim-arrow" points={geom.arrowEnd} />
+                  {/* 現合(現物合わせ)区間: 画面表示と同じく、確定寸法として誤読
+                      されないよう専用の1行注記表示にする（印刷でこそ誤読を
+                      避ける意味が大きいため、画面と同じロジックを使う）。
+                      補足メモのアイコンは画面上でタップして確認する用途のため
+                      印刷には出さない。 */}
+                  {s.isGenGou ? (
+                    <text
+                      className="dim-gengou"
+                      x={line1X}
+                      y={line1Y}
+                      textAnchor="middle"
+                      transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
+                    >
+                      {genGouLabelText(s.genGouQualifier, s.genGouDimension)}
+                    </text>
+                  ) : (
+                    <>
                   <text
                     className="dim-center"
                     x={line1X}
@@ -633,6 +651,8 @@ export function PrintIsometric({
                     >
                       継手不足
                     </text>
+                  )}
+                    </>
                   )}
                 </g>
               )
