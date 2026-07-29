@@ -1112,6 +1112,85 @@ export function SegmentPanel({
           </fieldset>
         </details>
 
+        {/* 現場溶接マーク: 配管ライン上の1箇所に、工場加工の分割点(ここから
+            先は現場で溶接して繋ぐ)を示す三角マークを置く。継手ごとの自動
+            配置ではなく、必ずここでの操作(またはキャンバス上のマーク直接
+            タップ)で1箇所だけ手動配置する。向きの自動判定はしない。
+            表示専用の注記で、切り寸法等の計算結果には一切影響しない。 */}
+        <fieldset className="panel-grid" disabled={!canEditStructure}>
+          <div className="field round-field">
+            <span className="field-label">
+              現場溶接マーク
+              <span className="field-note">工場加工の分割点（表示のみ）</span>
+            </span>
+            {(() => {
+              const mark = segment.fieldWeldMark
+              return mark ? (
+                <div className="round-toggle">
+                  <button
+                    type="button"
+                    onClick={() =>
+                      onChange({ fieldWeldMark: { ...mark, flipped: !mark.flipped } })
+                    }
+                  >
+                    向きを反転
+                  </button>
+                  <button type="button" onClick={() => onChange({ fieldWeldMark: undefined })}>
+                    削除
+                  </button>
+                </div>
+              ) : (
+                <div className="round-toggle">
+                  <button
+                    type="button"
+                    onClick={() => onChange({ fieldWeldMark: { t: 0.5, flipped: false } })}
+                  >
+                    この区間に配置
+                  </button>
+                </div>
+              )
+            })()}
+          </div>
+        </fieldset>
+
+        {/* 現場合わせ区間: 現場で寸法を合わせるため、あえて長めに(遊びを
+            持たせて)加工している区間であることを示す。ONにすると区間全体
+            を二重線で表示し、両端に向き変更可能な三角マークを置く。
+            始点側・終点側それぞれの向きは個別に手動で選ぶ(自動判定しない)。
+            表示専用のフラグで、切り寸法等の計算結果には一切影響しない。 */}
+        <fieldset className="panel-grid" disabled={!canEditStructure}>
+          <div className="field round-field">
+            <label className="gasket-check">
+              <input
+                type="checkbox"
+                checked={segment.fieldFitAllowance ?? false}
+                onChange={(e) => onChange({ fieldFitAllowance: e.target.checked })}
+              />
+              <span>現場合わせ区間（遊びを持たせて加工）</span>
+            </label>
+            {segment.fieldFitAllowance && (
+              <div className="round-toggle">
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChange({ fieldFitStartFlipped: !segment.fieldFitStartFlipped })
+                  }
+                >
+                  始点側の向きを反転
+                </button>
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChange({ fieldFitEndFlipped: !segment.fieldFitEndFlipped })
+                  }
+                >
+                  終点側の向きを反転
+                </button>
+              </div>
+            )}
+          </div>
+        </fieldset>
+
         {/* ⑧ 切り寸法の丸め（最下部・スクロールしないと見えない位置） */}
         <fieldset className="panel-grid" disabled={!canEditStructure}>
           <div className="field round-field">

@@ -732,6 +732,28 @@ export default function App() {
     if (selectedId === id) setSelectedId(null)
   }
 
+  // 現場溶接マーク・現場合わせ区間の三角マークは、キャンバス上のマーク自体を
+  // タップすると向きを反転できる（詳細パネルの反転ボタンと同じ操作を、
+  // マークの直接タップでも行えるようにするための最短経路）。表示専用の
+  // トグル値であり、切り寸法等の計算結果には一切影響しない。
+  function toggleFieldWeldFlip(id: string) {
+    if (!canEditStructure) return
+    mutateSegments((prev) =>
+      prev.map((s) =>
+        s.id === id && s.fieldWeldMark
+          ? { ...s, fieldWeldMark: { ...s.fieldWeldMark, flipped: !s.fieldWeldMark.flipped } }
+          : s,
+      ),
+    )
+  }
+  function toggleFieldFitFlip(id: string, at: 'start' | 'end') {
+    if (!canEditStructure) return
+    const key = at === 'start' ? 'fieldFitStartFlipped' : 'fieldFitEndFlipped'
+    mutateSegments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, [key]: !s[key] } : s)),
+    )
+  }
+
   function undo() {
     if (history.length === 0) return
     const prevState = history[history.length - 1]
@@ -1048,6 +1070,8 @@ export default function App() {
           onEraseSegment={eraseSegment}
           assemblyNumberActive={assemblyNumberActive}
           assemblyNumberById={assemblyNumberById}
+          onToggleFieldWeldFlip={canEditStructure ? toggleFieldWeldFlip : undefined}
+          onToggleFieldFitFlip={canEditStructure ? toggleFieldFitFlip : undefined}
         />
 
         {/* ドラッグ中のパーツ ghost */}

@@ -600,6 +600,31 @@ body {
   stroke-linecap: round;
 }
 
+/* 現場溶接マーク（工場加工の分割点。正三角形・輪郭のみ・赤系で目立たせる。
+   既存のエラー/警告色(--label-over)を流用し、新しい色を増やさない）。 */
+.field-weld-mark {
+  fill: none;
+  stroke: var(--label-over);
+  stroke-width: calc(1.6px * var(--ui-scale, 1));
+  stroke-linejoin: round;
+}
+
+/* 現場合わせ区間（遊びを持たせて加工している区間）の二重線・端点マーク。
+   選択中セグメントと同系色(橙)にして、通常の配管線・現場溶接マーク(赤)
+   のどちらとも見分けやすくする。 */
+.field-fit-line {
+  stroke: var(--seg-selected);
+  stroke-width: calc(1.4px * var(--ui-scale, 1));
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.field-fit-mark {
+  fill: none;
+  stroke: var(--seg-selected);
+  stroke-width: calc(1.6px * var(--ui-scale, 1));
+  stroke-linejoin: round;
+}
+
 /* --- 常設 属性パネル（画面下部） --- */
 .attr-panel {
   background: var(--panel);

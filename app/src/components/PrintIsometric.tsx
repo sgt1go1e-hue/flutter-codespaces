@@ -12,6 +12,11 @@ import {
   type LabelJob,
 } from '../lib/labelLayout'
 import { chooseDimSide, dimExtensionLine, dimGeometry } from '../lib/dimensionLine'
+import {
+  fieldFitDoubleLines,
+  fieldFitEndMarkGeometry,
+  fieldWeldMarkGeometry,
+} from '../lib/fieldMarks'
 
 interface Props {
   segments: Segment[]
@@ -334,6 +339,31 @@ export function PrintIsometric({
     )
   }
 
+  // 現場合わせ区間の二重線（印刷用。画面表示と同じジオメトリ、常に等倍）
+  function fieldFitDoubleLine(s: Segment) {
+    const { line1, line2 } = fieldFitDoubleLines(s.start, s.end, 1)
+    return (
+      <>
+        <line x1={line1.x1} y1={line1.y1} x2={line1.x2} y2={line1.y2} className="field-fit-line" />
+        <line x1={line2.x1} y1={line2.y1} x2={line2.x2} y2={line2.y2} className="field-fit-line" />
+      </>
+    )
+  }
+
+  // 現場合わせ区間の端点三角マーク（印刷用。タップ操作は不要なので描画のみ）
+  function fieldFitEndMark(s: Segment, at: 'start' | 'end', flipped: boolean) {
+    const points = fieldFitEndMarkGeometry(s, at, flipped, 1)
+    return <polygon className="field-fit-mark" points={points} />
+  }
+
+  // 現場溶接マーク（印刷用。描画のみ）
+  function fieldWeldMark(s: Segment) {
+    const mark = s.fieldWeldMark
+    if (!mark) return null
+    const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, 1)
+    return <polygon className="field-weld-mark" points={points} />
+  }
+
   // 45°エルボを使用した端に「45°」マークを表示（90°エルボとの区別を現場ですぐ判別できるように）
   function elbow45Mark(s: Segment, at: 'start' | 'end') {
     const pt = at === 'start' ? s.start : s.end
@@ -430,6 +460,10 @@ export function PrintIsometric({
             <circle cx={s.end.x} cy={s.end.y} r={4} fill="#94a3b8" />
             {s.startFlange && flangeMarker(s, 'start', s.startFlange)}
             {s.endFlange && flangeMarker(s, 'end', s.endFlange)}
+            {s.fieldFitAllowance && fieldFitDoubleLine(s)}
+            {s.fieldFitAllowance && fieldFitEndMark(s, 'start', s.fieldFitStartFlipped ?? false)}
+            {s.fieldFitAllowance && fieldFitEndMark(s, 'end', s.fieldFitEndFlipped ?? false)}
+            {fieldWeldMark(s)}
             {eff?.fitting === 'reducer_concentric' &&
               reducerSymbol(s, 'concentric', undefined, cutById[s.id]?.reducerLargeAtStart ?? true)}
             {eff?.fitting === 'reducer_eccentric' &&

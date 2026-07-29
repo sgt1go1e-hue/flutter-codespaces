@@ -22,6 +22,11 @@ import {
   type LabelJob,
 } from '../lib/labelLayout'
 import { chooseDimSide, dimExtensionLine, dimGeometry, DIM_STANDOFF } from '../lib/dimensionLine'
+import {
+  fieldFitDoubleLines,
+  fieldFitEndMarkGeometry,
+  fieldWeldMarkGeometry,
+} from '../lib/fieldMarks'
 
 interface Props {
   segments: Segment[]
@@ -76,6 +81,10 @@ interface Props {
   assemblyNumberActive?: boolean
   /** 区間ごとの実効相番。芯々未入力の区間には含まれない。 */
   assemblyNumberById?: Record<string, number>
+  /** 現場溶接マークの三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
+  onToggleFieldWeldFlip?: (segId: string) => void
+  /** 現場合わせ区間の端点三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
+  onToggleFieldFitFlip?: (segId: string, at: 'start' | 'end') => void
 }
 
 // 「指が動いたかどうか」のごく小さいデッドゾーン(px、画面座標＝ズーム非依存)。
@@ -191,6 +200,8 @@ export function DrawingCanvas({
   disableDraw = false,
   assemblyNumberActive = false,
   assemblyNumberById = {},
+  onToggleFieldWeldFlip,
+  onToggleFieldFitFlip,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
@@ -867,6 +878,58 @@ export function DrawingCanvas({
     )
   }
 
+  // 現場合わせ区間（現場で寸法を合わせるため、あえて長めに加工している区間）
+  // の二重線。既存の線のすぐ両側に平行な線を1本ずつ添える（表示専用、
+  // 計算結果には影響しない）。
+  function fieldFitDoubleLine(s: Segment) {
+    const { line1, line2 } = fieldFitDoubleLines(s.start, s.end, uiScale)
+    return (
+      <>
+        <line x1={line1.x1} y1={line1.y1} x2={line1.x2} y2={line1.y2} className="field-fit-line" />
+        <line x1={line2.x1} y1={line2.y1} x2={line2.x2} y2={line2.y2} className="field-fit-line" />
+      </>
+    )
+  }
+
+  // 現場合わせ区間の端点(始点/終点)の三角マーク。タップで向きを反転できる
+  // （キャンバス側の直接タップ＝onToggleFieldFitFlip、詳細パネル側にも
+  // 同じ操作のボタンを用意している）。stopPropagationで、キャンバス本体の
+  // ドラッグ/タップ判定(線を引く・選択する等)に巻き込まれないようにする。
+  function fieldFitEndMark(s: Segment, at: 'start' | 'end', flipped: boolean) {
+    const points = fieldFitEndMarkGeometry(s, at, flipped, uiScale)
+    return (
+      <polygon
+        className="field-fit-mark"
+        points={points}
+        // 塗りつぶしなし(輪郭のみ)のため、pointer-events="auto"のままだと
+        // 線の内側(塗りが無い部分)がタップを拾えない。"all"にして、輪郭で
+        // 囲まれた領域全体をタップ対象にする。
+        pointerEvents="all"
+        style={{ cursor: onToggleFieldFitFlip ? 'pointer' : undefined }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => onToggleFieldFitFlip?.(s.id, at)}
+      />
+    )
+  }
+
+  // 現場溶接マーク（工場での加工分割点。「ここから先は現場で溶接して繋ぐ」の目印）。
+  // タップで向きを反転できる（fieldFitEndMarkと同じ理由でstopPropagationする）。
+  function fieldWeldMark(s: Segment) {
+    const mark = s.fieldWeldMark
+    if (!mark) return null
+    const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, uiScale)
+    return (
+      <polygon
+        className="field-weld-mark"
+        points={points}
+        pointerEvents="all"
+        style={{ cursor: onToggleFieldWeldFlip ? 'pointer' : undefined }}
+        onPointerDown={(e) => e.stopPropagation()}
+        onClick={() => onToggleFieldWeldFlip?.(s.id)}
+      />
+    )
+  }
+
   // 45°エルボを使用した端に「45°」マークを表示（90°エルボとの区別を現場ですぐ判別できるように）
   function elbow45Mark(s: Segment, at: 'start' | 'end') {
     const pt = at === 'start' ? s.start : s.end
@@ -1030,6 +1093,12 @@ export function DrawingCanvas({
             <circle cx={s.end.x} cy={s.end.y} r={4 * uiScale} fill="var(--seg-dot)" />
             {s.startFlange && flangeMarker(s, 'start', s.startFlange)}
             {s.endFlange && flangeMarker(s, 'end', s.endFlange)}
+            {/* 現場合わせ区間: 二重線＋両端の三角マーク（表示専用、計算結果には無関係） */}
+            {s.fieldFitAllowance && fieldFitDoubleLine(s)}
+            {s.fieldFitAllowance && fieldFitEndMark(s, 'start', s.fieldFitStartFlipped ?? false)}
+            {s.fieldFitAllowance && fieldFitEndMark(s, 'end', s.fieldFitEndFlipped ?? false)}
+            {/* 現場溶接マーク: セグメント上の1点に置く三角マーク（表示専用） */}
+            {fieldWeldMark(s)}
             {/* レジューサーのシンボル（同心=二等辺 / 偏心=直角三角形） */}
             {eff?.fitting === 'reducer_concentric' &&
               reducerSymbol(s, 'concentric', undefined, cutById[s.id]?.reducerLargeAtStart ?? true)}
