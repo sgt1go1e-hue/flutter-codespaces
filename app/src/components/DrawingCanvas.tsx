@@ -83,6 +83,11 @@ interface Props {
   assemblyNumberById?: Record<string, number>
   /** 現場溶接マークの三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
   onToggleFieldWeldFlip?: (segId: string) => void
+  /**
+   * 現場溶接マークの三角をドラッグして移動したとき、対象点からの相対
+   * オフセット(表示スケール=1のときのpx相当)を確定する（表示専用）。
+   */
+  onMoveFieldWeldMark?: (segId: string, offsetX: number, offsetY: number) => void
   /** 現場合わせ区間の端点三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
   onToggleFieldFitFlip?: (segId: string, at: 'start' | 'end') => void
 }
@@ -202,6 +207,7 @@ export function DrawingCanvas({
   assemblyNumberById = {},
   onToggleFieldWeldFlip,
   onToggleFieldFitFlip,
+  onMoveFieldWeldMark,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
@@ -245,6 +251,26 @@ export function DrawingCanvas({
   // 選択してしまうと、そこを起点にドラッグして新しい線を描こうとした操作まで
   // タップ扱いになり、詳細パネルが誤って開いてしまう（密集した図面で頻発）。
   const labelPointerDownSegIdRef = useRef<string | null>(null)
+
+  // 現場溶接マーク(三角)のドラッグ移動用。タップ(=向き反転)とドラッグ(=移動)を
+  // 「離すまでの移動量」で判定する(TAP_DEADZONE_PXと同じ考え方)。移動中は
+  // fieldWeldDrag(state)でその場でプレビューを更新し、離した時点で確定して
+  // 親(App)へ相対オフセットを渡す。ジェスチャの起点情報自体はrefで持ち、
+  // 毎フレームの再レンダーには影響させない。
+  const fieldWeldDragRef = useRef<{
+    pointerId: number
+    segId: string
+    startClientX: number
+    startClientY: number
+    startOffsetX: number
+    startOffsetY: number
+    moved: boolean
+  } | null>(null)
+  const [fieldWeldDrag, setFieldWeldDrag] = useState<{
+    segId: string
+    offsetX: number
+    offsetY: number
+  } | null>(null)
 
   useEffect(() => {
     const el = svgRef.current
@@ -913,21 +939,94 @@ export function DrawingCanvas({
   }
 
   // 現場溶接マーク（工場での加工分割点。「ここから先は現場で溶接して繋ぐ」の目印）。
-  // タップで向きを反転できる（fieldFitEndMarkと同じ理由でstopPropagationする）。
+  // 動かさずに離せばタップ＝向き反転、動かして離せばドラッグ＝移動確定。
+  // 寸法線と同じ「避けたい点」(45°マーク)を渡し、既定配置が寸法線と同じ側に
+  // 来てしまわないようにする（fieldFitEndMarkと同じ理由でstopPropagationする）。
   function fieldWeldMark(s: Segment) {
     const mark = s.fieldWeldMark
     if (!mark) return null
-    const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, uiScale)
+    const at = {
+      x: s.start.x + (s.end.x - s.start.x) * mark.t,
+      y: s.start.y + (s.end.y - s.start.y) * mark.t,
+    }
+    const avoidPoint = nearestElbow45Mark(elbow45Marks, at.x, at.y) ?? undefined
+    const dragging = fieldWeldDrag && fieldWeldDrag.segId === s.id
+    const customOffset = dragging
+      ? { x: fieldWeldDrag.offsetX, y: fieldWeldDrag.offsetY }
+      : mark.offsetX != null && mark.offsetY != null
+        ? { x: mark.offsetX, y: mark.offsetY }
+        : undefined
+    const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, uiScale, avoidPoint, customOffset)
     return (
       <polygon
-        className="field-weld-mark"
+        className={`field-weld-mark${dragging ? ' dragging' : ''}`}
         points={points}
         pointerEvents="all"
-        style={{ cursor: onToggleFieldWeldFlip ? 'pointer' : undefined }}
-        onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => onToggleFieldWeldFlip?.(s.id)}
+        style={{ cursor: onToggleFieldWeldFlip || onMoveFieldWeldMark ? 'pointer' : undefined }}
+        onPointerDown={(e) => handleFieldWeldPointerDown(e, s)}
+        onPointerMove={handleFieldWeldPointerMove}
+        onPointerUp={handleFieldWeldPointerUp}
+        onPointerCancel={handleFieldWeldPointerUp}
       />
     )
+  }
+
+  function handleFieldWeldPointerDown(e: React.PointerEvent<SVGPolygonElement>, s: Segment) {
+    e.stopPropagation()
+    const mark = s.fieldWeldMark
+    if (!mark) return
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const at = {
+      x: s.start.x + (s.end.x - s.start.x) * mark.t,
+      y: s.start.y + (s.end.y - s.start.y) * mark.t,
+    }
+    const avoidPoint = nearestElbow45Mark(elbow45Marks, at.x, at.y) ?? undefined
+    const customOffset =
+      mark.offsetX != null && mark.offsetY != null ? { x: mark.offsetX, y: mark.offsetY } : undefined
+    const { baseCenter } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, uiScale, avoidPoint, customOffset)
+    const startOffsetX = (baseCenter.x - at.x) / uiScale
+    const startOffsetY = (baseCenter.y - at.y) / uiScale
+    fieldWeldDragRef.current = {
+      pointerId: e.pointerId,
+      segId: s.id,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startOffsetX,
+      startOffsetY,
+      moved: false,
+    }
+    setFieldWeldDrag({ segId: s.id, offsetX: startOffsetX, offsetY: startOffsetY })
+  }
+
+  function handleFieldWeldPointerMove(e: React.PointerEvent<SVGPolygonElement>) {
+    const d = fieldWeldDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    const dxScreen = e.clientX - d.startClientX
+    const dyScreen = e.clientY - d.startClientY
+    if (Math.abs(dxScreen) > TAP_DEADZONE_PX || Math.abs(dyScreen) > TAP_DEADZONE_PX) {
+      d.moved = true
+    }
+    // 画面座標の移動量 -> 論理座標(パン・ズームの逆変換)、さらにuiScaleを
+    // 割り戻して「基準スケール(=1)のときのpx相当」の相対オフセットにする
+    // (fieldWeldMarkGeometry側で uiScale 倍して使うのと対になる)。
+    const offsetX = d.startOffsetX + dxScreen / view.scale / uiScale
+    const offsetY = d.startOffsetY + dyScreen / view.scale / uiScale
+    setFieldWeldDrag({ segId: d.segId, offsetX, offsetY })
+  }
+
+  function handleFieldWeldPointerUp(e: React.PointerEvent<SVGPolygonElement>) {
+    const d = fieldWeldDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    fieldWeldDragRef.current = null
+    if (d.moved) {
+      const final = fieldWeldDrag && fieldWeldDrag.segId === d.segId ? fieldWeldDrag : null
+      onMoveFieldWeldMark?.(d.segId, final?.offsetX ?? d.startOffsetX, final?.offsetY ?? d.startOffsetY)
+    } else {
+      onToggleFieldWeldFlip?.(d.segId)
+    }
+    setFieldWeldDrag(null)
   }
 
   // 45°エルボを使用した端に「45°」マークを表示（90°エルボとの区別を現場ですぐ判別できるように）

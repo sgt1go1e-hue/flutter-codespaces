@@ -10,8 +10,12 @@ import { chooseDimSide } from './dimensionLine'
 
 /** 正三角形の一辺の長さ(基準値, px)。相番バッジ・寸法文字と同程度のスケール感。実際はscale倍。 */
 export const FIELD_MARK_SIZE = 16
-/** 現場溶接マークの、配管ラインからのオフセット距離(基準値, px)。実際はscale倍。 */
-export const FIELD_WELD_OFFSET = 18
+/** 現場溶接マークの、配管ラインからの既定オフセット距離(基準値, px)。実際はscale倍。
+    以前は寸法線(DIM_STANDOFF=21)と同程度離していたが、対象点から離れすぎて
+    寸法テキストと誤認しやすかったため、パイプにより近い位置に縮めてある。
+    ユーザーがドラッグで移動した場合はこの既定値は使わず、保存済みの
+    offsetX/offsetY(fieldWeldMarkGeometryのcustomOffset)を使う。 */
+export const FIELD_WELD_OFFSET = 11
 /** 現場合わせ区間の二重線の間隔(基準値, px。線の中心線からの片側オフセット)。実際はscale倍。 */
 export const FIELD_FIT_LINE_GAP = 2.5
 /** 現場合わせ区間の端点三角マークの、配管ラインからのオフセット距離(基準値, px)。実際はscale倍。 */
@@ -41,11 +45,14 @@ export function trianglePoints(
 
 /**
  * セグメントに対して、寸法線と重ならないよう反対側に寄せた法線方向を返す
- * (寸法線が既定で出す側の逆側)。現場溶接マーク・現場合わせ区間マークの
- * 配置に使う。厳密な重なり回避ではないが、簡便かつ効果的な目安として使う。
+ * (寸法線が実際に出す側の逆側)。avoidPointは、DrawingCanvas/PrintIsometric
+ * が寸法線の側を決めるときと同じ「避けたい点」(45°マーク等)を渡すことで、
+ * 寸法線の側の判定(chooseDimSide)と食い違わないようにする。これが揃って
+ * いないと、寸法線が45°マーク回避で反転した区間だけマークと寸法線が
+ * 同じ側に来て重なって見えることがあった。
  */
-function markSide(start: Point, end: Point): { nx: number; ny: number } {
-  const dimSide = chooseDimSide(start, end)
+function markSide(start: Point, end: Point, avoidPoint?: Point): { nx: number; ny: number } {
+  const dimSide = chooseDimSide(start, end, avoidPoint)
   return { nx: -dimSide.nx, ny: -dimSide.ny }
 }
 
@@ -55,17 +62,26 @@ export function fieldWeldMarkGeometry(
   t: number,
   flipped: boolean,
   scale: number,
-): { points: string; anchor: Point } {
+  avoidPoint?: Point,
+  customOffset?: { x: number; y: number },
+): { points: string; anchor: Point; baseCenter: Point } {
   const len = distance(s.start, s.end) || 1
   const ux = (s.end.x - s.start.x) / len
   const uy = (s.end.y - s.start.y) / len
   const at = { x: s.start.x + (s.end.x - s.start.x) * t, y: s.start.y + (s.end.y - s.start.y) * t }
-  const { nx, ny } = markSide(s.start, s.end)
-  const off = FIELD_WELD_OFFSET * scale
-  const baseCenter = { x: at.x + nx * off, y: at.y + ny * off }
+  // customOffset(ドラッグで移動して保存済みの相対位置)があればそれを優先する。
+  // 無ければ、寸法線と反対側・パイプに近い既定位置を自動で使う。
+  const baseCenter = customOffset
+    ? { x: at.x + customOffset.x * scale, y: at.y + customOffset.y * scale }
+    : (() => {
+        const { nx, ny } = markSide(s.start, s.end, avoidPoint)
+        const off = FIELD_WELD_OFFSET * scale
+        return { x: at.x + nx * off, y: at.y + ny * off }
+      })()
   return {
     points: trianglePoints(baseCenter, { x: ux, y: uy }, flipped, FIELD_MARK_SIZE * scale),
     anchor: at,
+    baseCenter,
   }
 }
 

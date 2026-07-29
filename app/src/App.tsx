@@ -865,6 +865,19 @@ export default function App() {
     )
   }
 
+  // 現場溶接マークをドラッグして移動したとき、対象点(t位置)からの相対
+  // オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
+  function moveFieldWeldMark(id: string, offsetX: number, offsetY: number) {
+    if (!canEditStructure) return
+    mutateSegments((prev) =>
+      prev.map((s) =>
+        s.id === id && s.fieldWeldMark
+          ? { ...s, fieldWeldMark: { ...s.fieldWeldMark, offsetX, offsetY } }
+          : s,
+      ),
+    )
+  }
+
   function undo() {
     if (history.length === 0) return
     const prevState = history[history.length - 1]
@@ -1200,6 +1213,7 @@ export default function App() {
           assemblyNumberById={assemblyNumberById}
           onToggleFieldWeldFlip={canEditStructure ? toggleFieldWeldFlip : undefined}
           onToggleFieldFitFlip={canEditStructure ? toggleFieldFitFlip : undefined}
+          onMoveFieldWeldMark={canEditStructure ? moveFieldWeldMark : undefined}
         />
 
         {/* ドラッグ中のパーツ ghost */}

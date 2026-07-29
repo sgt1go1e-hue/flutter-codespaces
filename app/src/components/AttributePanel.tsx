@@ -1121,7 +1121,7 @@ export function SegmentPanel({
           <div className="field round-field">
             <span className="field-label">
               現場溶接マーク
-              <span className="field-note">工場加工の分割点（表示のみ）</span>
+              <span className="field-note">工場加工の分割点（表示のみ・キャンバス上でドラッグして移動可）</span>
             </span>
             {(() => {
               const mark = segment.fieldWeldMark
@@ -1135,6 +1135,18 @@ export function SegmentPanel({
                   >
                     向きを反転
                   </button>
+                  {(mark.offsetX != null || mark.offsetY != null) && (
+                    <button
+                      type="button"
+                      onClick={() =>
+                        onChange({
+                          fieldWeldMark: { t: mark.t, flipped: mark.flipped },
+                        })
+                      }
+                    >
+                      位置をリセット
+                    </button>
+                  )}
                   <button type="button" onClick={() => onChange({ fieldWeldMark: undefined })}>
                     削除
                   </button>
