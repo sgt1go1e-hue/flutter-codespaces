@@ -1,5 +1,5 @@
 import { useRef } from 'react'
-import { partsPalette } from '../data/parts'
+import { partsPalette, getPart } from '../data/parts'
 
 interface Props {
   /** チップのドラッグ開始（partId と開始位置の画面座標を渡す） */
@@ -10,6 +10,10 @@ interface Props {
   selectedId: string | null
   /** チップをタップ（動かさず離す）したとき。同じ部材を再タップすると選択解除する想定 */
   onSelect: (partId: string) => void
+  /** パレット本体(チップ一覧)を開いているか。既定は閉（キャンバスを広く保つため）。 */
+  open: boolean
+  /** ヘッダーをタップして開閉を切り替える */
+  onToggle: () => void
 }
 
 // 動きが「横スクロール」か「上へドラッグ」かを判定するまでの移動量(px)
@@ -22,7 +26,7 @@ const GESTURE_THRESHOLD = 10
  * シビアなレジューサー等でも、タップは指でドラッグ中の対象を隠さないぶん
  * 狙った場所に置きやすい。定義は data/parts.ts の partsPalette 配列。
  */
-export function PartsPalette({ onDragStart, draggingId, selectedId, onSelect }: Props) {
+export function PartsPalette({ onDragStart, draggingId, selectedId, onSelect, open, onToggle }: Props) {
   // 押した瞬間はまだ「タップ選択」か「ドラッグ配置」か「横スクロールで他の候補を
   // 見る」か分からないため、動きを見てから判定する（横に動けばスクロールに任せ、
   // 上下に動けばドラッグ開始、動かさずに離せばタップ選択）。
@@ -82,23 +86,31 @@ export function PartsPalette({ onDragStart, draggingId, selectedId, onSelect }: 
   }
 
   return (
-    <div className="palette">
-      <span className="palette-title">パーツ</span>
-      <div className="palette-items">
-        {partsPalette.map((p) => (
-          <button
-            key={p.id}
-            className={`palette-chip${draggingId === p.id ? ' dragging' : ''}${selectedId === p.id ? ' selected' : ''}`}
-            onPointerDown={(e) => handlePointerDown(e, p.id)}
-          >
-            <span className="chip-icon">{p.icon}</span>
-            <span className="chip-name">{p.name}</span>
-          </button>
-        ))}
-        <span className="palette-hint">
-          {selectedId ? '↓ 配管をタップして配置（タップで解除）' : 'タップして選択→配管をタップで配置（またはドラッグ）'}
+    <div className={`palette${open ? ' open' : ''}`}>
+      <button className="panel-header" onClick={onToggle}>
+        <span className="panel-caret">{open ? '▼' : '▲'}</span>
+        <span className="panel-summary">
+          <span className="sum-mode">パーツ</span>
+          {!open && selectedId && <span className="sum-none">選択中: {getPart(selectedId)?.name}</span>}
         </span>
-      </div>
+      </button>
+      {open && (
+        <div className="palette-items">
+          {partsPalette.map((p) => (
+            <button
+              key={p.id}
+              className={`palette-chip${draggingId === p.id ? ' dragging' : ''}${selectedId === p.id ? ' selected' : ''}`}
+              onPointerDown={(e) => handlePointerDown(e, p.id)}
+            >
+              <span className="chip-icon">{p.icon}</span>
+              <span className="chip-name">{p.name}</span>
+            </button>
+          ))}
+          <span className="palette-hint">
+            {selectedId ? '↓ 配管をタップして配置（タップで解除）' : 'タップして選択→配管をタップで配置（またはドラッグ）'}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

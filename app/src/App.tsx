@@ -245,6 +245,8 @@ export default function App() {
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 「作図設定」バーの開閉（寸法入力とは独立。既定は畳んだ状態で割り込まない）
   const [settingsOpen, setSettingsOpen] = useState(false)
+  // パーツパレットの開閉。キャンバスを広く保つため既定は閉。
+  const [partsOpen, setPartsOpen] = useState(false)
   // 消しゴムモード。オンの間はキャンバス上の線をタップすると詳細パネルを
   // 経由せずその場で即削除する（ルート変更等で何本もまとめて消したい場面向け）。
   // 他のメニュー操作を行うと自動的に解除する（誤操作防止）。
@@ -1169,6 +1171,8 @@ export default function App() {
             setEraserMode(false)
             setSelectedPartId((cur) => (cur === partId ? null : partId))
           }}
+          open={partsOpen}
+          onToggle={() => setPartsOpen((v) => !v)}
         />
       )}
 
