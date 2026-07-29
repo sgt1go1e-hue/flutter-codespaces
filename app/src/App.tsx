@@ -23,13 +23,19 @@ import { computeBom } from './lib/bom'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
   type DrawingMeta,
+  type FolderMeta,
+  type StatusColor,
   makeDrawingId,
+  makeFolderId,
   loadDrawingSegments,
   saveDrawingSegments,
   deleteDrawingSegments,
   saveIndex,
+  loadFolders,
+  saveFolders,
   migrateLegacyDrawing,
 } from './lib/drawingStore'
+import { FolderShelf } from './components/FolderShelf'
 import {
   distance,
   distanceToSegment,
@@ -228,6 +234,12 @@ export default function App() {
   const [drawingIndex, setDrawingIndex] = useState<DrawingMeta[]>(() =>
     migrateLegacyDrawing(),
   )
+  // 現場・案件フォルダ(1階層のみ)。ホーム画面の整理用で、図面の計算内容とは無関係。
+  const [folders, setFolders] = useState<FolderMeta[]>(() => loadFolders())
+  // ホーム画面の表示状態: 'shelf'=フォルダ棚、それ以外=そのフォルダ(nullは未分類)の
+  // 図面一覧。図面を開いて「過去の図面」で戻ってきたときに元のフォルダ一覧へ
+  // 自然に戻れるよう、画面遷移(screen)とは独立に保持する（goToLauncherではリセットしない）。
+  const [homeView, setHomeView] = useState<'shelf' | { folderId: string | null }>('shelf')
   const [drawingId, setDrawingId] = useState<string | null>(null)
   const [segments, setSegments] = useState<Segment[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
@@ -379,20 +391,35 @@ export default function App() {
   useEffect(() => {
     if (!drawingId) return
     saveDrawingSegments(drawingId, segments)
+    let touchedFolderId: string | null = null
     setDrawingIndex((prev) => {
       const now = Date.now()
-      const exists = prev.some((m) => m.id === drawingId)
-      if (!exists && segments.length === 0) return prev
-      const next = exists
+      const existing = prev.find((m) => m.id === drawingId)
+      if (!existing && segments.length === 0) return prev
+      touchedFolderId = existing?.folderId ?? null
+      const next = existing
         ? prev.map((m) =>
             m.id === drawingId
               ? { ...m, updatedAt: now, segCount: segments.length }
               : m,
           )
-        : [...prev, { id: drawingId, createdAt: now, updatedAt: now, segCount: segments.length }]
+        : [
+            ...prev,
+            {
+              id: drawingId,
+              createdAt: now,
+              updatedAt: now,
+              segCount: segments.length,
+              folderId: null,
+              statusColor: 'white' as const,
+            },
+          ]
       saveIndex(next)
       return next
     })
+    // 図面が現場・案件フォルダに属していれば、フォルダの最終更新日も連動させる
+    // （棚の並び順=最終更新日順に反映するため）。
+    if (touchedFolderId) touchFolder(touchedFolderId)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments, drawingId])
 
@@ -454,6 +481,8 @@ export default function App() {
         updatedAt: now,
         segCount: parsed.segments.length,
         name: parsed.drawingName ? `${parsed.drawingName}（受信）` : '共有で受信した図面',
+        folderId: null,
+        statusColor: 'white',
       }
       const next = [...prev, meta]
       saveIndex(next)
@@ -515,6 +544,86 @@ export default function App() {
       setSegments([])
       setHistory([])
     }
+  }
+
+  // --- 現場・案件フォルダ（ホーム画面の整理用。1階層のみ） ---
+
+  /** 図面の更新に連動して、所属フォルダの最終更新日時も進める（棚の並び順に使う）。 */
+  function touchFolder(folderId: string) {
+    const now = Date.now()
+    setFolders((prev) => {
+      if (!prev.some((f) => f.id === folderId)) return prev
+      const next = prev.map((f) => (f.id === folderId ? { ...f, updatedAt: now } : f))
+      saveFolders(next)
+      return next
+    })
+  }
+
+  function createFolder() {
+    const input = window.prompt('現場・案件名を入力してください')
+    if (input == null) return
+    const name = input.trim()
+    if (!name) return
+    const now = Date.now()
+    const folder: FolderMeta = { id: makeFolderId(), name, createdAt: now, updatedAt: now }
+    setFolders((prev) => {
+      const next = [...prev, folder]
+      saveFolders(next)
+      return next
+    })
+  }
+
+  function renameFolder(id: string) {
+    const folder = folders.find((f) => f.id === id)
+    if (!folder) return
+    const input = window.prompt('現場・案件名を入力してください', folder.name)
+    if (input == null) return
+    const name = input.trim()
+    if (!name) return
+    setFolders((prev) => {
+      const next = prev.map((f) => (f.id === id ? { ...f, name } : f))
+      saveFolders(next)
+      return next
+    })
+  }
+
+  function deleteFolder(id: string) {
+    const containedCount = drawingIndex.filter((m) => m.folderId === id).length
+    const msg =
+      containedCount > 0
+        ? `このフォルダを削除しますか？中の${containedCount}件の図面は「未分類」に戻ります。`
+        : 'このフォルダを削除しますか？'
+    if (!window.confirm(msg)) return
+    setFolders((prev) => {
+      const next = prev.filter((f) => f.id !== id)
+      saveFolders(next)
+      return next
+    })
+    setDrawingIndex((prev) => {
+      const next = prev.map((m) => (m.folderId === id ? { ...m, folderId: null } : m))
+      saveIndex(next)
+      return next
+    })
+    setHomeView((v) => (v !== 'shelf' && v.folderId === id ? 'shelf' : v))
+  }
+
+  /** 図面を別の現場・案件フォルダ（またはnull=未分類）へ移動する。 */
+  function moveDrawingToFolder(id: string, folderId: string | null) {
+    setDrawingIndex((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, folderId } : m))
+      saveIndex(next)
+      return next
+    })
+    if (folderId) touchFolder(folderId)
+  }
+
+  /** 図面の進捗ステータス色（白/赤/緑/青、意味はユーザー自由）を設定する。 */
+  function setDrawingStatusColor(id: string, statusColor: StatusColor) {
+    setDrawingIndex((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, statusColor } : m))
+      saveIndex(next)
+      return next
+    })
   }
 
   const selected = useMemo(
@@ -1003,17 +1112,32 @@ export default function App() {
 
   return (
     <div className="app">
-      {screen === 'launcher' && (
-        <DrawingLauncher
-          drawings={drawingIndex}
-          onCreate={createNewDrawing}
-          onOpen={openDrawing}
-          onRename={renameDrawing}
-          onDelete={deleteDrawing}
-          onQuickCalc={openQuickCalc}
-          onImportFile={importShareFile}
-        />
-      )}
+      {screen === 'launcher' &&
+        (homeView === 'shelf' ? (
+          <FolderShelf
+            folders={folders}
+            drawings={drawingIndex}
+            onOpenFolder={(folderId) => setHomeView({ folderId })}
+            onCreateFolder={createFolder}
+            onRenameFolder={renameFolder}
+            onDeleteFolder={deleteFolder}
+            onCreate={createNewDrawing}
+            onQuickCalc={openQuickCalc}
+            onImportFile={importShareFile}
+          />
+        ) : (
+          <DrawingLauncher
+            drawings={drawingIndex}
+            folders={folders}
+            folderId={homeView.folderId}
+            onBack={() => setHomeView('shelf')}
+            onOpen={openDrawing}
+            onRename={renameDrawing}
+            onDelete={deleteDrawing}
+            onMoveToFolder={moveDrawingToFolder}
+            onSetStatusColor={setDrawingStatusColor}
+          />
+        ))}
 
       {screen === 'quickcalc' && <QuickCalc onClose={closeQuickCalc} />}
 

@@ -1,15 +1,24 @@
-import { useRef } from 'react'
-import type { DrawingMeta } from '../lib/drawingStore'
+import type { DrawingMeta, FolderMeta, StatusColor } from '../lib/drawingStore'
 
 interface Props {
   drawings: DrawingMeta[]
-  onCreate: () => void
+  folders: FolderMeta[]
+  /** 表示するフォルダ(null=未分類)。このフォルダに属する図面だけを一覧する。 */
+  folderId: string | null
+  onBack: () => void
   onOpen: (id: string) => void
   onRename: (id: string, currentName: string) => void
   onDelete: (id: string) => void
-  onQuickCalc: () => void
-  /** 共有ファイル(LINE・AirDrop等で受け取ったもの)を選んで開く */
-  onImportFile: (file: File) => void
+  onMoveToFolder: (id: string, folderId: string | null) => void
+  onSetStatusColor: (id: string, color: StatusColor) => void
+}
+
+const STATUS_COLORS: StatusColor[] = ['white', 'red', 'green', 'blue']
+const STATUS_COLOR_LABEL: Record<StatusColor, string> = {
+  white: '白（未設定）',
+  red: '赤',
+  green: '緑',
+  blue: '青',
 }
 
 function formatDateTime(ms: number): string {
@@ -22,52 +31,39 @@ function formatDateTime(ms: number): string {
   })
 }
 
-// アプリを開いた直後、および図面画面から「過去の図面」で戻ってきたときに表示する
-// 起点画面。名前を付けずに自動保存された過去の図面から選ぶか、新規作成する。
-// 一覧の各項目は名前変更・削除もできる。
+// フォルダ棚(FolderShelf)でフォルダをタップした後に見せる、その中の図面一覧。
+// 見た目は導入前の「過去の図面」リストのままで、各カードに進捗ステータス色
+// (白/赤/緑/青、意味は自由)のドットと、フォルダ移動用のプルダウンを追加した。
 export function DrawingLauncher({
   drawings,
-  onCreate,
+  folders,
+  folderId,
+  onBack,
   onOpen,
   onRename,
   onDelete,
-  onQuickCalc,
-  onImportFile,
+  onMoveToFolder,
+  onSetStatusColor,
 }: Props) {
-  const sorted = [...drawings].sort((a, b) => b.updatedAt - a.updatedAt)
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const folderName = folderId == null ? '未分類' : (folders.find((f) => f.id === folderId)?.name ?? '（不明なフォルダ）')
+  const sorted = drawings
+    .filter((d) => d.folderId === folderId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+
   return (
     <div className="launcher">
-      <div className="launcher-title">配管アイソメ図</div>
-      <button className="launcher-new" onClick={onCreate}>
-        ＋ 新規作成
+      <button className="launcher-back" onClick={onBack}>
+        ← フォルダ一覧
       </button>
-      <button className="launcher-quickcalc" onClick={onQuickCalc}>
-        🧮 クイック計算（芯引き）
-      </button>
-      {/* 他の人から共有された図面ファイル(LINE・AirDrop等で受け取ったもの)を
-          開く。サーバーは使わず、端末に保存済みのファイルを選ぶだけ。 */}
-      <button className="launcher-import" onClick={() => fileInputRef.current?.click()}>
-        📥 共有ファイルを開く
-      </button>
-      <input
-        ref={fileInputRef}
-        type="file"
-        accept=".json,.pipeiso.json,application/json"
-        style={{ display: 'none' }}
-        onChange={(e) => {
-          const file = e.target.files?.[0]
-          if (file) onImportFile(file)
-          e.target.value = ''
-        }}
-      />
+      <div className="launcher-title">{folderName}</div>
 
-      {sorted.length > 0 && (
-        <>
-          <div className="launcher-sub">過去の図面</div>
-          <ul className="launcher-list">
-            {sorted.map((d) => (
-              <li key={d.id} className="launcher-row">
+      {sorted.length === 0 ? (
+        <p className="panel-hint">このフォルダにはまだ図面がありません。</p>
+      ) : (
+        <ul className="launcher-list">
+          {sorted.map((d) => (
+            <li key={d.id} className="launcher-row-group">
+              <div className="launcher-row">
                 <button className="launcher-item" onClick={() => onOpen(d.id)}>
                   <span className="launcher-item-date">
                     {d.name || formatDateTime(d.updatedAt)}
@@ -95,10 +91,36 @@ export function DrawingLauncher({
                 >
                   削除
                 </button>
-              </li>
-            ))}
-          </ul>
-        </>
+              </div>
+              <div className="launcher-row-sub">
+                <span className="status-dot-row">
+                  {STATUS_COLORS.map((c) => (
+                    <button
+                      key={c}
+                      type="button"
+                      className={`status-dot status-dot-${c}${d.statusColor === c ? ' active' : ''}`}
+                      aria-label={STATUS_COLOR_LABEL[c]}
+                      title={STATUS_COLOR_LABEL[c]}
+                      onClick={() => onSetStatusColor(d.id, c)}
+                    />
+                  ))}
+                </span>
+                <select
+                  className="launcher-move-select"
+                  value={d.folderId ?? ''}
+                  onChange={(e) => onMoveToFolder(d.id, e.target.value || null)}
+                >
+                  <option value="">未分類</option>
+                  {folders.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </li>
+          ))}
+        </ul>
       )}
     </div>
   )

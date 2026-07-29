@@ -225,6 +225,134 @@ body {
   background: var(--panel-2);
 }
 
+/* フォルダの中の図面一覧に出る「← フォルダ一覧」。棚(FolderShelf)へ戻る。 */
+.launcher-back {
+  align-self: flex-start;
+  background: transparent;
+  border: none;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+  padding: 4px 0;
+}
+
+/* --- 現場・案件フォルダの棚(FolderShelf) --- */
+.folder-shelf-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 16px;
+}
+
+.folder-add-btn {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--text);
+  font-size: 13px;
+  padding: 6px 12px;
+}
+
+.folder-shelf {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.folder-card-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.folder-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  min-height: 72px;
+  color: var(--text);
+  text-align: left;
+}
+.folder-card:active {
+  background: var(--panel-2);
+}
+.folder-card-name {
+  font-weight: 700;
+  font-size: 14px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 100%;
+}
+.folder-card-date {
+  color: var(--hint);
+  font-size: 12px;
+}
+.folder-card-actions {
+  display: flex;
+  gap: 6px;
+}
+.folder-card-actions .launcher-action {
+  flex: 1;
+}
+
+/* --- 図面カードのステータス色(白/赤/緑/青)＋フォルダ移動 --- */
+.launcher-row-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.launcher-row-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 4px;
+}
+.status-dot-row {
+  display: flex;
+  gap: 6px;
+}
+.status-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  border: 1px solid var(--border);
+  padding: 0;
+}
+.status-dot.active {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.status-dot-white {
+  background: #ffffff;
+}
+.status-dot-red {
+  background: #ef4444;
+}
+.status-dot-green {
+  background: #22c55e;
+}
+.status-dot-blue {
+  background: #3b82f6;
+}
+
+.launcher-move-select {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  font-size: 12px;
+  padding: 4px 8px;
+  max-width: 45%;
+}
+
 .topbar {
   display: flex;
   align-items: center;
