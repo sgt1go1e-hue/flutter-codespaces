@@ -126,6 +126,14 @@ export interface Segment {
   fieldFitStartFlipped?: boolean
   /** 現場合わせ区間の終点側三角マークの向き(タップ/ボタンで反転するトグル値) */
   fieldFitEndFlipped?: boolean
+
+  /**
+   * 配管ライン色分け(系統)。data/lineColors.ts の固定パレットのid
+   * ('c1'〜'c6')。色自体に系統の意味は決め打ちせず、実際の系統名は
+   * フォルダ単位/図面単位の対応表(colorLabels)側で自由に設定する。
+   * あくまで表示専用で、切り寸法等の計算結果には一切関与しない。
+   */
+  colorId?: string
 }
 
 // 図面全体の状態

@@ -24,6 +24,7 @@ import {
   type CalcState,
 } from '../lib/calcExpr'
 import { CalcKeypad } from './CalcKeypad'
+import { LINE_COLOR_PALETTE } from '../data/lineColors'
 
 const round1 = (x: number) => Math.round(x * 10) / 10
 
@@ -237,6 +238,15 @@ interface SegmentPanelProps {
   assemblyNumberActive?: boolean
   /** この区間の実効相番（自動採番 or 手動上書き済みの値）。芯々未入力なら undefined。 */
   assemblyNumber?: number
+  /**
+   * 配管ライン色分け(系統)。この図面で有効な色↔系統名の対応表(フォルダの
+   * 既定または図面側の上書き。App側で解決済みの値をそのまま渡す)。
+   */
+  colorLabels: Record<string, string>
+  /** 系統名を1色ぶんだけ変更する（色選択の近くの小さい入力欄用）。 */
+  onChangeColorLabel: (colorId: string, label: string) => void
+  /** 全色まとめて編集する画面を開く。 */
+  onOpenColorLabels: () => void
   onChange: (patch: Partial<Segment>) => void
   onDelete: () => void
   /** パネルを閉じる（選択解除）。常に押しやすい固定位置のボタンとして用意。 */
@@ -275,6 +285,9 @@ export function SegmentPanel({
   onGasketChange,
   assemblyNumberActive,
   assemblyNumber,
+  colorLabels,
+  onChangeColorLabel,
+  onOpenColorLabels,
   onChange,
   onDelete,
   onClose,
@@ -992,6 +1005,57 @@ export function SegmentPanel({
               </select>
             </label>
           )}
+        </fieldset>
+
+        {/* 系統色: 配管の系統(給水・排水など)を色で見分けるための表示専用の
+            色分け。色自体に系統の意味は決め打ちせず、系統名(ラベル)は
+            ユーザーがこのフォルダ/図面向けに自由に設定する(colorLabels、
+            App側でフォルダの既定＋この図面の上書きを解決して渡している)。
+            切り寸法・BOM等の計算結果には一切関与しない。 */}
+        <fieldset className="panel-grid" disabled={!canEditStructure}>
+          <div className="field round-field">
+            <span className="field-label">
+              系統色
+              <span className="field-note">表示のみ・任意</span>
+            </span>
+            <div className="color-swatch-row">
+              <button
+                type="button"
+                className={`color-swatch color-swatch-none${!segment.colorId ? ' selected' : ''}`}
+                onClick={() => onChange({ colorId: undefined })}
+                aria-label="色なし"
+                title="色なし"
+              >
+                なし
+              </button>
+              {LINE_COLOR_PALETTE.map((c) => (
+                <button
+                  key={c.id}
+                  type="button"
+                  className={`color-swatch${segment.colorId === c.id ? ' selected' : ''}`}
+                  style={{ background: c.hex }}
+                  onClick={() => onChange({ colorId: c.id })}
+                  aria-label={colorLabels[c.id] || '系統名未設定'}
+                  title={colorLabels[c.id] || undefined}
+                />
+              ))}
+              <button type="button" className="color-edit-all" onClick={onOpenColorLabels}>
+                系統名をまとめて編集
+              </button>
+            </div>
+            {segment.colorId && (
+              <label className="field color-label-field">
+                <span className="field-label">系統名</span>
+                <input
+                  type="text"
+                  className="num-input"
+                  placeholder="例: 給水（空欄可）"
+                  value={colorLabels[segment.colorId] ?? ''}
+                  onChange={(e) => onChangeColorLabel(segment.colorId!, e.target.value)}
+                />
+              </label>
+            )}
+          </div>
         </fieldset>
 
         {/* ⑦ パーツ（フランジ・レジューサー等） */}

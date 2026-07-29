@@ -28,6 +28,14 @@ export interface FolderMeta {
   name: string
   createdAt: number
   updatedAt: number
+  /**
+   * 配管ライン色分け(系統)の既定対応表(colorId → 系統名)。このフォルダに
+   * 属する図面を開いたとき、その図面がまだ自分自身の対応表を保存して
+   * いなければ、ここを初期値として使う(以後は図面側で独立して編集でき、
+   * 図面側の変更はこのフォルダの既定には反映しない)。未設定/空なら
+   * ラベルなし(色のみ)から始まる。
+   */
+  colorLabels?: Record<string, string>
 }
 
 const INDEX_KEY = 'piping-iso:index'
@@ -111,10 +119,39 @@ export function saveDrawingSegments(id: string, segments: Segment[]) {
   }
 }
 
+const drawingColorLabelsKey = (id: string) => `piping-iso:drawing:${id}:colorLabels`
+
+/**
+ * この図面自身が保存した色分け(系統)ラベルの対応表。セグメント本体
+ * (drawingKey)とは別のキーに持たせる(既存の図面データ形式・後方互換を
+ * 崩さないため)。
+ * 戻り値がnullなのは「この図面はまだ一度も保存したことがない」ことを表す
+ * (呼び出し側はこの場合、所属フォルダの既定値にフォールバックする)。
+ * 一度保存された後は、中身が空オブジェクトであっても(=全て削除された)
+ * nullを返さず、その空の状態をそのまま尊重する。
+ */
+export function loadDrawingColorLabels(id: string): Record<string, string> | null {
+  try {
+    const raw = localStorage.getItem(drawingColorLabelsKey(id))
+    return raw ? (JSON.parse(raw) as Record<string, string>) : null
+  } catch {
+    return null
+  }
+}
+
+export function saveDrawingColorLabels(id: string, labels: Record<string, string>) {
+  try {
+    localStorage.setItem(drawingColorLabelsKey(id), JSON.stringify(labels))
+  } catch {
+    // 保存失敗（容量超過など）は無視する
+  }
+}
+
 /** 図面本体のストレージを削除する（一覧(index)からの削除は呼び出し側で行う）。 */
 export function deleteDrawingSegments(id: string) {
   try {
     localStorage.removeItem(drawingKey(id))
+    localStorage.removeItem(drawingColorLabelsKey(id))
   } catch {
     // 削除失敗は無視する
   }

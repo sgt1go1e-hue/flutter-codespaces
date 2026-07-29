@@ -34,8 +34,11 @@ import {
   loadFolders,
   saveFolders,
   migrateLegacyDrawing,
+  loadDrawingColorLabels,
+  saveDrawingColorLabels,
 } from './lib/drawingStore'
 import { FolderShelf } from './components/FolderShelf'
+import { ColorLabelsModal } from './components/ColorLabelsModal'
 import {
   distance,
   distanceToSegment,
@@ -243,6 +246,16 @@ export default function App() {
   const [drawingId, setDrawingId] = useState<string | null>(null)
   const [segments, setSegments] = useState<Segment[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  // 配管ライン色分け(系統)の色↔系統名対応表。今開いている図面のもの。
+  // 図面が自分自身の対応表をまだ一度も保存していなければ、所属フォルダの
+  // 既定値を初期値として使う(openDrawing/createNewDrawing側で解決する)。
+  // 保存は編集した瞬間だけ行う(自動保存だとフォルダの既定値をたどれなく
+  // なるため、segmentsの自動保存effectとは意図的に分けている)。
+  const [colorLabels, setColorLabels] = useState<Record<string, string>>({})
+  // 系統色をまとめて編集する画面。今開いている図面向け/特定フォルダ向けで
+  // 対象が異なるため別々に持つ。
+  const [showColorLabelsModal, setShowColorLabelsModal] = useState(false)
+  const [editFolderColorsId, setEditFolderColorsId] = useState<string | null>(null)
   // 「作図設定」バーの開閉（寸法入力とは独立。既定は畳んだ状態で割り込まない）
   const [settingsOpen, setSettingsOpen] = useState(false)
   // パーツパレットの開閉。キャンバスを広く保つため既定は閉。
@@ -443,6 +456,9 @@ export default function App() {
     setSharePermission('full')
     setNotes([])
     setIsImportedDrawing(false)
+    // 新規作成した図面は必ず未分類に入る(フォルダ機能の既定動作)ため、
+    // フォルダの既定色設定を引き継ぐ余地はなく、常に空から始まる。
+    setColorLabels({})
     setScreen('drawing')
   }
 
@@ -460,6 +476,18 @@ export default function App() {
     setSharePermission(shareMeta?.permission ?? 'full')
     setNotes(shareMeta?.notes ?? [])
     setIsImportedDrawing(shareMeta != null)
+    // 配管ライン色分け(系統): この図面が自分自身の対応表をまだ一度も
+    // 保存していなければ(=null)、所属フォルダの既定値を初期値として使う
+    // (フォルダなし/未分類なら空)。一度でも保存済みなら、その内容を
+    // (空であっても)そのまま尊重する。
+    const ownColorLabels = loadDrawingColorLabels(id)
+    if (ownColorLabels) {
+      setColorLabels(ownColorLabels)
+    } else {
+      const folderId = drawingIndex.find((m) => m.id === id)?.folderId ?? null
+      const folderDefault = folderId ? folders.find((f) => f.id === folderId)?.colorLabels : undefined
+      setColorLabels(folderDefault ?? {})
+    }
     setScreen('drawing')
   }
 
@@ -624,6 +652,36 @@ export default function App() {
     setDrawingIndex((prev) => {
       const next = prev.map((m) => (m.id === id ? { ...m, statusColor } : m))
       saveIndex(next)
+      return next
+    })
+  }
+
+  /**
+   * このフォルダの配管ライン色分け(系統)の既定値を1色ぶん変更する。
+   * フォルダ一覧画面(DrawingLauncher)の「このフォルダの色設定」から使う。
+   * 図面側での色ラベル編集(updateColorLabel)はこちらには一切影響しない
+   * （フォルダのデフォルトを図面側の変更で意図せず書き換えないため）。
+   */
+  function updateFolderColorLabel(folderId: string, colorId: string, label: string) {
+    setFolders((prev) => {
+      const next = prev.map((f) =>
+        f.id === folderId ? { ...f, colorLabels: { ...(f.colorLabels ?? {}), [colorId]: label } } : f,
+      )
+      saveFolders(next)
+      return next
+    })
+  }
+
+  /**
+   * 今開いている図面の配管ライン色分け(系統)ラベルを1色ぶん変更する。
+   * この図面だけのローカルな上書きとして保存する(所属フォルダの既定値・
+   * 他の図面には一切影響しない)。
+   */
+  function updateColorLabel(colorId: string, label: string) {
+    if (!drawingId) return
+    setColorLabels((prev) => {
+      const next = { ...prev, [colorId]: label }
+      saveDrawingColorLabels(drawingId, next)
       return next
     })
   }
@@ -1163,8 +1221,21 @@ export default function App() {
             onDelete={deleteDrawing}
             onMoveToFolder={moveDrawingToFolder}
             onSetStatusColor={setDrawingStatusColor}
+            onEditFolderColors={
+              homeView.folderId != null ? () => setEditFolderColorsId(homeView.folderId) : undefined
+            }
           />
         ))}
+
+      {editFolderColorsId && (
+        <ColorLabelsModal
+          title="このフォルダの色設定"
+          hint="このフォルダ内で新しく開く図面の初期値になります（既に開いたことがある図面には影響しません）。"
+          labels={folders.find((f) => f.id === editFolderColorsId)?.colorLabels ?? {}}
+          onChange={(colorId, label) => updateFolderColorLabel(editFolderColorsId, colorId, label)}
+          onClose={() => setEditFolderColorsId(null)}
+        />
+      )}
 
       {screen === 'quickcalc' && <QuickCalc onClose={closeQuickCalc} />}
 
@@ -1290,10 +1361,23 @@ export default function App() {
           }
           assemblyNumberActive={assemblyNumberActive}
           assemblyNumber={assemblyNumberById[selected.id]}
+          colorLabels={colorLabels}
+          onChangeColorLabel={updateColorLabel}
+          onOpenColorLabels={() => setShowColorLabelsModal(true)}
           onChange={updateSelected}
           onDelete={deleteSelected}
           onClose={closeSelection}
           canEditStructure={canEditStructure}
+        />
+      )}
+
+      {showColorLabelsModal && (
+        <ColorLabelsModal
+          title="系統色設定（この図面）"
+          hint="この図面だけに適用されます（所属フォルダの既定値や他の図面には影響しません）。"
+          labels={colorLabels}
+          onChange={updateColorLabel}
+          onClose={() => setShowColorLabelsModal(false)}
         />
       )}
 

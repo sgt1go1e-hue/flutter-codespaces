@@ -11,6 +11,11 @@ interface Props {
   onDelete: (id: string) => void
   onMoveToFolder: (id: string, folderId: string | null) => void
   onSetStatusColor: (id: string, color: StatusColor) => void
+  /**
+   * このフォルダの配管ライン色分け(系統)既定値を編集する画面を開く。
+   * 未分類(folderId=null)はフォルダの既定値を持たないため表示しない。
+   */
+  onEditFolderColors?: () => void
 }
 
 const STATUS_COLORS: StatusColor[] = ['white', 'red', 'green', 'blue']
@@ -44,6 +49,7 @@ export function DrawingLauncher({
   onDelete,
   onMoveToFolder,
   onSetStatusColor,
+  onEditFolderColors,
 }: Props) {
   const folderName = folderId == null ? '未分類' : (folders.find((f) => f.id === folderId)?.name ?? '（不明なフォルダ）')
   const sorted = drawings
@@ -55,7 +61,14 @@ export function DrawingLauncher({
       <button className="launcher-back" onClick={onBack}>
         ← フォルダ一覧
       </button>
-      <div className="launcher-title">{folderName}</div>
+      <div className="launcher-title-row">
+        <div className="launcher-title">{folderName}</div>
+        {folderId != null && onEditFolderColors && (
+          <button className="launcher-action" onClick={onEditFolderColors}>
+            このフォルダの色設定
+          </button>
+        )}
+      </div>
 
       {sorted.length === 0 ? (
         <p className="panel-hint">このフォルダにはまだ図面がありません。</p>

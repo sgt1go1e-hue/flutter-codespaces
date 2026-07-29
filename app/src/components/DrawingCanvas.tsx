@@ -27,6 +27,7 @@ import {
   fieldFitEndMarkGeometry,
   fieldWeldMarkGeometry,
 } from '../lib/fieldMarks'
+import { lineColorHex } from '../data/lineColors'
 
 interface Props {
   segments: Segment[]
@@ -1167,12 +1168,14 @@ export function DrawingCanvas({
         const selected = s.id === selectedId
         const eff = effectiveById[s.id]
         const resolved = eff?.resolved ?? false
-        // 色: 選択=橙 / 属性確定=水色 / 未確定=グレー（ライト/ダークテーマで色を出し分け）
+        // 色: 選択=橙(最優先) / 系統色を設定していればその色 / 未設定なら
+        // 従来通り属性確定=水色・未確定=グレー（ライト/ダークテーマで色を
+        // 出し分け）。系統色は表示専用の任意設定で、未確定(dashed)かどうかの
+        // 判定には関与しない（未確定でも系統色自体は見えたほうが分かりやすいため）。
         const stroke = selected
           ? 'var(--seg-selected)'
-          : resolved
-            ? 'var(--seg-resolved)'
-            : 'var(--seg-unresolved)'
+          : (s.colorId && lineColorHex(s.colorId)) ||
+            (resolved ? 'var(--seg-resolved)' : 'var(--seg-unresolved)')
         const dashed = !resolved && !selected
         const pieces = breakLine(
           s.start,

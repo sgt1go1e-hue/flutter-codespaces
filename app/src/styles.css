@@ -128,6 +128,17 @@ body {
   margin-bottom: 8px;
 }
 
+.launcher-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.launcher-title-row .launcher-title {
+  margin-bottom: 0;
+}
+
 .launcher-new {
   background: #10b981;
   color: #04231a;
@@ -1091,6 +1102,81 @@ fieldset.panel-grid:disabled {
 
 .gasket-thick .num-input {
   width: 100px;
+}
+
+/* 配管ライン色分け(系統)。色スウォッチの並びは、老眼配慮で他のタップ領域
+   (ズームボタン等)と同じ44px前後の当たり判定を確保する。色自体には
+   系統の意味を持たせない(ラベルはユーザー任意設定、data/lineColors.ts)。 */
+.color-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  padding: 0;
+}
+
+.color-swatch.selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.color-swatch-none {
+  width: auto;
+  min-width: 44px;
+  height: 36px;
+  border-radius: 18px;
+  padding: 0 10px;
+  background: var(--field-bg);
+  color: var(--hint);
+  font-size: 12px;
+}
+
+.color-swatch-static {
+  cursor: default;
+}
+
+.color-edit-all {
+  background: var(--panel-2);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  min-height: 36px;
+}
+
+.color-label-field {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+}
+
+/* 色↔系統名をまとめて編集する画面(ColorLabelsModal)。既存のモーダル
+   (disclaimer-overlay/card)の見た目をそのまま流用する。 */
+.color-labels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+
+.color-labels-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-labels-row .num-input {
+  flex: 1;
 }
 
 .cut-field .cut-value {
