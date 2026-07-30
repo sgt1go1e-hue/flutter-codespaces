@@ -798,7 +798,7 @@ export function DrawingCanvas({
     const uy = (other.y - pt.y) / len
     const nx = -uy
     const ny = ux
-    const half = 8
+    const half = 10
     const bar = (cx: number, cy: number, key: number) => (
       <line
         key={key}
