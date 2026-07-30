@@ -40,8 +40,12 @@ export function PanJoystick({ view, onViewChange, uiScale }: Props) {
   const lastTapRef = useRef(0)
   const rootRef = useRef<HTMLDivElement>(null)
 
-  const base = BASE_SIZE * uiScale
-  const knobMax = KNOB_MAX * uiScale
+  // iPad等の広い画面ではuiScaleが最大2倍まで伸びるが、ジョイスティックは
+  // 丸ごと同率で拡大すると指の可動範囲に対して大きすぎる(操作しづらい)ため、
+  // 他のUI要素より控えめな上限で頭打ちにする。
+  const joystickScale = Math.min(uiScale, 1.3)
+  const base = BASE_SIZE * joystickScale
+  const knobMax = KNOB_MAX * joystickScale
 
   // 常時まわす移動ループ。ドラッグ中(draggingRef)だけ実際にviewを動かす。
   // マウント中ずっと1本のrAFループを回し続け、ドラッグの開始/終了のたびに

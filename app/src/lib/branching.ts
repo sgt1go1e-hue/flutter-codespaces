@@ -20,6 +20,9 @@ export function splitSegmentAt(
     parentId: target.id,
     connection: target.connection,
     // size/pipeType/fitting は持たせない → A から継承（ユーザーが後で変更可）
+    // 系統色(colorId)だけは継承の仕組み(Effective)を持たない直接指定の属性
+    // なので、ここで明示的にコピーしないと分割後のB側だけ色が消えてしまう。
+    colorId: target.colorId,
   }
   const result: Segment[] = []
   for (const s of segments) {
