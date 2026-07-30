@@ -891,6 +891,66 @@ body {
   color: #04222e;
 }
 
+/* パン(移動)ジョイスティック。二本指ドラッグでのパンは既存のまま残しつつ、
+   スマホゲームの移動スティックのように片手の親指で連続的に画面を動かせる
+   保険のコントローラー。既定は左下(ズームボタンは右下のため衝突しない)。
+   タップ・ドラッグ判定を全て自前で行うため、ブラウザ標準のスクロール/
+   ダブルタップズーム等に横取りされないようtouch-action: noneにする。 */
+.pan-joystick {
+  position: absolute;
+  z-index: 15;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px var(--shadow);
+  touch-action: none;
+  opacity: 0.9;
+}
+
+.pan-joystick.repositioning {
+  box-shadow: 0 0 0 3px var(--accent), 0 8px 24px var(--shadow);
+  opacity: 1;
+}
+
+.pan-joystick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+.pan-joystick.repositioning .pan-joystick-knob {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 「持ち上げ」中(ダブルタップ後)、次の1タップで置き場所を選べるように
+   画面全体を覆う透明なタップ受け皿。既存の作図・選択操作には一切影響
+   させず、この間だけ最前面でタップを横取りする。 */
+.pan-joystick-place-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  touch-action: none;
+}
+
+.pan-joystick-place-hint {
+  margin-top: max(16px, env(safe-area-inset-top));
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
 .zoom-percent {
   min-width: 42px;
   text-align: center;

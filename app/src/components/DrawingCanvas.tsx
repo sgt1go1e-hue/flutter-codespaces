@@ -29,6 +29,7 @@ import {
 } from '../lib/fieldMarks'
 import { lineColorHex } from '../data/lineColors'
 import { genGouLabelText } from '../lib/genGou'
+import { PanJoystick } from './PanJoystick'
 
 interface Props {
   segments: Segment[]
@@ -1496,6 +1497,9 @@ export function DrawingCanvas({
         ＋
       </button>
     </div>
+    {/* パン(移動)ジョイスティック。二本指ドラッグでのパン操作は変えず、
+        片手の親指でも連続的に画面を動かせる保険として追加。 */}
+    <PanJoystick view={view} onViewChange={onViewChange} uiScale={uiScale} />
     </>
   )
 }
