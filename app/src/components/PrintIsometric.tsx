@@ -242,8 +242,12 @@ export function PrintIsometric({
     return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles])
   }, [segments, cutById, effectiveById, crossoverGaps, baseSlopeDenom])
 
-  const viewBox = useMemo(() => {
-    if (segments.length === 0) return '0 0 200 200'
+  // viewBoxの数値(幅/高さ)は、印刷時にSVG要素自体の縦横比(aspect-ratio)を
+  // 実際の図面の形に合わせて絞り込むためにも使う(下記<svg>のstyle参照)。
+  // それにより、細長い図面でも枠(.print-iso-svg)の中に大きな余白が残らず、
+  // 図面の形にフィットした箱になる。
+  const viewBoxRect = useMemo(() => {
+    if (segments.length === 0) return { minX: 0, minY: 0, w: 200, h: 200 }
     let minX = Infinity
     let minY = Infinity
     let maxX = -Infinity
@@ -262,8 +266,9 @@ export function PrintIsometric({
     minY -= pad
     maxX += pad
     maxY += pad
-    return `${minX} ${minY} ${maxX - minX} ${maxY - minY}`
+    return { minX, minY, w: maxX - minX, h: maxY - minY }
   }, [segments])
+  const viewBox = `${viewBoxRect.minX} ${viewBoxRect.minY} ${viewBoxRect.w} ${viewBoxRect.h}`
 
   function flangeMarker(s: Segment, at: 'start' | 'end', type: 'double' | 'single') {
     const pt = at === 'start' ? s.start : s.end
@@ -445,7 +450,12 @@ export function PrintIsometric({
   }
 
   return (
-    <svg className="print-iso-svg" viewBox={viewBox} preserveAspectRatio="xMidYMid meet">
+    <svg
+      className="print-iso-svg"
+      viewBox={viewBox}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ aspectRatio: `${viewBoxRect.w} / ${viewBoxRect.h}` }}
+    >
       {segments.map((s) => {
         const eff = effectiveById[s.id]
         const resolved = eff?.resolved ?? false
