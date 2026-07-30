@@ -16,7 +16,7 @@ interface Props {
 // 好きな位置へ動かせる（動かした位置は端末に記憶する）。
 const BASE_SIZE = 84 // 基準直径(px)。実際はuiScale倍。
 const KNOB_MAX = 28 // スティックが中心から動ける最大距離(px, 基準値)。実際はuiScale倍。
-const PAN_SPEED_MAX = 700 // 最大まで倒したときのパン速度(画面px/秒)。uiScaleに関係なく画面上の速さを揃える。
+const PAN_SPEED_MAX = 420 // 最大まで倒したときのパン速度(画面px/秒)。uiScaleに関係なく画面上の速さを揃える。
 const DOUBLE_TAP_MS = 350
 
 export function PanJoystick({ view, onViewChange, uiScale }: Props) {
@@ -55,10 +55,12 @@ export function PanJoystick({ view, onViewChange, uiScale }: Props) {
       if (draggingRef.current && dirRef.current.mag > 0.05) {
         const speed = PAN_SPEED_MAX * dirRef.current.mag
         const v = viewRef.current
+        // スティックを倒した方向へ「画面(表示範囲)」が動くようにする。
+        // 図面(コンテンツ)はその逆方向へ動いて見える(カメラ操作と同じ向き)。
         onViewChange({
           scale: v.scale,
-          tx: v.tx + dirRef.current.x * speed * dt,
-          ty: v.ty + dirRef.current.y * speed * dt,
+          tx: v.tx - dirRef.current.x * speed * dt,
+          ty: v.ty - dirRef.current.y * speed * dt,
         })
       }
       raf = requestAnimationFrame(step)
