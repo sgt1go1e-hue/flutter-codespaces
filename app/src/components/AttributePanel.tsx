@@ -24,7 +24,7 @@ import {
   type CalcState,
 } from '../lib/calcExpr'
 import { CalcKeypad } from './CalcKeypad'
-import { LINE_COLOR_PALETTE } from '../data/lineColors'
+import { LINE_COLOR_PALETTE, lineColorHex } from '../data/lineColors'
 import { GEN_GOU_QUALIFIER_PRESETS } from '../lib/genGou'
 
 const round1 = (x: number) => Math.round(x * 10) / 10
@@ -132,6 +132,13 @@ export interface DrawDefaults {
   rootGap?: number
   /** 相番(合番)表示のON/OFF。未設定(auto)ならセグメント数で自動判定する。 */
   assemblyNumberMode?: 'auto' | 'on' | 'off'
+  /**
+   * 系統色(data/lineColors.ts のcolorId)。設定している間は、これから描く
+   * 線すべてにこの色を自動で付ける(区間ごとに毎回選び直さなくてよいように)。
+   * 管種・サイズ等と違い、続きの線かどうかに関わらず常に適用する
+   * (接続方法・塩ビ継手タイプと同じ扱い)。
+   */
+  colorId?: string
 }
 
 function roleLabel(role: string): string {
@@ -1381,6 +1388,8 @@ interface DrawSettingsPanelProps {
   onOpenMenuOrder: () => void
   /** 図面共有機能でフル編集以外の権限のとき true。作図設定の変更を封じる。 */
   disabled?: boolean
+  /** 系統色のラベル表示用(この図面で有効な対応表)。スウォッチのtitle/aria-labelに使う。 */
+  colorLabels?: Record<string, string>
 }
 
 export function DrawSettingsPanel({
@@ -1391,6 +1400,7 @@ export function DrawSettingsPanel({
   segmentCount,
   onOpenMenuOrder,
   disabled = false,
+  colorLabels,
 }: DrawSettingsPanelProps) {
   const sizes = sizesForPipeType(defaults.pipeType)
   const od = getSizeInfo(defaults.size)?.od
@@ -1410,6 +1420,15 @@ export function DrawSettingsPanel({
           {connectionName && <b>{connectionName}</b>}
           {defaults.slopeDenom && <b>勾配1/{defaults.slopeDenom}</b>}
           {!!defaults.rootGap && <b>RG{defaults.rootGap}mm</b>}
+          {defaults.colorId && (
+            <b>
+              <span
+                className="color-swatch-dot"
+                style={{ background: lineColorHex(defaults.colorId) }}
+              />
+              {colorLabels?.[defaults.colorId] || '系統色'}
+            </b>
+          )}
         </span>
       </button>
       {open && (
@@ -1468,6 +1487,38 @@ export function DrawSettingsPanel({
                 ))}
               </select>
             </label>
+
+            {/* 系統色: 設定している間、これから描く線すべてに自動で付く
+                (区間ごとに毎回選び直さなくて済むように)。ラベル(系統名)は
+                詳細パネル側と同じ対応表(colorLabels)を使う。 */}
+            <div className="field round-field">
+              <span className="field-label">
+                系統色
+                <span className="field-note">これから描く線に自動で適用</span>
+              </span>
+              <div className="color-swatch-row">
+                <button
+                  type="button"
+                  className={`color-swatch color-swatch-none${!defaults.colorId ? ' selected' : ''}`}
+                  onClick={() => onChange({ colorId: undefined })}
+                  aria-label="色なし"
+                  title="色なし"
+                >
+                  なし
+                </button>
+                {LINE_COLOR_PALETTE.map((c) => (
+                  <button
+                    key={c.id}
+                    type="button"
+                    className={`color-swatch${defaults.colorId === c.id ? ' selected' : ''}`}
+                    style={{ background: c.hex }}
+                    onClick={() => onChange({ colorId: c.id })}
+                    aria-label={colorLabels?.[c.id] || '系統名未設定'}
+                    title={colorLabels?.[c.id] || undefined}
+                  />
+                ))}
+              </div>
+            </div>
 
             {/* 塩ビ(VP)のみ: DV継手(排水・勾配考慮が必要)/TS継手(給水)で継手寸法が
                 異なるため、どちらのシリーズかを選ぶ。接続方法は差込のみで固定。 */}

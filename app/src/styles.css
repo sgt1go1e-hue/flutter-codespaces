@@ -1170,6 +1170,17 @@ fieldset.panel-grid:disabled {
   cursor: default;
 }
 
+/* 作図設定バーのヘッダー要約(panel-summary)に出す、系統色の小さい丸
+   (既存のbバッジの中に添える。バッジ自体の背景色は変えず、色は点で示す)。 */
+.color-swatch-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
 .color-edit-all {
   background: var(--panel-2);
   color: var(--accent);

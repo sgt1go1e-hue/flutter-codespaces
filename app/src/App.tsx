@@ -341,6 +341,12 @@ export default function App() {
      * 自動でON、10本以下ならOFFにする。'on'/'off' で本数によらず固定できる。
      */
     assemblyNumberMode?: 'auto' | 'on' | 'off'
+    /**
+     * 系統色(data/lineColors.ts のcolorId)。設定している間、これから描く
+     * 線すべてに自動で付ける(区間ごとに毎回選び直さなくてよいように)。
+     * 接続方法・塩ビ継手タイプと同じく、続きの線かどうかに関わらず常に適用。
+     */
+    colorId?: string
   }>('piping-iso:defaults', {})
   // 配管設定(defaults)で管種・サイズを変更した直後は、たとえ既存の線から
   // 続けて描く（＝親を持つ）新しい線であっても、その変更を次に描く1本には
@@ -806,6 +812,9 @@ export default function App() {
     if (defaults.connection) applied.connection = defaults.connection
     // 塩ビの継手タイプ(DV/TS)も接続方法と同様、継承対象外で毎回適用
     if (defaults.vpSeries) applied.vpSeries = defaults.vpSeries
+    // 系統色も同様に、設定している間は全ての新規線へ毎回適用する
+    // （線を引くたびに詳細パネルで選び直さなくて済むようにするため）。
+    if (defaults.colorId) applied.colorId = defaults.colorId
     // 管種・サイズは基本、ルート(接続元なし)にのみ付与し、続きの線は上流から
     // 継承する（レジューサー等で下流のサイズが自動的に縮小反映される仕組みの
     // 土台のため）。ただし配管設定でたった今どちらかを変更した直後は、続きの
@@ -1318,6 +1327,7 @@ export default function App() {
           segmentCount={segments.length}
           onOpenMenuOrder={() => setShowMenuOrder(true)}
           disabled={!canEditStructure}
+          colorLabels={colorLabels}
         />
       </main>
 
