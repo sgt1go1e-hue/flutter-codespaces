@@ -1320,7 +1320,7 @@ export function SegmentPanel({
                   <input
                     className="num-input"
                     type="text"
-                    placeholder="自由入力も可（未入力なら「現合」）"
+                    placeholder="自由入力も可（未入力なら「現場合わせ」）"
                     value={segment.genGouQualifier ?? ''}
                     onChange={(e) => onChange({ genGouQualifier: e.target.value })}
                   />
