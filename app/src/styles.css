@@ -2031,15 +2031,9 @@ fieldset.panel-grid:disabled {
   break-inside: avoid;
   page-break-inside: avoid;
 }
-/* 高さは固定値ではなく、SVG自身のaspect-ratio(実際の図面の縦横比。
-   PrintIsometric.tsx側でインラインstyleとして設定)に幅(100%)を掛けた
-   値になり、図面の形にフィットした箱になる。max-heightは、極端に縦長/
-   横長な図面のときに箱が用紙からあふれないための上限(安全弁)として残す。 */
 .print-iso-svg {
-  display: block;
   width: 100%;
-  height: auto;
-  max-height: 620px;
+  height: 620px;
   border: 1px solid #999;
   background: #fff;
 }
@@ -2076,8 +2070,7 @@ fieldset.panel-grid:disabled {
   margin-bottom: 6px;
 }
 .bom-print-only.compact .print-iso-svg {
-  height: auto;
-  max-height: 240px;
+  height: 240px;
 }
 
 /* A3横1ページレイアウト（左2/3アイソメ図・右1/3明細）。A3横向き＋
@@ -2122,8 +2115,7 @@ fieldset.panel-grid:disabled {
 }
 
 .a3-iso-col .print-iso-svg {
-  height: auto;
-  max-height: 480px;
+  height: 480px;
 }
 
 /* 画面プレビュー（「PDFで見る」）。印刷ダイアログを介さずまず内容を確認できる
@@ -2196,8 +2188,7 @@ fieldset.panel-grid:disabled {
     page: a3-landscape;
   }
   .bom-print-only.a3-landscape .a3-iso-col .print-iso-svg {
-    height: auto;
-    max-height: 230mm;
+    height: 230mm;
   }
 
   /* 「詳細（複数ページ）」モード全般の用紙サイズ・向き選択。A3横1ページ
@@ -2238,81 +2229,34 @@ fieldset.panel-grid:disabled {
      1ページに収まる方を優先する。 */
   .bom-print-only:not(.compact) .print-iso-wrap .print-iso-svg {
     width: 100%;
-    height: auto;
-    max-height: 180mm;
+    height: 180mm;
   }
   .bom-print-only:not(.compact) .print-iso-wrap:first-of-type .print-iso-svg {
-    max-height: 150mm;
+    height: 150mm;
   }
   .bom-print-only.paper-a4-landscape:not(.compact) .print-iso-wrap .print-iso-svg {
-    max-height: 110mm;
+    height: 110mm;
   }
   .bom-print-only.paper-a4-landscape:not(.compact)
     .print-iso-wrap:first-of-type
     .print-iso-svg {
-    max-height: 85mm;
+    height: 85mm;
   }
   .bom-print-only.paper-a3-portrait:not(.compact) .print-iso-wrap .print-iso-svg {
-    max-height: 280mm;
+    height: 280mm;
   }
   .bom-print-only.paper-a3-portrait:not(.compact)
     .print-iso-wrap:first-of-type
     .print-iso-svg {
-    max-height: 240mm;
+    height: 240mm;
   }
   .bom-print-only.paper-a3-landscape:not(.compact) .print-iso-wrap .print-iso-svg {
-    max-height: 180mm;
+    height: 180mm;
   }
   .bom-print-only.paper-a3-landscape:not(.compact)
     .print-iso-wrap:first-of-type
     .print-iso-svg {
-    max-height: 145mm;
-  }
-
-  /* 余白の整理: 図面(アイソメ図)・材料明細のどちらも、内容が1ページ分の
-     高さより短ければ、その残り余白を下に集めるのではなく上下均等になる
-     よう中央寄せにする(min-height + flexで中央寄せ)。
-     内容が1ページに収まりきらない場合(min-heightより内容が長い場合)は
-     単にflexの余white-spaceが無くなるだけで通常の上詰め・複数ページへの
-     継続に自然にフォールバックするため、既存の改ページ・あふれ対策
-     （page-break-inside: avoid 等）には一切影響しない。
-     値は「@pageのmargin差し引き後の理論上の印刷可能領域の高さ」そのもの
-     ではなく、そこから.bom-print-only自身のpadding(16px)や実機の印刷
-     エンジンごとの誤差を見込んだ余裕を差し引いた、控えめな値にしてある
-     （上のアイソメ図の高さと同じ考え方＝あふれて空白ページが増える方が
-     中央寄せの見た目より絶対に避けるべき実害、のため）。実際にこの値
-     ちょうどで指定したところ、材料明細ページの直後に空白ページが1枚
-     増える不具合が確認できたため、明確な余裕を持たせている。 */
-  .bom-print-only:not(.compact) .print-iso-wrap,
-  .bom-print-only:not(.compact) .bom-detail-block {
-    display: flex;
-    flex-direction: column;
-    justify-content: center;
-    min-height: 245mm;
-  }
-  .bom-print-only:not(.compact) .print-iso-wrap:first-of-type {
-    min-height: 215mm;
-  }
-  .bom-print-only.paper-a4-landscape:not(.compact) .print-iso-wrap,
-  .bom-print-only.paper-a4-landscape:not(.compact) .bom-detail-block {
-    min-height: 158mm;
-  }
-  .bom-print-only.paper-a4-landscape:not(.compact) .print-iso-wrap:first-of-type {
-    min-height: 133mm;
-  }
-  .bom-print-only.paper-a3-portrait:not(.compact) .print-iso-wrap,
-  .bom-print-only.paper-a3-portrait:not(.compact) .bom-detail-block {
-    min-height: 372mm;
-  }
-  .bom-print-only.paper-a3-portrait:not(.compact) .print-iso-wrap:first-of-type {
-    min-height: 332mm;
-  }
-  .bom-print-only.paper-a3-landscape:not(.compact) .print-iso-wrap,
-  .bom-print-only.paper-a3-landscape:not(.compact) .bom-detail-block {
-    min-height: 249mm;
-  }
-  .bom-print-only.paper-a3-landscape:not(.compact) .print-iso-wrap:first-of-type {
-    min-height: 214mm;
+    height: 145mm;
   }
 
   /* アプリ本体(#root)は fixed/absolute配置と 100vh 固定+overflow:hidden の

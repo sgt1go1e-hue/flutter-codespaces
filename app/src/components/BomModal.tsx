@@ -494,24 +494,13 @@ export function BomModal({
               </div>
             )
           }
-          // 明細表(パイプ/継手/フランジ/相番対応表)は、常にアイソメ図の後の
-          // 新しいページから始まる(print-iso-wrapの強制改ページのため)。
-          // 内容が1ページに収まる分量のとき、その余白を下に集めず上下均等に
-          // 中央寄せするため(.bom-detail-block, styles.css)、まとめて1つの
-          // 要素で包む。中身が無い(空の図面)場合は余白だけの空ページを
-          // 作らないよう、何か表示するものがあるときだけ包む。
-          const detailBlock = (pipesBlock || fittingsBlock || flangesBlock || assemblyBlock) && (
-            <div className="bom-detail-block">
+          return (
+            <>
+              {isoBlock}
               {pipesBlock}
               {fittingsBlock}
               {flangesBlock}
               {assemblyBlock}
-            </div>
-          )
-          return (
-            <>
-              {isoBlock}
-              {detailBlock}
             </>
           )
         })()}
