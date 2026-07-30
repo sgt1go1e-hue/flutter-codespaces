@@ -344,7 +344,6 @@ export function QuickCalc({ onClose }: Props) {
         </div>
 
         <CalcKeypad
-          calc={calc}
           onChange={setCalc}
           onEqual={() => {
             pressEqual()

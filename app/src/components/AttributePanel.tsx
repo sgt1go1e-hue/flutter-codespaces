@@ -109,7 +109,7 @@ const DimCalcInput = forwardRef<HTMLButtonElement, DimCalcInputProps>(function D
                 </button>
               </div>
               <div className="qc-overall-display">{calc.display || '0'}</div>
-              <CalcKeypad calc={calc} onChange={setCalc} onEqual={pressEqual} />
+              <CalcKeypad onChange={setCalc} onEqual={pressEqual} />
             </div>
           </div>,
           document.body,

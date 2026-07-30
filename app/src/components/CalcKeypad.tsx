@@ -9,8 +9,15 @@ import {
 } from '../lib/calcExpr'
 
 interface Props {
-  calc: CalcState
-  onChange: (next: CalcState) => void
+  /**
+   * useStateのsetterをそのまま渡す想定(値だけでなく関数更新も受け付ける)。
+   * 連打時、propsのcalc(前回レンダー時点のスナップショット)を直接使って
+   * 次の状態を計算すると、複数回のタップがバッチ処理された場合に古い
+   * calcを元にした計算が後勝ちで上書きし合い、入力が欠落することがある。
+   * 関数更新(常に最新のstateを引数で受け取る)にすることで、連打しても
+   * 取りこぼさないようにする。
+   */
+  onChange: (updater: CalcState | ((prev: CalcState) => CalcState)) => void
   /** ＝キーが押されたとき呼ぶ（押した時点のcalcを呼び出し側でcalcEvaluateして使う想定） */
   onEqual: () => void
 }
@@ -48,12 +55,12 @@ function KeyButton({
  * (AttributePanel.tsx)からも使い回せるよう、ここに切り出した(計算ロジック自体は
  * calcExpr.tsのまま、キー配置UIだけを共通化している)。
  */
-export function CalcKeypad({ calc, onChange, onEqual }: Props) {
+export function CalcKeypad({ onChange, onEqual }: Props) {
   function pressDigit(d: string) {
-    onChange(calcPressDigit(calc, d))
+    onChange((prev) => calcPressDigit(prev, d))
   }
   function pressOp(op: '+' | '-') {
-    onChange(calcPressOp(calc, op))
+    onChange((prev) => calcPressOp(prev, op))
   }
 
   return (
@@ -64,7 +71,7 @@ export function CalcKeypad({ calc, onChange, onEqual }: Props) {
       <KeyButton
         label="±"
         variant="op"
-        onClick={() => onChange(calcPressSign(calc))}
+        onClick={() => onChange((prev) => calcPressSign(prev))}
         gridColumn="4"
         gridRow="1"
       />
@@ -82,7 +89,7 @@ export function CalcKeypad({ calc, onChange, onEqual }: Props) {
       <KeyButton label="0" onClick={() => pressDigit('0')} gridColumn="1 / span 2" gridRow="4" />
       <KeyButton
         label="."
-        onClick={() => onChange(calcPressDot(calc))}
+        onClick={() => onChange((prev) => calcPressDot(prev))}
         gridColumn="3"
         gridRow="4"
       />
@@ -97,14 +104,14 @@ export function CalcKeypad({ calc, onChange, onEqual }: Props) {
       <KeyButton
         label="C"
         variant="clear"
-        onClick={() => onChange(calcPressClear())}
+        onClick={() => onChange(() => calcPressClear())}
         gridColumn="1"
         gridRow="5"
       />
       <KeyButton
         label="BS"
         variant="clear"
-        onClick={() => onChange(calcPressBackspace(calc))}
+        onClick={() => onChange((prev) => calcPressBackspace(prev))}
         gridColumn="2 / span 2"
         gridRow="5"
       />
