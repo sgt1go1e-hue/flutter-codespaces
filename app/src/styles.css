@@ -162,6 +162,18 @@ body {
   min-height: 50px;
 }
 
+.launcher-nitrogen {
+  margin-top: 10px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 50px;
+}
+
 .launcher-sub {
   margin-top: 16px;
   color: var(--hint);

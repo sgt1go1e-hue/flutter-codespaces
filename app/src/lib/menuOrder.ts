@@ -7,7 +7,6 @@ export type MenuItemId =
   | 'bom'
   | 'share'
   | 'quickCalc'
-  | 'nitrogenCalc'
   | 'newDrawing'
   | 'openLauncher'
   | 'disclaimer'
@@ -23,7 +22,6 @@ export const DEFAULT_MENU_ORDER: MenuItemId[] = [
   'bom',
   'share',
   'quickCalc',
-  'nitrogenCalc',
   'newDrawing',
   'openLauncher',
   'disclaimer',
@@ -38,7 +36,6 @@ export const MENU_ITEM_LABELS: Record<MenuItemId, string> = {
   bom: '集計・拾い出し',
   share: '共有',
   quickCalc: 'クイック計算',
-  nitrogenCalc: '窒素計算',
   newDrawing: '新規作成',
   openLauncher: '過去の図面',
   disclaimer: '免責',

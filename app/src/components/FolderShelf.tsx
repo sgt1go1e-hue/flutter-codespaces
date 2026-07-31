@@ -10,6 +10,7 @@ interface Props {
   onDeleteFolder: (id: string) => void
   onCreate: () => void
   onQuickCalc: () => void
+  onNitrogenCalc: () => void
   onImportFile: (file: File) => void
 }
 
@@ -34,6 +35,7 @@ export function FolderShelf({
   onDeleteFolder,
   onCreate,
   onQuickCalc,
+  onNitrogenCalc,
   onImportFile,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -50,6 +52,9 @@ export function FolderShelf({
       </button>
       <button className="launcher-quickcalc" onClick={onQuickCalc}>
         🧮 クイック計算（芯引き）
+      </button>
+      <button className="launcher-nitrogen" onClick={onNitrogenCalc}>
+        💨 窒素計算（気密試験）
       </button>
       <button className="launcher-import" onClick={() => fileInputRef.current?.click()}>
         📥 共有ファイルを開く

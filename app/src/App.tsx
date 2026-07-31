@@ -1135,11 +1135,6 @@ export default function App() {
         🧮 クイック計算
       </button>
     ),
-    nitrogenCalc: (
-      <button key="nitrogenCalc" onClick={openNitrogenCalc}>
-        💨 窒素計算
-      </button>
-    ),
     undo: (
       <button key="undo" onClick={undo} disabled={history.length === 0 || !canEditStructure}>
         元に戻す
@@ -1233,6 +1228,7 @@ export default function App() {
             onDeleteFolder={deleteFolder}
             onCreate={createNewDrawing}
             onQuickCalc={openQuickCalc}
+            onNitrogenCalc={openNitrogenCalc}
             onImportFile={importShareFile}
           />
         ) : (
