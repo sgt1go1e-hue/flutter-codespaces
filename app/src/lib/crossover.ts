@@ -28,21 +28,23 @@ function segmentIntersection(
  * （そのセグメント上のパラメータ t, 0〜1）を求める。
  *
  * ルール: データ上つながっていない（端点を共有しない）2線が視覚的に交差する場合、
- * 後から作図された方（配列で後ろにある方）を通し線・手前とし、先に作図された方
- * （既存の主管など）を途切れ・奥とする。配管は必ず「主管を先に描いてから、あとで
- * 枝管を継ぎ足す」描き方になるため、向き（垂直/斜め等）に関係なく、作図順だけで
- * 手前/奥が安定して判定できる。これは見た目だけの処理で、接続関係（parentId等）
- * には影響しない。
+ * 先に作図された方（配列で前にある方、既存の主管など）を通し線・手前とし、
+ * 後から作図された方（あとで継ぎ足した枝管など）を途切れ・奥とする。
+ * これは見た目だけの処理で、接続関係（parentId等）には影響しない。
+ *
+ * 補足: 以前は逆（後から描いた方を手前）にしていたが、実際の描き方では
+ * 先に引いてある主管の上を、あとから引いた枝管が奥へくぐっていくケースが
+ * 多く逆転して見える、との報告により反転した。
  */
 export function computeCrossoverGaps(segments: Segment[]): Record<string, number[]> {
   const gaps: Record<string, number[]> = {}
   for (let i = 0; i < segments.length; i++) {
     for (let j = i + 1; j < segments.length; j++) {
-      const a = segments[i] // 先に作図された方 → 途切れさせる
-      const b = segments[j]
+      const a = segments[i]
+      const b = segments[j] // 後から作図された方 → 途切れさせる
       const hit = segmentIntersection(a.start, a.end, b.start, b.end)
       if (hit) {
-        ;(gaps[a.id] ??= []).push(hit.t)
+        ;(gaps[b.id] ??= []).push(hit.u)
       }
     }
   }
