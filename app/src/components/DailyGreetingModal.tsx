@@ -21,7 +21,7 @@ export function DailyGreetingModal({ onClose }: Props) {
         </div>
         <div className="disclaimer-actions">
           <button className="disclaimer-agree" onClick={onClose}>
-            OK
+            ご安全に！！
           </button>
         </div>
       </div>
