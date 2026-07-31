@@ -9,6 +9,8 @@ import {
   pipeVolumeLiters,
   requiredCylinderCount,
   requiredNitrogenLiters,
+  simulateCascadeFill,
+  type CascadeResult,
 } from '../lib/nitrogenCalc'
 
 interface Props {
@@ -148,6 +150,19 @@ function PipeRowEditor({
   )
 }
 
+interface UsedCylinderRow {
+  id: string
+  pressureMPa?: number
+}
+
+let usedRowSeq = 0
+function makeUsedRow(): UsedCylinderRow {
+  usedRowSeq += 1
+  return { id: `used_${usedRowSeq}` }
+}
+
+const DEFAULT_CYLINDER_PHYSICAL_VOLUME_L = 46.7
+
 export function NitrogenCalc({ onClose }: Props) {
   const [mode, setMode] = useState<InputMode>('diameterLength')
   const [rows, setRows] = useState<PipeRow[]>([makeRow()])
@@ -157,6 +172,41 @@ export function NitrogenCalc({ onClose }: Props) {
   const [capacityL, setCapacityL] = useState(47)
   const [fillPressureMPa, setFillPressureMPa] = useState(14.7)
   const [residualPressureMPa, setResidualPressureMPa] = useState(0.5)
+
+  // --- 段階昇圧シミュレーター(カスケード充填計算) ---
+  const [showCascade, setShowCascade] = useState(false)
+  const [usedCylinders, setUsedCylinders] = useState<UsedCylinderRow[]>([])
+  const [cylinderPhysicalVolumeL, setCylinderPhysicalVolumeL] = useState(
+    DEFAULT_CYLINDER_PHYSICAL_VOLUME_L,
+  )
+  const [initialPipePressureMPa, setInitialPipePressureMPa] = useState(0)
+  const [cascadeResult, setCascadeResult] = useState<CascadeResult | null>(null)
+
+  function updateUsedCylinder(id: string, pressureMPa: number | undefined) {
+    setUsedCylinders((prev) => prev.map((r) => (r.id === id ? { ...r, pressureMPa } : r)))
+  }
+  function addUsedCylinder() {
+    setUsedCylinders((prev) => [...prev, makeUsedRow()])
+  }
+  function removeUsedCylinder(id: string) {
+    setUsedCylinders((prev) => prev.filter((r) => r.id !== id))
+  }
+  function runCascadeSimulation() {
+    if (volumeL == null || volumeL <= 0 || testPressureMPa == null) return
+    const usedPressures = usedCylinders
+      .map((r) => r.pressureMPa)
+      .filter((p): p is number => p != null && p >= 0)
+    setCascadeResult(
+      simulateCascadeFill({
+        pipeVolumeL: volumeL,
+        initialPipePressureMPa,
+        targetPressureMPa: testPressureMPa,
+        usedCylinderPressuresMPa: usedPressures,
+        cylinderPhysicalVolumeL,
+        freshFillPressureMPa: fillPressureMPa,
+      }),
+    )
+  }
 
   function updateRow(id: string, patch: Partial<PipeRow>) {
     setRows((prev) => prev.map((r) => (r.id === id ? { ...r, ...patch } : r)))
@@ -332,6 +382,156 @@ export function NitrogenCalc({ onClose }: Props) {
             </div>
           )}
         </div>
+
+        <button
+          type="button"
+          className="n2-add-row"
+          onClick={() => setShowCascade((v) => !v)}
+        >
+          {showCascade ? '段階昇圧シミュレーションを閉じる' : '段階昇圧シミュレーションを見る'}
+        </button>
+
+        {showCascade && (
+          <div className="n2-panel n2-cascade">
+            <div className="panel-body">
+              <p className="panel-hint">
+                ボンベと配管をつなぐと、両者の圧力が等しくなった時点で流れが止まります。単純な割り算では見えない「等圧で止まって使い切れないボンベ」を考慮し、ボンベを1本ずつ投入したときの到達圧力を計算します。試験圧力が高い場合や配管容積が小さい場合ほど、上の簡易計算より必要本数が増えることがあります。
+              </p>
+
+              <label className="field">
+                <span className="field-label">配管の初期圧力（MPa、すでに入っている分。無ければ0）</span>
+                <input
+                  className="num-input"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  value={initialPipePressureMPa}
+                  onChange={(e) => setInitialPipePressureMPa(Number(e.target.value))}
+                />
+              </label>
+
+              <label className="field">
+                <span className="field-label">ボンベ物理容量（L）※常圧換算量とは別の値です</span>
+                <input
+                  className="num-input"
+                  type="number"
+                  inputMode="decimal"
+                  step="0.1"
+                  value={cylinderPhysicalVolumeL}
+                  onChange={(e) => setCylinderPhysicalVolumeL(Number(e.target.value))}
+                />
+              </label>
+
+              <div className="n2-rows">
+                <span className="field-label">手持ちの使いかけボンベの残圧（任意・空でもOK）</span>
+                {usedCylinders.map((row, i) => (
+                  <div className="n2-row" key={row.id}>
+                    <div className="n2-row-head">
+                      <span className="field-label">使いかけ{i + 1}</span>
+                      <button
+                        type="button"
+                        className="n2-row-remove"
+                        onClick={() => removeUsedCylinder(row.id)}
+                      >
+                        削除
+                      </button>
+                    </div>
+                    <label className="field">
+                      <span className="field-label">残圧（MPa）</span>
+                      <input
+                        className="num-input"
+                        type="number"
+                        inputMode="decimal"
+                        step="0.1"
+                        value={row.pressureMPa ?? ''}
+                        onChange={(e) =>
+                          updateUsedCylinder(
+                            row.id,
+                            e.target.value === '' ? undefined : Number(e.target.value),
+                          )
+                        }
+                      />
+                    </label>
+                  </div>
+                ))}
+                <button type="button" className="n2-add-row" onClick={addUsedCylinder}>
+                  ＋ 使いかけボンベを追加
+                </button>
+              </div>
+
+              <button
+                type="button"
+                className="n2-run-button"
+                onClick={runCascadeSimulation}
+                disabled={volumeL == null || volumeL <= 0 || testPressureMPa == null}
+              >
+                シミュレーション実行
+              </button>
+              {(volumeL == null || volumeL <= 0 || testPressureMPa == null) && (
+                <p className="field-note">
+                  上の「内容積」と「試験圧力」を入力すると実行できます
+                </p>
+              )}
+
+              {cascadeResult && (
+                <div className="n2-cascade-result">
+                  {cascadeResult.impossible ? (
+                    <p className="qc-result-error">
+                      目標圧力が新品ボンベの充填圧力以上のため、この方法では到達できません。充填圧力または試験圧力を見直してください。
+                    </p>
+                  ) : (
+                    <>
+                      <div className="n2-cascade-table-wrap">
+                        <table className="n2-cascade-table">
+                          <thead>
+                            <tr>
+                              <th>番号</th>
+                              <th>ボンベ</th>
+                              <th>投入前圧力</th>
+                              <th>到達圧力</th>
+                              <th>目標</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {cascadeResult.steps.map((s) => (
+                              <tr key={s.index} className={s.reachedTarget ? 'reached' : ''}>
+                                <td>{s.index}</td>
+                                <td>{s.label}</td>
+                                <td>{round2(s.beforePressureMPa)} MPa</td>
+                                <td>{round2(s.afterPressureMPa)} MPa</td>
+                                <td>{s.reachedTarget ? '到達' : '—'}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+
+                      {cascadeResult.reachedTarget ? (
+                        <>
+                          <p className="n2-recommend">
+                            必要本数（新品換算）：使いかけ{cascadeResult.usedCylinderCount}本 + 新品
+                            {cascadeResult.freshCylinderCount}本 = 計{cascadeResult.steps.length}本
+                          </p>
+                          <p className="field-note">
+                            投入順序：{cascadeResult.steps.map((s) => s.label).join(' → ')}
+                          </p>
+                        </>
+                      ) : (
+                        <p className="qc-result-error">
+                          安全上限（{cascadeResult.steps.length}本）まで計算しても目標に到達しませんでした。入力値をご確認ください。
+                        </p>
+                      )}
+                    </>
+                  )}
+                </div>
+              )}
+
+              <p className="panel-hint n2-disclaimer">
+                この計算は等温・理想気体近似です。実際は気温変化や配管形状により若干のズレが生じます。CO2冷媒など高圧・超臨界配管では特にこのシミュレーションを参考にしてください。
+              </p>
+            </div>
+          </div>
+        )}
 
         <p className="panel-hint n2-disclaimer">
           本計算は概算です。実際のボンベ残量・気温により変動します。試験圧力は必ず設計圧力・機器仕様に基づいて設定してください。

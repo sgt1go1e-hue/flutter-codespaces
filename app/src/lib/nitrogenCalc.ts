@@ -40,3 +40,118 @@ export function requiredCylinderCount(requiredL: number, usablePerCylinderL: num
   if (usablePerCylinderL <= 0) return 0
   return Math.ceil(requiredL / usablePerCylinderL)
 }
+
+// --- 段階昇圧シミュレーター(カスケード充填計算) ---
+// 単純な「総量÷使用可能量」の割り算では、ボンベと配管をつなぐと圧力が
+// 等しくなった時点で流れが止まる、という物理現象を無視してしまう。
+// ここでは等温・理想気体近似のもと、ボンベを1本ずつ接続したときの均衡圧力を
+// 質量保存式で逐次計算する。この節の計算に使う「物理容量(L)」は、上記の
+// cylinderUsableLiters が使う「常圧換算7,000L」の慣用値とは別物なので
+// 混同しないよう変数名・関数を完全に分けている。
+
+/** 標準大気圧(MPa)。ゲージ圧⇔絶対圧の変換に使う。 */
+const ATM_MPA = 0.1013
+
+function gaugeToAbs(gaugeMPa: number): number {
+  return gaugeMPa + ATM_MPA
+}
+function absToGauge(absMPa: number): number {
+  return absMPa - ATM_MPA
+}
+
+export interface CascadeStep {
+  index: number
+  label: string
+  beforePressureMPa: number
+  afterPressureMPa: number
+  reachedTarget: boolean
+}
+
+export interface CascadeResult {
+  steps: CascadeStep[]
+  reachedTarget: boolean
+  usedCylinderCount: number
+  freshCylinderCount: number
+  /** 目標圧力がボンベ充填圧力以上で、この方法では原理上到達できない場合true */
+  impossible: boolean
+}
+
+export interface CascadeParams {
+  /** 配管内容積(L) */
+  pipeVolumeL: number
+  /** 配管の初期圧力(MPa, ゲージ圧)。すでに何か入っていれば入力する。 */
+  initialPipePressureMPa: number
+  /** 目標試験圧力(MPa, ゲージ圧) */
+  targetPressureMPa: number
+  /** 手持ちの使いかけボンベの残圧(MPa, ゲージ圧)の配列(未ソートでよい) */
+  usedCylinderPressuresMPa: number[]
+  /** ボンベの物理内容積(L)。47Lボンベなら実容積は約46.7L。 */
+  cylinderPhysicalVolumeL: number
+  /** 新品ボンベの充填圧力(MPa, ゲージ圧) */
+  freshFillPressureMPa: number
+  /** 無限ループ防止の安全上限(既定200本) */
+  maxSteps?: number
+}
+
+/**
+ * ボンベ投入順(使いかけを残圧が低い順→最後に新品)で、配管内圧が
+ * 目標試験圧力に到達するまで1本ずつ均衡圧力を計算するシミュレーション。
+ */
+export function simulateCascadeFill(params: CascadeParams): CascadeResult {
+  const {
+    pipeVolumeL,
+    initialPipePressureMPa,
+    targetPressureMPa,
+    usedCylinderPressuresMPa,
+    cylinderPhysicalVolumeL,
+    freshFillPressureMPa,
+    maxSteps = 200,
+  } = params
+
+  const impossible = targetPressureMPa >= freshFillPressureMPa
+
+  let pipeAbs = gaugeToAbs(initialPipePressureMPa)
+  const steps: CascadeStep[] = []
+  let reached = absToGauge(pipeAbs) >= targetPressureMPa - 1e-9
+  let usedCylinderCount = 0
+  let freshCylinderCount = 0
+
+  function injectOne(beforeGauge: number, label: string) {
+    const beforeAbs = gaugeToAbs(beforeGauge)
+    const afterAbs =
+      (beforeAbs * cylinderPhysicalVolumeL + pipeAbs * pipeVolumeL) /
+      (cylinderPhysicalVolumeL + pipeVolumeL)
+    pipeAbs = afterAbs
+    const afterGauge = absToGauge(afterAbs)
+    const nowReached = afterGauge >= targetPressureMPa - 1e-9
+    steps.push({
+      index: steps.length + 1,
+      label,
+      beforePressureMPa: beforeGauge,
+      afterPressureMPa: afterGauge,
+      reachedTarget: nowReached,
+    })
+    return nowReached
+  }
+
+  if (!reached && !impossible) {
+    const sortedUsed = [...usedCylinderPressuresMPa].sort((a, b) => a - b)
+    for (const usedP of sortedUsed) {
+      if (reached || steps.length >= maxSteps) break
+      usedCylinderCount += 1
+      reached = injectOne(usedP, '使いかけボンベ')
+    }
+    while (!reached && steps.length < maxSteps) {
+      freshCylinderCount += 1
+      reached = injectOne(freshFillPressureMPa, '新品ボンベ')
+    }
+  }
+
+  return {
+    steps,
+    reachedTarget: reached,
+    usedCylinderCount,
+    freshCylinderCount,
+    impossible,
+  }
+}

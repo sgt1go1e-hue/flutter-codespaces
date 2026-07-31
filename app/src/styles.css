@@ -2699,6 +2699,64 @@ fieldset.panel-grid:disabled {
   font-size: 11.5px;
 }
 
+.n2-cascade .panel-body {
+  padding: 12px;
+  gap: 12px;
+}
+
+.n2-run-button {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  min-height: 48px;
+}
+
+.n2-run-button:disabled {
+  opacity: 0.45;
+}
+
+.n2-cascade-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.n2-cascade-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.n2-cascade-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.n2-cascade-table th,
+.n2-cascade-table td {
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.n2-cascade-table thead th {
+  color: var(--hint);
+  font-weight: 700;
+  background: var(--panel-2);
+}
+
+.n2-cascade-table tr.reached td {
+  color: var(--label-cut);
+  font-weight: 700;
+}
+
 /* --- ベータ期間ロック（合言葉入力・期限切れ画面） --- */
 .beta-screen {
   flex: 1;
