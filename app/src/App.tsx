@@ -1397,7 +1397,6 @@ export default function App() {
           左寄せの既定順にしている。表示順は menuOrder(並び替え設定で変更・
           端末に保存)に従う。ボタン自体の機能・見た目は並び替えの対象外。 */}
       <header className="topbar">
-        <div className="title">配管アイソメ図</div>
         <div className={`tools-wrap${toolsOverflow ? ' has-more' : ''}`}>
           <div className="tools" ref={toolsRef}>
             {menuOrder.map((id) => menuItemNodes[id])}
@@ -1407,10 +1406,6 @@ export default function App() {
           </span>
         </div>
       </header>
-
-      <footer className="statusbar">
-        <span className="count">セグメント数: {segments.length}</span>
-      </footer>
 
       {/* 材料集計(BOM) */}
       {showBom && (

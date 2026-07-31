@@ -369,9 +369,10 @@ body {
   align-items: center;
   justify-content: space-between;
   padding: 10px 14px;
-  /* 画面下部(パーツパレットと入れ替え済み)に配置しているため、ノッチ等の
-     セーフエリアは footer(statusbar) 側が下端として吸収する。ここでは
-     上端の特別な余白は不要。 */
+  /* 画面下部(パーツパレットと入れ替え済み)に配置している、画面最下段の
+     バーなので、ノッチ等のセーフエリアはここで吸収する(以前はこの下に
+     あったfooter(statusbar)が担っていたが、セグメント数表示ごと廃止した)。 */
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
   background: var(--panel);
   gap: 12px;
 }
@@ -528,21 +529,6 @@ body {
   stroke-width: calc(1px * var(--ui-scale, 1));
 }
 
-.statusbar {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  padding: 10px 14px;
-  padding-bottom: max(10px, env(safe-area-inset-bottom));
-  background: var(--panel);
-  font-size: 13px;
-}
-
-.count {
-  color: var(--hint);
-  white-space: nowrap;
-}
 
 /* 属性入力フォーム（常設パネル内で使用） */
 .field {
