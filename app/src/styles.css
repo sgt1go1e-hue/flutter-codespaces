@@ -2576,6 +2576,117 @@ fieldset.panel-grid:disabled {
   font-variant-numeric: tabular-nums;
 }
 
+/* --- 窒素計算(気密試験)画面 --- */
+.n2-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.n2-row {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.n2-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.n2-row-remove {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--label-over);
+  padding: 4px 10px;
+  font-size: 12px;
+  min-height: 30px;
+}
+
+.n2-row-volume {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.n2-row-volume b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.n2-add-row {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.n2-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.n2-total-row b {
+  color: var(--label-cut);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.n2-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  /* .qc-bodyはflex-direction:columnのスクロール領域のため、overflow:hiddenを
+     持つ子は自動最小高さが0扱いになり(CSS Flexboxの仕様)、他の兄弟要素の
+     高さに押し潰されてしまう(実機で発生を確認)。押し潰されないよう固定する。 */
+  flex-shrink: 0;
+}
+
+.n2-panel .panel-header {
+  font-size: 14px;
+}
+
+.n2-panel .panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: none;
+}
+
+.n2-recommend {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.n2-formula {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--hint-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.n2-disclaimer {
+  font-size: 11.5px;
+}
+
 /* --- ベータ期間ロック（合言葉入力・期限切れ画面） --- */
 .beta-screen {
   flex: 1;

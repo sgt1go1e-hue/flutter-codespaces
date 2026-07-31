@@ -9,6 +9,7 @@ import { MenuOrderModal } from './components/MenuOrderModal'
 import { DEFAULT_MENU_ORDER, sanitizeMenuOrder, type MenuItemId } from './lib/menuOrder'
 import { DrawingLauncher } from './components/DrawingLauncher'
 import { QuickCalc } from './components/QuickCalc'
+import { NitrogenCalc } from './components/NitrogenCalc'
 import { ShareExportModal } from './components/ShareExportModal'
 import { NotePanel } from './components/NotePanel'
 import {
@@ -233,7 +234,7 @@ function markSingleFlange(
 export default function App() {
   // 起動時は必ず「新規作成／過去の図面」を選ぶ画面から始める。
   // 図面は名前を付けず自動保存され、複数を切り替えて管理できる。
-  const [screen, setScreen] = useState<'launcher' | 'drawing' | 'quickcalc'>('launcher')
+  const [screen, setScreen] = useState<'launcher' | 'drawing' | 'quickcalc' | 'nitrogen'>('launcher')
   const [drawingIndex, setDrawingIndex] = useState<DrawingMeta[]>(() =>
     migrateLegacyDrawing(),
   )
@@ -550,6 +551,16 @@ export default function App() {
 
   // クイック計算を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
   function closeQuickCalc() {
+    setScreen(drawingId ? 'drawing' : 'launcher')
+  }
+
+  function openNitrogenCalc() {
+    setEraserMode(false)
+    setScreen('nitrogen')
+  }
+
+  // 窒素計算を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
+  function closeNitrogenCalc() {
     setScreen(drawingId ? 'drawing' : 'launcher')
   }
 
@@ -1124,6 +1135,11 @@ export default function App() {
         🧮 クイック計算
       </button>
     ),
+    nitrogenCalc: (
+      <button key="nitrogenCalc" onClick={openNitrogenCalc}>
+        💨 窒素計算
+      </button>
+    ),
     undo: (
       <button key="undo" onClick={undo} disabled={history.length === 0 || !canEditStructure}>
         元に戻す
@@ -1247,6 +1263,8 @@ export default function App() {
       )}
 
       {screen === 'quickcalc' && <QuickCalc onClose={closeQuickCalc} />}
+
+      {screen === 'nitrogen' && <NitrogenCalc onClose={closeNitrogenCalc} />}
 
       {screen === 'drawing' && (
         <>
