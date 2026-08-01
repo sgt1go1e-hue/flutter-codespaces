@@ -18,6 +18,7 @@ import { effectiveSlopeDenom } from '../lib/slope'
 import {
   estimateTextWidth,
   resolveOverlaps,
+  rotatedBoxSize,
   type LabelBox,
   type LabelJob,
 } from '../lib/labelLayout'
@@ -681,16 +682,16 @@ export function DrawingCanvas({
       const w1 = estimateTextWidth(line1, fs1) + 6 * uiScale
       const w2 = estimateTextWidth(line2, fs2) + 6 * uiScale
       const lineBoxH = 16 * uiScale
-      // 文字が縦向き(±90度寄り)に回転しているときは、当たり判定の箱もw/hを
-      // 入れ替える(縦長の箱として扱う)。斜め(±30度)はおおむね元の箱のままで
-      // 妥当な近似として扱う。1本の線に2行を積んでいるため、行の回転角は共通。
-      const rotated = Math.abs(geom.textRotateDeg) > 45
+      // 当たり判定の箱は、実際の回転角(±30°刻みのアイソメ角度に対応)に応じた
+      // 軸並行(AABB)サイズで見積もる。1本の線に2行を積んでいるため回転角は共通。
+      const box1 = rotatedBoxSize(w1, lineBoxH, geom.textRotateDeg)
+      const box2 = rotatedBoxSize(w2, lineBoxH, geom.textRotateDeg)
       jobs.push({
         key: `dim-line1-${s.id}`,
         cx: geom.text1X,
         cy: geom.text1Y,
-        w: rotated ? lineBoxH : w1,
-        h: rotated ? w1 : lineBoxH,
+        w: box1.w,
+        h: box1.h,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -698,8 +699,8 @@ export function DrawingCanvas({
         key: `dim-line2-${s.id}`,
         cx: geom.text2X,
         cy: geom.text2Y,
-        w: rotated ? lineBoxH : w2,
-        h: rotated ? w2 : lineBoxH,
+        w: box2.w,
+        h: box2.h,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -1408,6 +1409,16 @@ export function DrawingCanvas({
               const line2Resolved = resolvedLabels.get(`dim-line2-${s.id}`)
               const line2X = line2Resolved?.cx ?? geom.text2X
               const line2Y = line2Resolved?.cy ?? geom.text2Y
+              // 近接する他区間のラベルと重なるため押し出された場合、文字の位置と
+              // 本来の寸法線上の位置が離れてしまい、どちらの配管の数字か分かり
+              // づらくなる。一定以上ずれたときだけ、細い引き出し線でつなぐ。
+              const origAnchorX = (geom.text1X + geom.text2X) / 2
+              const origAnchorY = (geom.text1Y + geom.text2Y) / 2
+              const resolvedAnchorX = (line1X + line2X) / 2
+              const resolvedAnchorY = (line1Y + line2Y) / 2
+              const leaderNeeded =
+                Math.hypot(resolvedAnchorX - origAnchorX, resolvedAnchorY - origAnchorY) >
+                8 * uiScale
               return (
                 <g className="dim-group">
                   <line
@@ -1433,6 +1444,15 @@ export function DrawingCanvas({
                   />
                   <polygon className="dim-arrow" points={geom.arrowStart} />
                   <polygon className="dim-arrow" points={geom.arrowEnd} />
+                  {leaderNeeded && (
+                    <line
+                      className="dim-leader-line"
+                      x1={origAnchorX}
+                      y1={origAnchorY}
+                      x2={resolvedAnchorX}
+                      y2={resolvedAnchorY}
+                    />
+                  )}
                   {/* 現合(現物合わせ)区間: 確定寸法として誤読されないよう、通常の
                       芯々/切り寸法の2段表記の代わりに1行だけの注記表示にする
                       (色も専用のものにして明確に見た目を変える)。 */}

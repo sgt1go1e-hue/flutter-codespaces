@@ -18,6 +18,22 @@ export interface LabelBox {
   h: number
 }
 
+/**
+ * 回転したラベル矩形の軸並行(AABB)サイズを求める。寸法ラベル(芯々/芯先・
+ * 切り寸法)はパイプの向き(アイソメ角度=0/30/90/150/210/270/330°)に合わせて
+ * 常に回転して表示されるため、回転を無視した幅高さのまま衝突判定すると、
+ * 実際の見た目より小さい箱で判定してしまい、斜めの2本の配管が近接する
+ * 箇所でラベルどうしが重なって見えても「重なっていない」と誤判定して
+ * しまう(45°を境に丸ごと縦横を入れ替えるだけの簡易対応では、それ以外の
+ * 角度(30°/60°等)で過小評価が残っていた)。
+ */
+export function rotatedBoxSize(w: number, h: number, rotateDeg: number): { w: number; h: number } {
+  const rad = (rotateDeg * Math.PI) / 180
+  const c = Math.abs(Math.cos(rad))
+  const s = Math.abs(Math.sin(rad))
+  return { w: w * c + h * s, h: w * s + h * c }
+}
+
 function boxesOverlap(a: LabelBox, b: LabelBox): boolean {
   return (
     Math.abs(a.cx - b.cx) * 2 < a.w + b.w && Math.abs(a.cy - b.cy) * 2 < a.h + b.h

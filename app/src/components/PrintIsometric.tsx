@@ -8,6 +8,7 @@ import { effectiveSlopeDenom } from '../lib/slope'
 import {
   estimateTextWidth,
   resolveOverlaps,
+  rotatedBoxSize,
   type LabelBox,
   type LabelJob,
 } from '../lib/labelLayout'
@@ -175,13 +176,16 @@ export function PrintIsometric({
       const geom = dimGeometry(s.start, s.end, side, 1)
       const w1 = estimateTextWidth(line1, 10.5) + 6
       const w2 = estimateTextWidth(line2, fs2) + 6
-      const rotated = Math.abs(geom.textRotateDeg) > 45
+      // 当たり判定の箱は、実際の回転角(±30°刻みのアイソメ角度に対応)に応じた
+      // 軸並行(AABB)サイズで見積もる。
+      const box1 = rotatedBoxSize(w1, 16, geom.textRotateDeg)
+      const box2 = rotatedBoxSize(w2, 18, geom.textRotateDeg)
       jobs.push({
         key: `dim-line1-${s.id}`,
         cx: geom.text1X,
         cy: geom.text1Y,
-        w: rotated ? 16 : w1,
-        h: rotated ? w1 : 16,
+        w: box1.w,
+        h: box1.h,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -189,8 +193,8 @@ export function PrintIsometric({
         key: `dim-line2-${s.id}`,
         cx: geom.text2X,
         cy: geom.text2Y,
-        w: rotated ? 18 : w2,
-        h: rotated ? w2 : 18,
+        w: box2.w,
+        h: box2.h,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -608,6 +612,15 @@ export function PrintIsometric({
               const line2Resolved = resolvedLabels.get(`dim-line2-${s.id}`)
               const line2X = line2Resolved?.cx ?? geom.text2X
               const line2Y = line2Resolved?.cy ?? geom.text2Y
+              // 近接する他区間のラベルと重なるため押し出された場合、文字の位置と
+              // 本来の寸法線上の位置が離れてしまい、どちらの配管の数字か分かり
+              // づらくなる。一定以上ずれたときだけ、細い引き出し線でつなぐ。
+              const origAnchorX = (geom.text1X + geom.text2X) / 2
+              const origAnchorY = (geom.text1Y + geom.text2Y) / 2
+              const resolvedAnchorX = (line1X + line2X) / 2
+              const resolvedAnchorY = (line1Y + line2Y) / 2
+              const leaderNeeded =
+                Math.hypot(resolvedAnchorX - origAnchorX, resolvedAnchorY - origAnchorY) > 8
               return (
                 <g className="dim-group">
                   <line
@@ -633,6 +646,15 @@ export function PrintIsometric({
                   />
                   <polygon className="dim-arrow" points={geom.arrowStart} />
                   <polygon className="dim-arrow" points={geom.arrowEnd} />
+                  {leaderNeeded && (
+                    <line
+                      className="dim-leader-line"
+                      x1={origAnchorX}
+                      y1={origAnchorY}
+                      x2={resolvedAnchorX}
+                      y2={resolvedAnchorY}
+                    />
+                  )}
                   {/* 現合(現物合わせ)区間: 画面表示と同じく、確定寸法として誤読
                       されないよう専用の1行注記表示にする（印刷でこそ誤読を
                       避ける意味が大きいため、画面と同じロジックを使う）。
