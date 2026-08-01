@@ -38,6 +38,7 @@
   --label-tight: #fb923c;
   --label-terminus: #fbbf24;
   --label-elbow45: #f472b6;
+  --label-elbow-short: #2dd4bf;
 }
 
 /* 屋外の明るい場所でも見やすいライトテーマ。トップバーの切替ボタンで選べる。 */
@@ -75,6 +76,7 @@
   --label-tight: #c2410c;
   --label-terminus: #b45309;
   --label-elbow45: #be185d;
+  --label-elbow-short: #0f766e;
 }
 
 * {
@@ -740,6 +742,16 @@ body {
 /* 45°エルボ使用箇所のマーク（90°エルボと区別できるよう明示） */
 .elbow45-mark {
   fill: var(--label-elbow45);
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3px * var(--ui-scale, 1));
+}
+
+/* 90°ショートエルボ使用箇所のマーク（ロングが既定のため、加工時に見落とさないよう明示） */
+.elbow-short-mark {
+  fill: var(--label-elbow-short);
   font-size: calc(11px * var(--ui-scale, 1));
   font-weight: 800;
   paint-order: stroke;

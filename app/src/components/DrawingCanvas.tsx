@@ -173,6 +173,37 @@ function allElbow45MarkPositions(
   return marks
 }
 
+// アイソメ図上に実際に表示される「ショート」マーク（90°ショートエルボを
+// 使用している端）の位置を全て求める。45°マークと違い、セグメント自身の
+// fitting値ではなく、実際の計算に使われた継手id(cutById[...].start/endFittingId、
+// 始点/終点の個別上書きも反映済み)で判定する。ロングが既定のため、ショートを
+// 使っている箇所だけ現場で見落とさないよう明示する。
+function allElbowShortMarkPositions(
+  segments: Segment[],
+  cutById: Record<string, CutResult>,
+): Point[] {
+  const marks: Point[] = []
+  for (const s of segments) {
+    const c = cutById[s.id]
+    if (!c) continue
+    for (const at of ['start', 'end'] as const) {
+      const role = at === 'start' ? c.startRole : c.endRole
+      if (role !== 'elbow' && role !== 'elbow-reducer') continue
+      const fittingId = at === 'start' ? c.startFittingId : c.endFittingId
+      if (fittingId !== 'elbow90_short') continue
+      const pt = at === 'start' ? s.start : s.end
+      const other = at === 'start' ? s.end : s.start
+      const len = distance(pt, other) || 1
+      const dx = (other.x - pt.x) / len
+      const dy = (other.y - pt.y) / len
+      const nx = -dy
+      const ny = dx
+      marks.push({ x: pt.x + dx * 20 + nx * 11, y: pt.y + dy * 20 + ny * 11 })
+    }
+  }
+  return marks
+}
+
 // 指定座標に最も近い45°マーク（一定距離内にあるものだけ）。無ければnull。
 function nearestElbow45Mark(marks: Point[], x: number, y: number): Point | null {
   let best: Point | null = null
@@ -543,11 +574,14 @@ export function DrawingCanvas({
     setPreview(null)
   }
 
-  // 実際に描かれる45°マークの位置（寸法線を出す側の判定に使う。マークを
+  // 実際に描かれる45°/ショートマークの位置（寸法線を出す側の判定に使う。マークを
   // 持つセグメント自身だけでなく、ノードを共有する隣接セグメント側からも
   // 近さで判定するため、レンダー側(寸法線の実描画)でも同じ値を参照する）。
   const elbow45Marks = useMemo(
-    () => allElbow45MarkPositions(segments, effectiveById, cutById),
+    () => [
+      ...allElbow45MarkPositions(segments, effectiveById, cutById),
+      ...allElbowShortMarkPositions(segments, cutById),
+    ],
     [segments, effectiveById, cutById],
   )
 
@@ -769,6 +803,10 @@ export function DrawingCanvas({
           h: 22 * uiScale,
         })
       }
+    }
+    // ショートエルボの「ショート」マークも同様に回避領域として扱う。
+    for (const pos of allElbowShortMarkPositions(segments, cutById)) {
+      elbow45Obstacles.push({ cx: pos.x, cy: pos.y, w: 34 * uiScale, h: 22 * uiScale })
     }
     return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles])
   }, [
@@ -1082,6 +1120,27 @@ export function DrawingCanvas({
     )
   }
 
+  // 90°ショートエルボを使用した端に「ショート」マークを表示（ロングが既定のため、
+  // 加工時にどこがショートエルボか現場で見落とさないよう明示する）。
+  function elbowShortMark(s: Segment, at: 'start' | 'end') {
+    const pt = at === 'start' ? s.start : s.end
+    const other = at === 'start' ? s.end : s.start
+    const len = distance(pt, other) || 1
+    const dx = (other.x - pt.x) / len
+    const dy = (other.y - pt.y) / len
+    const nx = -dy
+    const ny = dx
+    const gap = 20
+    const off = 11
+    const cx = pt.x + dx * gap + nx * off
+    const cy = pt.y + dy * gap + ny * off
+    return (
+      <text className="elbow-short-mark" x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
+        ショート
+      </text>
+    )
+  }
+
   // 排水勾配(1/N)を設定した区間に「1/100」等のマークを表示する
   // （区間の中点、線の少し下側が基準位置。重なり回避で押し出された
   // 最終位置があればそちらを使う）。
@@ -1269,6 +1328,14 @@ export function DrawingCanvas({
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               eff?.fitting === 'elbow45_long' &&
               elbow45Mark(s, 'end')}
+            {(cutById[s.id]?.startRole === 'elbow' ||
+              cutById[s.id]?.startRole === 'elbow-reducer') &&
+              cutById[s.id]?.startFittingId === 'elbow90_short' &&
+              elbowShortMark(s, 'start')}
+            {(cutById[s.id]?.endRole === 'elbow' ||
+              cutById[s.id]?.endRole === 'elbow-reducer') &&
+              cutById[s.id]?.endFittingId === 'elbow90_short' &&
+              elbowShortMark(s, 'end')}
             {/* 排水勾配を設定した区間には「勾配1/N」を線の中点に表示する
                 （個別上書きが無ければ配管設定のベース値を継承して表示） */}
             {effectiveSlopeDenom(s, baseSlopeDenom) != null &&
