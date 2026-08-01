@@ -318,6 +318,11 @@ export function SegmentPanel({
     (isFortyFiveFitting(cut?.startFittingId) || isNinetyIshFitting(cut?.startFittingId)) &&
     (isFortyFiveFitting(cut?.endFittingId) || isNinetyIshFitting(cut?.endFittingId))
 
+  // 両端ともエルボ接続の短い区間（キック区間）かどうか。この場合、上の「継手」欄
+  // (segment.fitting)は始点・終点の両方へ一括適用されてしまうため、片側だけ
+  // 種類を変えたい（例:片側だけショートエルボ）場合は下の個別上書き欄を使う。
+  const isElbowToElbow = cut?.startRole === 'elbow' && cut?.endRole === 'elbow'
+
   // 別の線を選ぶたびに、キック区間ならオフセット欄へ、それ以外は芯々寸法欄へ
   // フォーカス（連続入力を最短タップに）。芯々寸法欄(DimCalcInput)は、
   // フォーカスされるとテンキーのポップアップを自動で開くようになっている
@@ -454,6 +459,47 @@ export function SegmentPanel({
               ))}
             </select>
           </label>
+
+          {/* 両端ともエルボの短いキック区間: 片側だけ違う種類のエルボ(例:片側のみ
+              ショート)にしたいことがある。上の「継手」欄は両端に一括適用されるため、
+              ここで始点側／終点側を個別に上書きできるようにする。未選択の側は
+              引き続き上の「継手」欄（自動判定含む）に従う。 */}
+          {isElbowToElbow && (
+            <>
+              <label className="field">
+                <span className="field-label">始点側の継手（個別指定）</span>
+                <select
+                  value={segment.startFitting ?? ''}
+                  onChange={(e) => onChange({ startFitting: e.target.value || undefined })}
+                >
+                  <option value="">（上の継手欄に従う）</option>
+                  {visibleFittings
+                    .filter((f) => f.id.startsWith('elbow'))
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <label className="field">
+                <span className="field-label">終点側の継手（個別指定）</span>
+                <select
+                  value={segment.endFitting ?? ''}
+                  onChange={(e) => onChange({ endFitting: e.target.value || undefined })}
+                >
+                  <option value="">（上の継手欄に従う）</option>
+                  {visibleFittings
+                    .filter((f) => f.id.startsWith('elbow'))
+                    .map((f) => (
+                      <option key={f.id} value={f.id}>
+                        {f.name}
+                      </option>
+                    ))}
+                </select>
+              </label>
+            </>
+          )}
 
           {/* 分岐(チーズ)接続時: もう一方(メイン管 or 枝管)のサイズもここで直接編集できる。
               「サイズ」と「相手径」のような曖昧な関係をやめ、メイン管/枝管という

@@ -11,7 +11,10 @@ export function splitSegmentAt(
   const target = segments.find((s) => s.id === targetId)
   if (!target) return segments
   const bId = makeId()
-  const A: Segment = { ...target, end: P }
+  // A の終点はP(新しい分岐ノード)に変わるため、元の終点側だけに意味を持つ
+  // endFitting個別上書きはAには残せない(そのままだと分割点の継手に誤って
+  // 適用されてしまう)。元の終点はB側が引き継ぐので、endFittingもBへ移す。
+  const A: Segment = { ...target, end: P, endFitting: undefined }
   const B: Segment = {
     id: bId,
     start: P,
@@ -23,6 +26,8 @@ export function splitSegmentAt(
     // 系統色(colorId)だけは継承の仕組み(Effective)を持たない直接指定の属性
     // なので、ここで明示的にコピーしないと分割後のB側だけ色が消えてしまう。
     colorId: target.colorId,
+    // 元の終点側の個別上書き(endFitting)はB側の終点として引き継ぐ。
+    endFitting: target.endFitting,
   }
   const result: Segment[] = []
   for (const s of segments) {

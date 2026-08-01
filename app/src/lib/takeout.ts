@@ -177,13 +177,28 @@ function buildGraph(
   return nodes
 }
 
-// エルボの継手id。自セグメント／隣接セグメントに明示指定があればそれを使い、
-// どちらも未指定(自動)なら、管種が塩ビ(VP)ならVP用の継手、いずれかの接続方法が
-// 「差込（ソケット）」なら差込式、「ねじ込み」ならねじ込み式、それ以外は
-// 突き合わせ溶接(ロング)を既定にする（接続方法を変えても継手が突き合わせ溶接の
-// ままになってしまう不具合の修正）。塩ビは接続方法(差込のみ)を選ばせる必要が
-// ないため、管種で先に判定する。
+// 始点側／終点側の個別上書き(startFitting/endFitting)。短いキック区間
+// （両端ともエルボ）で片側だけ種類を変えたいときに使う。segment.fitting は
+// 常に両端へ一括適用されてしまうため、この個別上書きは「自分の end 側」だけに
+// 効くようチェックする（inc.end が 'start'/'end' のどちらを指すセグメントの
+// 端かを表しているので、そのまま対応するフィールドだけを見る）。
+function elbowEndOverride(seg: Segment, end: 'start' | 'end'): string | undefined {
+  const perEnd = end === 'start' ? seg.startFitting : seg.endFitting
+  return isElbowId(perEnd) ? perEnd : undefined
+}
+
+// エルボの継手id。自セグメント／隣接セグメントの個別上書き(start/endFitting)
+// →自セグメント／隣接セグメントの一括指定(fitting)の順に見て、最初に
+// 見つかったものを使う。すべて未指定(自動)なら、管種が塩ビ(VP)ならVP用の継手、
+// いずれかの接続方法が「差込（ソケット）」なら差込式、「ねじ込み」ならねじ込み式、
+// それ以外は突き合わせ溶接(ロング)を既定にする（接続方法を変えても継手が
+// 突き合わせ溶接のままになってしまう不具合の修正）。塩ビは接続方法(差込のみ)を
+// 選ばせる必要がないため、管種で先に判定する。
 function defaultElbowId(inc: Inc, nb?: Inc): string {
+  const ownOverride = elbowEndOverride(inc.seg, inc.end)
+  if (ownOverride) return ownOverride
+  const nbOverride = nb ? elbowEndOverride(nb.seg, nb.end) : undefined
+  if (nbOverride) return nbOverride
   if (isElbowId(inc.seg.fitting)) return inc.seg.fitting as string
   if (isElbowId(nb?.seg.fitting)) return nb!.seg.fitting as string
   if (inc.pipeType === 'vp' || nb?.pipeType === 'vp') {
