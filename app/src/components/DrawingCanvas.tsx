@@ -591,6 +591,11 @@ export function DrawingCanvas({
   // ズーム・パン(view)には依存しない（すべて論理座標＝segment座標系で計算するため）。
   const resolvedLabels = useMemo(() => {
     const jobs: LabelJob[] = []
+    // 寸法線の矢羽根位置(両端)も、他のラベル(特に末端の呼び径ラベル)が重ならない
+    // よう固定の回避領域として扱う。複数の配管が集まる込み入ったノード付近では、
+    // 呼び径ラベル自身は他のテキストとは重ならない位置に押し出されても、隣の
+    // 区間の寸法線の矢羽根の真上に乗ってしまうことがあったため。
+    const dimArrowObstacles: LabelBox[] = []
     // 1) 中間の径変化ラベル（セグメント中点の上側）
     for (const s of segments) {
       const eff = effectiveById[s.id]
@@ -679,6 +684,10 @@ export function DrawingCanvas({
         (c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11) *
         uiScale
       const geom = dimGeometry(s.start, s.end, side, uiScale)
+      dimArrowObstacles.push(
+        { cx: geom.line.x1, cy: geom.line.y1, w: 16 * uiScale, h: 16 * uiScale },
+        { cx: geom.line.x2, cy: geom.line.y2, w: 16 * uiScale, h: 16 * uiScale },
+      )
       const w1 = estimateTextWidth(line1, fs1) + 6 * uiScale
       const w2 = estimateTextWidth(line2, fs2) + 6 * uiScale
       const lineBoxH = 16 * uiScale
@@ -809,7 +818,7 @@ export function DrawingCanvas({
     for (const pos of allElbowShortMarkPositions(segments, cutById)) {
       elbow45Obstacles.push({ cx: pos.x, cy: pos.y, w: 34 * uiScale, h: 22 * uiScale })
     }
-    return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles])
+    return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles, ...dimArrowObstacles])
   }, [
     segments,
     cutById,

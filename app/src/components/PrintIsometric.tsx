@@ -134,6 +134,9 @@ export function PrintIsometric({
 
   const resolvedLabels = useMemo(() => {
     const jobs: LabelJob[] = []
+    // 寸法線の矢羽根位置(両端)も、他のラベル(特に末端の呼び径ラベル)が重ならない
+    // よう固定の回避領域として扱う(画面表示のDrawingCanvas.tsxと同じ考え方)。
+    const dimArrowObstacles: LabelBox[] = []
     for (const s of segments) {
       const eff = effectiveById[s.id]
       const c = cutById[s.id]
@@ -174,6 +177,10 @@ export function PrintIsometric({
       const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
       const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
       const geom = dimGeometry(s.start, s.end, side, 1)
+      dimArrowObstacles.push(
+        { cx: geom.line.x1, cy: geom.line.y1, w: 16, h: 16 },
+        { cx: geom.line.x2, cy: geom.line.y2, w: 16, h: 16 },
+      )
       const w1 = estimateTextWidth(line1, 10.5) + 6
       const w2 = estimateTextWidth(line2, fs2) + 6
       // 当たり判定の箱は、実際の回転角(±30°刻みのアイソメ角度に対応)に応じた
@@ -281,7 +288,7 @@ export function PrintIsometric({
     for (const pos of allElbowShortMarkPositions(segments, cutById)) {
       elbow45Obstacles.push({ cx: pos.x, cy: pos.y, w: 34, h: 22 })
     }
-    return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles])
+    return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles, ...dimArrowObstacles])
   }, [segments, cutById, effectiveById, crossoverGaps, baseSlopeDenom])
 
   const viewBox = useMemo(() => {
