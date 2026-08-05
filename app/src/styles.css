@@ -378,6 +378,32 @@ body {
   max-width: 45%;
 }
 
+/* フラットデザイン: 影や立体表現を使わないぶん、操作可能な要素であることと
+   状態の変化(ホバー・押下・キーボードフォーカス)を色だけで明確に伝える。 */
+.launcher-quickcalc:hover,
+.launcher-nitrogen:hover,
+.launcher-import:hover,
+.folder-add-btn:hover,
+.folder-card:hover,
+.launcher-item:hover,
+.launcher-action:hover {
+  background: var(--panel-2);
+}
+.launcher-new:hover {
+  background: #0d9c6f;
+}
+.launcher-new:focus-visible,
+.launcher-quickcalc:focus-visible,
+.launcher-nitrogen:focus-visible,
+.launcher-import:focus-visible,
+.folder-add-btn:focus-visible,
+.folder-card:focus-visible,
+.launcher-item:focus-visible,
+.launcher-action:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
 .topbar {
   display: flex;
   align-items: center;
