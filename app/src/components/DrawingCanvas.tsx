@@ -972,6 +972,12 @@ export function DrawingCanvas({
   // （キャンバス側の直接タップ＝onToggleFieldFitFlip、詳細パネル側にも
   // 同じ操作のボタンを用意している）。stopPropagationで、キャンバス本体の
   // ドラッグ/タップ判定(線を引く・選択する等)に巻き込まれないようにする。
+  // ただし、タップは同時にその区間を選択状態にもする（詳細パネルの「削除」
+  // 等へすぐ辿り着けるようにするため。マークだけをタップした場合、下の線を
+  // 別途タップし直さないと選択できず、削除できないという不具合があった）。
+  // また、他パーツ配置待ち(partPlaceMode)中はこのマーク自身の操作を止め、
+  // タップをそのままキャンバス本体(配置処理)に渡す（既存マークの近くでは
+  // 新規配置のタップが拾われず何も置けないという不具合があった）。
   function fieldFitEndMark(s: Segment, at: 'start' | 'end', flipped: boolean) {
     const points = fieldFitEndMarkGeometry(s, at, flipped, uiScale)
     return (
@@ -981,10 +987,13 @@ export function DrawingCanvas({
         // 塗りつぶしなし(輪郭のみ)のため、pointer-events="auto"のままだと
         // 線の内側(塗りが無い部分)がタップを拾えない。"all"にして、輪郭で
         // 囲まれた領域全体をタップ対象にする。
-        pointerEvents="all"
+        pointerEvents={partPlaceMode ? 'none' : 'all'}
         style={{ cursor: onToggleFieldFitFlip ? 'pointer' : undefined }}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => onToggleFieldFitFlip?.(s.id, at)}
+        onClick={() => {
+          onToggleFieldFitFlip?.(s.id, at)
+          onSelectSegment(s.id)
+        }}
       />
     )
   }
@@ -993,6 +1002,13 @@ export function DrawingCanvas({
   // 動かさずに離せばタップ＝向き反転、動かして離せばドラッグ＝移動確定。
   // 寸法線と同じ「避けたい点」(45°マーク)を渡し、既定配置が寸法線と同じ側に
   // 来てしまわないようにする（fieldFitEndMarkと同じ理由でstopPropagationする）。
+  // タップ(向き反転)時は同時にその区間を選択状態にもする。マークの真上を
+  // タップした場合、下の線をタップし直さないと選択できず、詳細パネルの
+  // 「削除」に辿り着けないという不具合があったため。
+  // また、他パーツ配置待ち(partPlaceMode)中はこのマーク自身の操作を止め、
+  // タップをそのままキャンバス本体(配置処理)に渡す。既存マークのすぐ近くに
+  // 別の区間を配置しようとしたタップがこのマークに奪われ、何も置けなく
+  // なる不具合があったため。
   function fieldWeldMark(s: Segment) {
     const mark = s.fieldWeldMark
     if (!mark) return null
@@ -1012,7 +1028,7 @@ export function DrawingCanvas({
       <polygon
         className={`field-weld-mark${dragging ? ' dragging' : ''}`}
         points={points}
-        pointerEvents="all"
+        pointerEvents={partPlaceMode ? 'none' : 'all'}
         style={{ cursor: onToggleFieldWeldFlip || onMoveFieldWeldMark ? 'pointer' : undefined }}
         onPointerDown={(e) => handleFieldWeldPointerDown(e, s)}
         onPointerMove={handleFieldWeldPointerMove}
@@ -1076,6 +1092,7 @@ export function DrawingCanvas({
       onMoveFieldWeldMark?.(d.segId, final?.offsetX ?? d.startOffsetX, final?.offsetY ?? d.startOffsetY)
     } else {
       onToggleFieldWeldFlip?.(d.segId)
+      onSelectSegment(d.segId)
     }
     setFieldWeldDrag(null)
   }
