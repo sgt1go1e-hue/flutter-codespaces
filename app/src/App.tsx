@@ -72,6 +72,10 @@ function makeId(): string {
   return `seg_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
 }
 
+function makeMarkId(): string {
+  return `wm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+}
+
 // 日替わり挨拶メッセージの判定に使う「今日の日付」キー(端末のローカル日付、
 // YYYY-MM-DD)。toISOString()はUTCに変換されるため、日本時間の深夜前後で
 // 日付がずれることがあり使わない。
@@ -925,12 +929,18 @@ export default function App() {
   // タップすると向きを反転できる（詳細パネルの反転ボタンと同じ操作を、
   // マークの直接タップでも行えるようにするための最短経路）。表示専用の
   // トグル値であり、切り寸法等の計算結果には一切影響しない。
-  function toggleFieldWeldFlip(id: string) {
+  // 1本のセグメントに複数マークを置けるため、markIdで対象を1つ特定する。
+  function toggleFieldWeldFlip(id: string, markId: string) {
     if (!canEditStructure) return
     mutateSegments((prev) =>
       prev.map((s) =>
-        s.id === id && s.fieldWeldMark
-          ? { ...s, fieldWeldMark: { ...s.fieldWeldMark, flipped: !s.fieldWeldMark.flipped } }
+        s.id === id && s.fieldWeldMarks
+          ? {
+              ...s,
+              fieldWeldMarks: s.fieldWeldMarks.map((m) =>
+                m.id === markId ? { ...m, flipped: !m.flipped } : m,
+              ),
+            }
           : s,
       ),
     )
@@ -945,12 +955,15 @@ export default function App() {
 
   // 現場溶接マークをドラッグして移動したとき、対象点(t位置)からの相対
   // オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
-  function moveFieldWeldMark(id: string, offsetX: number, offsetY: number) {
+  function moveFieldWeldMark(id: string, markId: string, offsetX: number, offsetY: number) {
     if (!canEditStructure) return
     mutateSegments((prev) =>
       prev.map((s) =>
-        s.id === id && s.fieldWeldMark
-          ? { ...s, fieldWeldMark: { ...s.fieldWeldMark, offsetX, offsetY } }
+        s.id === id && s.fieldWeldMarks
+          ? {
+              ...s,
+              fieldWeldMarks: s.fieldWeldMarks.map((m) => (m.id === markId ? { ...m, offsetX, offsetY } : m)),
+            }
           : s,
       ),
     )
@@ -1059,15 +1072,20 @@ export default function App() {
       }
     } else if (part.action.type === 'fieldWeldMark') {
       // 現熔マーク: 分割はせず、タップ/ドロップ位置に最も近い点(t)へ
-      // その区間の現場溶接マークとして置く（1本のセグメントにつき最大1箇所、
-      // 既に置いてあれば上書き）。表示専用の注記で、切り寸法等の計算結果
-      // には一切影響しない。フランジと同様、置いた後に選択状態へは
+      // その区間の現場溶接マークを1つ追加する（1本のセグメントに複数箇所
+      // 置ける。IFCデータからの拾い出し等、長い直管に複数の現場溶接が
+      // 必要なケースに対応するため）。表示専用の注記で、切り寸法等の計算
+      // 結果には一切影響しない。フランジと同様、置いた後に選択状態へは
       // しない（選択すると寸法欄が自動フォーカスしてテンキーが開いてしまい、
       // 「置いただけ」のつもりが詳細パネルへ強制的に飛ばされる形になって
       // しまうため。向き反転等はキャンバス上のマーク直接タップで行える）。
       const { t } = projectOnSegment(dropPoint, best.start, best.end)
       mutateSegments((prev) =>
-        prev.map((s) => (s.id === targetId ? { ...s, fieldWeldMark: { t, flipped: false } } : s)),
+        prev.map((s) =>
+          s.id === targetId
+            ? { ...s, fieldWeldMarks: [...(s.fieldWeldMarks ?? []), { id: makeMarkId(), t, flipped: false }] }
+            : s,
+        ),
       )
     }
     // 分割後は選択状態をリセット（前後が別データになるため）

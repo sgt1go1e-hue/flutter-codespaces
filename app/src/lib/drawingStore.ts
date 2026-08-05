@@ -1,5 +1,22 @@
 import type { Segment } from '../types'
 
+function makeMarkId(): string {
+  return `wm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
+}
+
+/**
+ * 現場溶接マークが単数(fieldWeldMark)だった旧バージョンのデータを、配列
+ * (fieldWeldMarks)へ移行する。読み込むたびに通すことで自己修復させる
+ * (normalizeDrawingMetaと同じ考え方)。新形式のデータはそのまま素通しする。
+ */
+function normalizeSegment(s: Segment): Segment {
+  const legacy = (s as Segment & { fieldWeldMark?: { t: number; flipped: boolean; offsetX?: number; offsetY?: number } })
+    .fieldWeldMark
+  if (!legacy || s.fieldWeldMarks) return s
+  const { fieldWeldMark: _drop, ...rest } = s as Segment & { fieldWeldMark?: unknown }
+  return { ...rest, fieldWeldMarks: [{ id: makeMarkId(), ...legacy }] }
+}
+
 // 複数図面(ファイル)管理: 図面ごとに id を振り、セグメント本体は
 // `piping-iso:drawing:<id>` に、一覧(名前は付けず更新日時とセグメント数のみ)は
 // `piping-iso:index` に保存する。すべて自動保存（保存操作は不要）。
@@ -105,7 +122,9 @@ export function saveFolders(list: FolderMeta[]) {
 export function loadDrawingSegments(id: string): Segment[] {
   try {
     const raw = localStorage.getItem(drawingKey(id))
-    return raw ? (JSON.parse(raw) as Segment[]) : []
+    if (!raw) return []
+    const parsed = JSON.parse(raw) as Segment[]
+    return parsed.map(normalizeSegment)
   } catch {
     return []
   }

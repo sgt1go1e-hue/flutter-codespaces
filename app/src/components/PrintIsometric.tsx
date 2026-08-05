@@ -410,17 +410,22 @@ export function PrintIsometric({
   // avoidPointと、ドラッグで移動済みならその相対オフセット(offsetX/offsetY)
   // を反映する(印刷でも画面表示と同じ位置になるようにするため)。
   function fieldWeldMark(s: Segment) {
-    const mark = s.fieldWeldMark
-    if (!mark) return null
-    const at = {
-      x: s.start.x + (s.end.x - s.start.x) * mark.t,
-      y: s.start.y + (s.end.y - s.start.y) * mark.t,
-    }
-    const avoidPoint = nearestElbow45Mark(elbow45Marks, at.x, at.y) ?? undefined
-    const customOffset =
-      mark.offsetX != null && mark.offsetY != null ? { x: mark.offsetX, y: mark.offsetY } : undefined
-    const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, 1, avoidPoint, customOffset)
-    return <polygon className="field-weld-mark" points={points} />
+    if (!s.fieldWeldMarks || s.fieldWeldMarks.length === 0) return null
+    return (
+      <>
+        {s.fieldWeldMarks.map((mark) => {
+          const at = {
+            x: s.start.x + (s.end.x - s.start.x) * mark.t,
+            y: s.start.y + (s.end.y - s.start.y) * mark.t,
+          }
+          const avoidPoint = nearestElbow45Mark(elbow45Marks, at.x, at.y) ?? undefined
+          const customOffset =
+            mark.offsetX != null && mark.offsetY != null ? { x: mark.offsetX, y: mark.offsetY } : undefined
+          const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, 1, avoidPoint, customOffset)
+          return <polygon key={mark.id} className="field-weld-mark" points={points} />
+        })}
+      </>
+    )
   }
 
   // 45°エルボを使用した端に「45°」マークを表示（90°エルボとの区別を現場ですぐ判別できるように）

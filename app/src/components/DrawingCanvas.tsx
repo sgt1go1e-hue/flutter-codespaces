@@ -86,12 +86,12 @@ interface Props {
   /** 区間ごとの実効相番。芯々未入力の区間には含まれない。 */
   assemblyNumberById?: Record<string, number>
   /** 現場溶接マークの三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
-  onToggleFieldWeldFlip?: (segId: string) => void
+  onToggleFieldWeldFlip?: (segId: string, markId: string) => void
   /**
    * 現場溶接マークの三角をドラッグして移動したとき、対象点からの相対
    * オフセット(表示スケール=1のときのpx相当)を確定する（表示専用）。
    */
-  onMoveFieldWeldMark?: (segId: string, offsetX: number, offsetY: number) => void
+  onMoveFieldWeldMark?: (segId: string, markId: string, offsetX: number, offsetY: number) => void
   /** 現場合わせ区間の端点三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
   onToggleFieldFitFlip?: (segId: string, at: 'start' | 'end') => void
 }
@@ -295,6 +295,7 @@ export function DrawingCanvas({
   const fieldWeldDragRef = useRef<{
     pointerId: number
     segId: string
+    markId: string
     startClientX: number
     startClientY: number
     startOffsetX: number
@@ -303,6 +304,7 @@ export function DrawingCanvas({
   } | null>(null)
   const [fieldWeldDrag, setFieldWeldDrag] = useState<{
     segId: string
+    markId: string
     offsetX: number
     offsetY: number
   } | null>(null)
@@ -1010,38 +1012,46 @@ export function DrawingCanvas({
   // 別の区間を配置しようとしたタップがこのマークに奪われ、何も置けなく
   // なる不具合があったため。
   function fieldWeldMark(s: Segment) {
-    const mark = s.fieldWeldMark
-    if (!mark) return null
-    const at = {
-      x: s.start.x + (s.end.x - s.start.x) * mark.t,
-      y: s.start.y + (s.end.y - s.start.y) * mark.t,
-    }
-    const avoidPoint = nearestElbow45Mark(elbow45Marks, at.x, at.y) ?? undefined
-    const dragging = fieldWeldDrag && fieldWeldDrag.segId === s.id
-    const customOffset = dragging
-      ? { x: fieldWeldDrag.offsetX, y: fieldWeldDrag.offsetY }
-      : mark.offsetX != null && mark.offsetY != null
-        ? { x: mark.offsetX, y: mark.offsetY }
-        : undefined
-    const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, uiScale, avoidPoint, customOffset)
+    if (!s.fieldWeldMarks || s.fieldWeldMarks.length === 0) return null
     return (
-      <polygon
-        className={`field-weld-mark${dragging ? ' dragging' : ''}`}
-        points={points}
-        pointerEvents={partPlaceMode ? 'none' : 'all'}
-        style={{ cursor: onToggleFieldWeldFlip || onMoveFieldWeldMark ? 'pointer' : undefined }}
-        onPointerDown={(e) => handleFieldWeldPointerDown(e, s)}
-        onPointerMove={handleFieldWeldPointerMove}
-        onPointerUp={handleFieldWeldPointerUp}
-        onPointerCancel={handleFieldWeldPointerUp}
-      />
+      <>
+        {s.fieldWeldMarks.map((mark) => {
+          const at = {
+            x: s.start.x + (s.end.x - s.start.x) * mark.t,
+            y: s.start.y + (s.end.y - s.start.y) * mark.t,
+          }
+          const avoidPoint = nearestElbow45Mark(elbow45Marks, at.x, at.y) ?? undefined
+          const dragging = fieldWeldDrag && fieldWeldDrag.markId === mark.id
+          const customOffset = dragging
+            ? { x: fieldWeldDrag.offsetX, y: fieldWeldDrag.offsetY }
+            : mark.offsetX != null && mark.offsetY != null
+              ? { x: mark.offsetX, y: mark.offsetY }
+              : undefined
+          const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, uiScale, avoidPoint, customOffset)
+          return (
+            <polygon
+              key={mark.id}
+              className={`field-weld-mark${dragging ? ' dragging' : ''}`}
+              points={points}
+              pointerEvents={partPlaceMode ? 'none' : 'all'}
+              style={{ cursor: onToggleFieldWeldFlip || onMoveFieldWeldMark ? 'pointer' : undefined }}
+              onPointerDown={(e) => handleFieldWeldPointerDown(e, s, mark)}
+              onPointerMove={handleFieldWeldPointerMove}
+              onPointerUp={handleFieldWeldPointerUp}
+              onPointerCancel={handleFieldWeldPointerUp}
+            />
+          )
+        })}
+      </>
     )
   }
 
-  function handleFieldWeldPointerDown(e: React.PointerEvent<SVGPolygonElement>, s: Segment) {
+  function handleFieldWeldPointerDown(
+    e: React.PointerEvent<SVGPolygonElement>,
+    s: Segment,
+    mark: NonNullable<Segment['fieldWeldMarks']>[number],
+  ) {
     e.stopPropagation()
-    const mark = s.fieldWeldMark
-    if (!mark) return
     e.currentTarget.setPointerCapture(e.pointerId)
     const at = {
       x: s.start.x + (s.end.x - s.start.x) * mark.t,
@@ -1056,13 +1066,14 @@ export function DrawingCanvas({
     fieldWeldDragRef.current = {
       pointerId: e.pointerId,
       segId: s.id,
+      markId: mark.id,
       startClientX: e.clientX,
       startClientY: e.clientY,
       startOffsetX,
       startOffsetY,
       moved: false,
     }
-    setFieldWeldDrag({ segId: s.id, offsetX: startOffsetX, offsetY: startOffsetY })
+    setFieldWeldDrag({ segId: s.id, markId: mark.id, offsetX: startOffsetX, offsetY: startOffsetY })
   }
 
   function handleFieldWeldPointerMove(e: React.PointerEvent<SVGPolygonElement>) {
@@ -1079,7 +1090,7 @@ export function DrawingCanvas({
     // (fieldWeldMarkGeometry側で uiScale 倍して使うのと対になる)。
     const offsetX = d.startOffsetX + dxScreen / view.scale / uiScale
     const offsetY = d.startOffsetY + dyScreen / view.scale / uiScale
-    setFieldWeldDrag({ segId: d.segId, offsetX, offsetY })
+    setFieldWeldDrag({ segId: d.segId, markId: d.markId, offsetX, offsetY })
   }
 
   function handleFieldWeldPointerUp(e: React.PointerEvent<SVGPolygonElement>) {
@@ -1088,10 +1099,10 @@ export function DrawingCanvas({
     e.stopPropagation()
     fieldWeldDragRef.current = null
     if (d.moved) {
-      const final = fieldWeldDrag && fieldWeldDrag.segId === d.segId ? fieldWeldDrag : null
-      onMoveFieldWeldMark?.(d.segId, final?.offsetX ?? d.startOffsetX, final?.offsetY ?? d.startOffsetY)
+      const final = fieldWeldDrag && fieldWeldDrag.markId === d.markId ? fieldWeldDrag : null
+      onMoveFieldWeldMark?.(d.segId, d.markId, final?.offsetX ?? d.startOffsetX, final?.offsetY ?? d.startOffsetY)
     } else {
-      onToggleFieldWeldFlip?.(d.segId)
+      onToggleFieldWeldFlip?.(d.segId, d.markId)
       onSelectSegment(d.segId)
     }
     setFieldWeldDrag(null)
