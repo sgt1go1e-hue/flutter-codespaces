@@ -1,4 +1,4 @@
-import type { Point, Segment } from '../types'
+import type { FieldWeldMark, Point, Segment } from '../types'
 import { distance } from './isometric'
 import { chooseDimSide } from './dimensionLine'
 
@@ -20,6 +20,39 @@ export const FIELD_WELD_OFFSET = 11
 export const FIELD_FIT_LINE_GAP = 2.5
 /** 現場合わせ区間の端点三角マークの、配管ラインからのオフセット距離(基準値, px)。実際はscale倍。 */
 export const FIELD_FIT_MARK_OFFSET = 16
+
+/**
+ * セグメントを位置t(0..1)で前後2本(A=始点側 / B=終点側)に分割するとき、
+ * そこに乗っている現場溶接マークをA/Bへ振り分ける。
+ *
+ * マークの位置は「そのセグメント上の相対位置(t)」で保持しているため、
+ * 分割で区間が短くなると同じtでも図面上の絶対位置が変わってしまう。
+ * 分割後の区間長に合わせてtを引き直すことで、チーズ・フランジ・
+ * レジューサーを後から挿入してもマークが元の場所に留まるようにする
+ * (この処理が無いと、分割のたびにマークが勝手にずれて動いていた)。
+ *
+ * offsetX/offsetY(ドラッグで移動済みの相対オフセット)は、対象点からの
+ * 相対値であり対象点の絶対位置は分割前後で変わらないため、そのまま
+ * 引き継いでよい。
+ */
+export function splitFieldWeldMarks(
+  marks: FieldWeldMark[] | undefined,
+  tSplit: number,
+): { a: FieldWeldMark[] | undefined; b: FieldWeldMark[] | undefined } {
+  if (!marks || marks.length === 0) return { a: undefined, b: undefined }
+  // 分割点が端に張り付いている場合、割り戻しでtが発散する(0除算)ため、
+  // 縮退しない側へまとめて寄せる。
+  if (!(tSplit > 0) || !(tSplit < 1)) {
+    return tSplit <= 0 ? { a: undefined, b: marks } : { a: marks, b: undefined }
+  }
+  const a: FieldWeldMark[] = []
+  const b: FieldWeldMark[] = []
+  for (const m of marks) {
+    if (m.t <= tSplit) a.push({ ...m, t: m.t / tSplit })
+    else b.push({ ...m, t: (m.t - tSplit) / (1 - tSplit) })
+  }
+  return { a: a.length ? a : undefined, b: b.length ? b : undefined }
+}
 
 /**
  * 正三角形(輪郭のみ)のpolygon points文字列を返す。

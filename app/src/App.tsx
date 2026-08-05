@@ -49,6 +49,7 @@ import {
 import type { Point } from './types'
 import { computeCrossoverGaps } from './lib/crossover'
 import { normalizeBranchSplits } from './lib/branching'
+import { splitFieldWeldMarks } from './lib/fieldMarks'
 import { computeAllCut } from './lib/cutlength'
 import { findTeeContext, isReducerId } from './lib/takeout'
 import { detectElbowClashes, applyElbowSuggestion, type ElbowClash } from './lib/elbowClash'
@@ -109,7 +110,10 @@ function splitForDoubleFlange(
   }
 
   const bId = makeId()
-  const A: Segment = { ...target, end: P, endFlange: 'double' }
+  // 現場溶接マークは分割後の区間長に合わせてA/Bへ振り分ける（詳細は
+  // splitFieldWeldMarks のコメント参照）。
+  const marks = splitFieldWeldMarks(target.fieldWeldMarks, t)
+  const A: Segment = { ...target, end: P, endFlange: 'double', fieldWeldMarks: marks.a }
   const B: Segment = {
     id: bId,
     start: P,
@@ -118,6 +122,7 @@ function splitForDoubleFlange(
     parentId: target.id,
     startFlange: 'double',
     connection: 'flange',
+    fieldWeldMarks: marks.b,
     // pipeType/size/fitting は持たせない → A から継承・自動
   }
   A.connection = target.connection ?? 'flange'
@@ -185,7 +190,16 @@ function splitForReducer(
   // Bに凍結しておき、メイン側/先端側のどちらか一方だけ入力されたとき、
   // もう一方をこの値から自動算出できるようにする（未入力ならレジューサー
   // 追加時に寸法入力を促す扱いになる＝ Rule 1）。
-  const A: Segment = { ...target, end: P, endFlange: undefined, centerLength: undefined }
+  // 現場溶接マークは分割後の区間長に合わせてA/Bへ振り分ける（詳細は
+  // splitFieldWeldMarks のコメント参照）。
+  const marks = splitFieldWeldMarks(target.fieldWeldMarks, t)
+  const A: Segment = {
+    ...target,
+    end: P,
+    endFlange: undefined,
+    centerLength: undefined,
+    fieldWeldMarks: marks.a,
+  }
   const B: Segment = {
     id: bId,
     start: P,
@@ -198,6 +212,7 @@ function splitForReducer(
     endFlange: target.endFlange,
     connection: target.connection,
     reducerSpanLength: target.centerLength,
+    fieldWeldMarks: marks.b,
   }
   const result: Segment[] = []
   for (const s of segments) {

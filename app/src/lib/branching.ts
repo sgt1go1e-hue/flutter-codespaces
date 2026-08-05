@@ -1,5 +1,6 @@
 import type { Point, Segment } from '../types'
 import { distanceToSegment, projectOnSegment, samePoint } from './isometric'
+import { splitFieldWeldMarks } from './fieldMarks'
 
 /** 指定セグメントを点 P で前後2本に分割する（下流 B は上流 A を親に継承）。 */
 export function splitSegmentAt(
@@ -11,10 +12,14 @@ export function splitSegmentAt(
   const target = segments.find((s) => s.id === targetId)
   if (!target) return segments
   const bId = makeId()
+  // 現場溶接マークは分割後の区間長に合わせてA/Bへ振り分ける(そのまま
+  // コピーすると、同じtでも区間が短くなった分だけ図面上の位置がずれる)。
+  const { t: tSplit } = projectOnSegment(P, target.start, target.end)
+  const marks = splitFieldWeldMarks(target.fieldWeldMarks, tSplit)
   // A の終点はP(新しい分岐ノード)に変わるため、元の終点側だけに意味を持つ
   // endFitting個別上書きはAには残せない(そのままだと分割点の継手に誤って
   // 適用されてしまう)。元の終点はB側が引き継ぐので、endFittingもBへ移す。
-  const A: Segment = { ...target, end: P, endFitting: undefined }
+  const A: Segment = { ...target, end: P, endFitting: undefined, fieldWeldMarks: marks.a }
   const B: Segment = {
     id: bId,
     start: P,
@@ -28,6 +33,7 @@ export function splitSegmentAt(
     colorId: target.colorId,
     // 元の終点側の個別上書き(endFitting)はB側の終点として引き継ぐ。
     endFitting: target.endFitting,
+    fieldWeldMarks: marks.b,
   }
   const result: Segment[] = []
   for (const s of segments) {
