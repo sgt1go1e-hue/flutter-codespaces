@@ -1,20 +1,35 @@
-import type { Segment } from '../types'
+import type { FieldWeldMark, Segment } from '../types'
 
 function makeMarkId(): string {
   return `wm_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`
 }
 
+/** 旧形式のマーク1件を現行形式へ揃える(向きは flipped(真偽) → rotation(度))。 */
+type LegacyMark = Partial<FieldWeldMark> & { t: number; flipped?: boolean }
+function normalizeMark(m: LegacyMark): FieldWeldMark {
+  const { flipped, ...rest } = m
+  return {
+    id: rest.id ?? makeMarkId(),
+    t: rest.t,
+    // 旧: flipped=trueで三角が反対を向いていた → 180°回した状態に相当する。
+    rotation: rest.rotation ?? (flipped ? 180 : 0),
+    offsetX: rest.offsetX,
+    offsetY: rest.offsetY,
+  }
+}
+
 /**
- * 現場溶接マークが単数(fieldWeldMark)だった旧バージョンのデータを、配列
- * (fieldWeldMarks)へ移行する。読み込むたびに通すことで自己修復させる
- * (normalizeDrawingMetaと同じ考え方)。新形式のデータはそのまま素通しする。
+ * 現場溶接マークの旧バージョンのデータを現行形式へ移行する。
+ *  - 単数(fieldWeldMark) → 配列(fieldWeldMarks)
+ *  - 向きの持ち方 flipped(反転の真偽) → rotation(90°刻みの角度)
+ * 読み込むたびに通すことで自己修復させる(normalizeDrawingMetaと同じ考え方)。
+ * 現行形式のデータはそのまま素通しする。
  */
 function normalizeSegment(s: Segment): Segment {
-  const legacy = (s as Segment & { fieldWeldMark?: { t: number; flipped: boolean; offsetX?: number; offsetY?: number } })
-    .fieldWeldMark
-  if (!legacy || s.fieldWeldMarks) return s
-  const { fieldWeldMark: _drop, ...rest } = s as Segment & { fieldWeldMark?: unknown }
-  return { ...rest, fieldWeldMarks: [{ id: makeMarkId(), ...legacy }] }
+  const { fieldWeldMark: legacy, ...rest } = s as Segment & { fieldWeldMark?: LegacyMark }
+  const marks = s.fieldWeldMarks ?? (legacy ? [legacy as LegacyMark] : undefined)
+  if (!marks) return legacy ? (rest as Segment) : s
+  return { ...(rest as Segment), fieldWeldMarks: marks.map((m) => normalizeMark(m as LegacyMark)) }
 }
 
 // 複数図面(ファイル)管理: 図面ごとに id を振り、セグメント本体は

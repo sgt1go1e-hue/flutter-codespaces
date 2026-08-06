@@ -940,12 +940,12 @@ export default function App() {
     if (selectedId === id) setSelectedId(null)
   }
 
-  // 現場溶接マーク・現場合わせ区間の三角マークは、キャンバス上のマーク自体を
-  // タップすると向きを反転できる（詳細パネルの反転ボタンと同じ操作を、
-  // マークの直接タップでも行えるようにするための最短経路）。表示専用の
-  // トグル値であり、切り寸法等の計算結果には一切影響しない。
-  // 1本のセグメントに複数マークを置けるため、markIdで対象を1つ特定する。
-  function toggleFieldWeldFlip(id: string, markId: string) {
+  // 現場溶接マークは、キャンバス上の三角をタップするたびに90°ずつ回る
+  // （詳細パネルの回転ボタンと同じ操作を、マークの直接タップでも行える
+  // ようにするための最短経路）。表示専用の値であり、切り寸法等の計算結果には
+  // 一切影響しない。1本のセグメントに複数マークを置けるため、markIdで対象を
+  // 1つ特定する。
+  function rotateFieldWeldMark(id: string, markId: string) {
     if (!canEditStructure) return
     mutateSegments((prev) =>
       prev.map((s) =>
@@ -953,9 +953,22 @@ export default function App() {
           ? {
               ...s,
               fieldWeldMarks: s.fieldWeldMarks.map((m) =>
-                m.id === markId ? { ...m, flipped: !m.flipped } : m,
+                m.id === markId ? { ...m, rotation: (m.rotation + 90) % 360 } : m,
               ),
             }
+          : s,
+      ),
+    )
+  }
+
+  // 現場溶接マークを1つ消す（消しゴム中のマーク直接タップ、または詳細パネルの
+  // 「消去」ボタンから）。
+  function deleteFieldWeldMark(id: string, markId: string) {
+    if (!canEditStructure) return
+    mutateSegments((prev) =>
+      prev.map((s) =>
+        s.id === id && s.fieldWeldMarks
+          ? { ...s, fieldWeldMarks: s.fieldWeldMarks.filter((m) => m.id !== markId) }
           : s,
       ),
     )
@@ -1093,12 +1106,14 @@ export default function App() {
       // 結果には一切影響しない。フランジと同様、置いた後に選択状態へは
       // しない（選択すると寸法欄が自動フォーカスしてテンキーが開いてしまい、
       // 「置いただけ」のつもりが詳細パネルへ強制的に飛ばされる形になって
-      // しまうため。向き反転等はキャンバス上のマーク直接タップで行える）。
+      // しまうため。回転・移動・消去はキャンバス上のマーク直接タップで行える）。
+      // オフセットは持たせず、タップした位置の配管上にそのまま置く（寸法線を
+      // 避ける等の自動配置はしない。位置の微調整はドラッグで行う）。
       const { t } = projectOnSegment(dropPoint, best.start, best.end)
       mutateSegments((prev) =>
         prev.map((s) =>
           s.id === targetId
-            ? { ...s, fieldWeldMarks: [...(s.fieldWeldMarks ?? []), { id: makeMarkId(), t, flipped: false }] }
+            ? { ...s, fieldWeldMarks: [...(s.fieldWeldMarks ?? []), { id: makeMarkId(), t, rotation: 0 }] }
             : s,
         ),
       )
@@ -1350,7 +1365,8 @@ export default function App() {
           onEraseSegment={eraseSegment}
           assemblyNumberActive={assemblyNumberActive}
           assemblyNumberById={assemblyNumberById}
-          onToggleFieldWeldFlip={canEditStructure ? toggleFieldWeldFlip : undefined}
+          onRotateFieldWeldMark={canEditStructure ? rotateFieldWeldMark : undefined}
+          onDeleteFieldWeldMark={canEditStructure ? deleteFieldWeldMark : undefined}
           onToggleFieldFitFlip={canEditStructure ? toggleFieldFitFlip : undefined}
           onMoveFieldWeldMark={canEditStructure ? moveFieldWeldMark : undefined}
         />

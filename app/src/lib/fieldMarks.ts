@@ -10,12 +10,6 @@ import { chooseDimSide } from './dimensionLine'
 
 /** 正三角形の一辺の長さ(基準値, px)。相番バッジ・寸法文字と同程度のスケール感。実際はscale倍。 */
 export const FIELD_MARK_SIZE = 16
-/** 現場溶接マークの、配管ラインからの既定オフセット距離(基準値, px)。実際はscale倍。
-    以前は寸法線(DIM_STANDOFF=21)と同程度離していたが、対象点から離れすぎて
-    寸法テキストと誤認しやすかったため、パイプにより近い位置に縮めてある。
-    ユーザーがドラッグで移動した場合はこの既定値は使わず、保存済みの
-    offsetX/offsetY(fieldWeldMarkGeometryのcustomOffset)を使う。 */
-export const FIELD_WELD_OFFSET = 11
 /** 現場合わせ区間の二重線の間隔(基準値, px。線の中心線からの片側オフセット)。実際はscale倍。 */
 export const FIELD_FIT_LINE_GAP = 2.5
 /** 現場合わせ区間の端点三角マークの、配管ラインからのオフセット距離(基準値, px)。実際はscale倍。 */
@@ -89,32 +83,49 @@ function markSide(start: Point, end: Point, avoidPoint?: Point): { nx: number; n
   return { nx: -dimSide.nx, ny: -dimSide.ny }
 }
 
-/** 現場溶接マーク(セグメント上の1点)の三角ジオメトリを求める。 */
+/**
+ * 正三角形(輪郭のみ)を、重心を中心にrotation度(時計回り)だけ回した
+ * polygon points文字列を返す。rotation=0で頂点が真上を向く。
+ * 現場溶接マーク用。配管の角度には合わせず、画面に対する絶対角度で回すため、
+ * どの向きの配管に置いても同じ4方向(0/90/180/270)を選べる。
+ */
+export function rotatedTrianglePoints(center: Point, rotation: number, size: number): string {
+  const height = (size * Math.sqrt(3)) / 2
+  // 重心から各頂点への相対位置(頂点が上を向いた状態)
+  const local: Point[] = [
+    { x: 0, y: -(height * 2) / 3 },
+    { x: -size / 2, y: height / 3 },
+    { x: size / 2, y: height / 3 },
+  ]
+  const rad = (rotation * Math.PI) / 180
+  const cos = Math.cos(rad)
+  const sin = Math.sin(rad)
+  return local
+    .map((p) => `${center.x + p.x * cos - p.y * sin},${center.y + p.x * sin + p.y * cos}`)
+    .join(' ')
+}
+
+/**
+ * 現場溶接マーク(セグメント上の1点)の三角ジオメトリを求める。
+ * 位置は「t位置 + 保存済みオフセット」だけで決まる(置いた場所・動かした場所を
+ * そのまま使い、寸法線を避ける等の自動配置は行わない)。
+ */
 export function fieldWeldMarkGeometry(
   s: Segment,
-  t: number,
-  flipped: boolean,
+  mark: FieldWeldMark,
   scale: number,
-  avoidPoint?: Point,
-  customOffset?: { x: number; y: number },
-): { points: string; anchor: Point; baseCenter: Point } {
-  const len = distance(s.start, s.end) || 1
-  const ux = (s.end.x - s.start.x) / len
-  const uy = (s.end.y - s.start.y) / len
-  const at = { x: s.start.x + (s.end.x - s.start.x) * t, y: s.start.y + (s.end.y - s.start.y) * t }
-  // customOffset(ドラッグで移動して保存済みの相対位置)があればそれを優先する。
-  // 無ければ、寸法線と反対側・パイプに近い既定位置を自動で使う。
-  const baseCenter = customOffset
-    ? { x: at.x + customOffset.x * scale, y: at.y + customOffset.y * scale }
-    : (() => {
-        const { nx, ny } = markSide(s.start, s.end, avoidPoint)
-        const off = FIELD_WELD_OFFSET * scale
-        return { x: at.x + nx * off, y: at.y + ny * off }
-      })()
+  offsetOverride?: { x: number; y: number },
+): { points: string; anchor: Point; center: Point } {
+  const anchor = {
+    x: s.start.x + (s.end.x - s.start.x) * mark.t,
+    y: s.start.y + (s.end.y - s.start.y) * mark.t,
+  }
+  const off = offsetOverride ?? { x: mark.offsetX ?? 0, y: mark.offsetY ?? 0 }
+  const center = { x: anchor.x + off.x * scale, y: anchor.y + off.y * scale }
   return {
-    points: trianglePoints(baseCenter, { x: ux, y: uy }, flipped, FIELD_MARK_SIZE * scale),
-    anchor: at,
-    baseCenter,
+    points: rotatedTrianglePoints(center, mark.rotation, FIELD_MARK_SIZE * scale),
+    anchor,
+    center,
   }
 }
 

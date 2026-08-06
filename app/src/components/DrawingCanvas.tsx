@@ -85,8 +85,10 @@ interface Props {
   assemblyNumberActive?: boolean
   /** 区間ごとの実効相番。芯々未入力の区間には含まれない。 */
   assemblyNumberById?: Record<string, number>
-  /** 現場溶接マークの三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
-  onToggleFieldWeldFlip?: (segId: string, markId: string) => void
+  /** 現場溶接マークの三角をタップしたとき、90°回す（表示専用）。 */
+  onRotateFieldWeldMark?: (segId: string, markId: string) => void
+  /** 消しゴム中に現場溶接マークの三角をタップしたとき、そのマークだけ消す。 */
+  onDeleteFieldWeldMark?: (segId: string, markId: string) => void
   /**
    * 現場溶接マークの三角をドラッグして移動したとき、対象点からの相対
    * オフセット(表示スケール=1のときのpx相当)を確定する（表示専用）。
@@ -240,7 +242,8 @@ export function DrawingCanvas({
   disableDraw = false,
   assemblyNumberActive = false,
   assemblyNumberById = {},
-  onToggleFieldWeldFlip,
+  onRotateFieldWeldMark,
+  onDeleteFieldWeldMark,
   onToggleFieldFitFlip,
   onMoveFieldWeldMark,
 }: Props) {
@@ -974,9 +977,8 @@ export function DrawingCanvas({
   // （キャンバス側の直接タップ＝onToggleFieldFitFlip、詳細パネル側にも
   // 同じ操作のボタンを用意している）。stopPropagationで、キャンバス本体の
   // ドラッグ/タップ判定(線を引く・選択する等)に巻き込まれないようにする。
-  // ただし、タップは同時にその区間を選択状態にもする（詳細パネルの「削除」
-  // 等へすぐ辿り着けるようにするため。マークだけをタップした場合、下の線を
-  // 別途タップし直さないと選択できず、削除できないという不具合があった）。
+  // タップで区間を選択状態にはしない（選択すると寸法欄が自動フォーカスして
+  // テンキーが開き、目印を触っただけで寸法入力に入ってしまうため）。
   // また、他パーツ配置待ち(partPlaceMode)中はこのマーク自身の操作を止め、
   // タップをそのままキャンバス本体(配置処理)に渡す（既存マークの近くでは
   // 新規配置のタップが拾われず何も置けないという不具合があった）。
@@ -992,21 +994,18 @@ export function DrawingCanvas({
         pointerEvents={partPlaceMode ? 'none' : 'all'}
         style={{ cursor: onToggleFieldFitFlip ? 'pointer' : undefined }}
         onPointerDown={(e) => e.stopPropagation()}
-        onClick={() => {
-          onToggleFieldFitFlip?.(s.id, at)
-          onSelectSegment(s.id)
-        }}
+        onClick={() => onToggleFieldFitFlip?.(s.id, at)}
       />
     )
   }
 
   // 現場溶接マーク（工場での加工分割点。「ここから先は現場で溶接して繋ぐ」の目印）。
-  // 動かさずに離せばタップ＝向き反転、動かして離せばドラッグ＝移動確定。
-  // 寸法線と同じ「避けたい点」(45°マーク)を渡し、既定配置が寸法線と同じ側に
-  // 来てしまわないようにする（fieldFitEndMarkと同じ理由でstopPropagationする）。
-  // タップ(向き反転)時は同時にその区間を選択状態にもする。マークの真上を
-  // タップした場合、下の線をタップし直さないと選択できず、詳細パネルの
-  // 「削除」に辿り着けないという不具合があったため。
+  // 三角形はあくまで目印なので、操作は移動・回転・消去の3つだけに絞る:
+  //   ドラッグ  = 移動（置いた位置をそのまま保持。自動整列はしない）
+  //   タップ    = 90°回転
+  //   消しゴム中のタップ = そのマークだけ消去
+  // タップで区間を選択状態にはしない。選択すると寸法欄が自動フォーカスして
+  // テンキーが開き、ただの目印を触っただけで寸法入力に入ってしまうため。
   // また、他パーツ配置待ち(partPlaceMode)中はこのマーク自身の操作を止め、
   // タップをそのままキャンバス本体(配置処理)に渡す。既存マークのすぐ近くに
   // 別の区間を配置しようとしたタップがこのマークに奪われ、何も置けなく
@@ -1016,25 +1015,18 @@ export function DrawingCanvas({
     return (
       <>
         {s.fieldWeldMarks.map((mark) => {
-          const at = {
-            x: s.start.x + (s.end.x - s.start.x) * mark.t,
-            y: s.start.y + (s.end.y - s.start.y) * mark.t,
-          }
-          const avoidPoint = nearestElbow45Mark(elbow45Marks, at.x, at.y) ?? undefined
           const dragging = fieldWeldDrag && fieldWeldDrag.markId === mark.id
-          const customOffset = dragging
+          const offsetOverride = dragging
             ? { x: fieldWeldDrag.offsetX, y: fieldWeldDrag.offsetY }
-            : mark.offsetX != null && mark.offsetY != null
-              ? { x: mark.offsetX, y: mark.offsetY }
-              : undefined
-          const { points } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, uiScale, avoidPoint, customOffset)
+            : undefined
+          const { points } = fieldWeldMarkGeometry(s, mark, uiScale, offsetOverride)
           return (
             <polygon
               key={mark.id}
               className={`field-weld-mark${dragging ? ' dragging' : ''}`}
               points={points}
               pointerEvents={partPlaceMode ? 'none' : 'all'}
-              style={{ cursor: onToggleFieldWeldFlip || onMoveFieldWeldMark ? 'pointer' : undefined }}
+              style={{ cursor: onRotateFieldWeldMark || onMoveFieldWeldMark ? 'pointer' : undefined }}
               onPointerDown={(e) => handleFieldWeldPointerDown(e, s, mark)}
               onPointerMove={handleFieldWeldPointerMove}
               onPointerUp={handleFieldWeldPointerUp}
@@ -1053,16 +1045,8 @@ export function DrawingCanvas({
   ) {
     e.stopPropagation()
     e.currentTarget.setPointerCapture(e.pointerId)
-    const at = {
-      x: s.start.x + (s.end.x - s.start.x) * mark.t,
-      y: s.start.y + (s.end.y - s.start.y) * mark.t,
-    }
-    const avoidPoint = nearestElbow45Mark(elbow45Marks, at.x, at.y) ?? undefined
-    const customOffset =
-      mark.offsetX != null && mark.offsetY != null ? { x: mark.offsetX, y: mark.offsetY } : undefined
-    const { baseCenter } = fieldWeldMarkGeometry(s, mark.t, mark.flipped, uiScale, avoidPoint, customOffset)
-    const startOffsetX = (baseCenter.x - at.x) / uiScale
-    const startOffsetY = (baseCenter.y - at.y) / uiScale
+    const startOffsetX = mark.offsetX ?? 0
+    const startOffsetY = mark.offsetY ?? 0
     fieldWeldDragRef.current = {
       pointerId: e.pointerId,
       segId: s.id,
@@ -1101,9 +1085,11 @@ export function DrawingCanvas({
     if (d.moved) {
       const final = fieldWeldDrag && fieldWeldDrag.markId === d.markId ? fieldWeldDrag : null
       onMoveFieldWeldMark?.(d.segId, d.markId, final?.offsetX ?? d.startOffsetX, final?.offsetY ?? d.startOffsetY)
+    } else if (eraserMode) {
+      // 消しゴム中はマークのタップでそのマークだけを消す（下の配管は消さない）。
+      onDeleteFieldWeldMark?.(d.segId, d.markId)
     } else {
-      onToggleFieldWeldFlip?.(d.segId, d.markId)
-      onSelectSegment(d.segId)
+      onRotateFieldWeldMark?.(d.segId, d.markId)
     }
     setFieldWeldDrag(null)
   }

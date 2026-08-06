@@ -1233,9 +1233,12 @@ export function SegmentPanel({
         {/* 現熔マーク(現場溶接マーク): 配管ライン上の任意の点に、工場加工の
             分割点(ここから先は現場で溶接して繋ぐ)を示す三角マークを置く。
             配置自体はパーツパレットの「現熔マーク」チップ(選択→タップ、
-            またはドラッグ)で行う。ここではキャンバス上に既に置いてある
-            マークの向き・位置の調整のみを行う(未配置の区間には何も
-            表示しない)。1本の区間に複数置ける(IFCデータからの拾い出し等、
+            またはドラッグ)で行う。三角はただの目印なので、操作は移動・回転・
+            消去の3つだけ。移動はキャンバス上でマークをドラッグ、回転は
+            マークのタップ(90°ずつ)、消去は消しゴム中にマークをタップ、で
+            それぞれ行える。ここではその回転・消去を、マークが重なって
+            タップしにくい場合の代替手段として用意している(未配置の区間には
+            何も表示しない)。1本の区間に複数置ける(IFCデータからの拾い出し等、
             長い直管に複数の現場溶接が必要なケースに対応するため)ので、
             始点側からの並び順に番号を振って一覧表示する。表示専用の注記で、
             切り寸法等の計算結果には一切影響しない。 */}
@@ -1244,37 +1247,36 @@ export function SegmentPanel({
             <div className="field round-field">
               <span className="field-label">
                 現熔マーク
-                <span className="field-note">工場加工の分割点（表示のみ・キャンバス上でドラッグして移動可）</span>
+                <span className="field-note">
+                  ただの目印（表示のみ）。移動＝ドラッグ / 回転＝タップ / 消去＝消しゴムでタップ
+                </span>
               </span>
               {[...segment.fieldWeldMarks]
                 .sort((a, b) => a.t - b.t)
                 .map((mark, i) => {
                   const marks = segment.fieldWeldMarks!
-                  const setMark = (patch: Partial<typeof mark>) =>
-                    onChange({
-                      fieldWeldMarks: marks.map((m) => (m.id === mark.id ? { ...m, ...patch } : m)),
-                    })
                   return (
                     <div className="round-toggle" key={mark.id}>
                       <span className="field-note">{i + 1}</span>
-                      <button type="button" onClick={() => setMark({ flipped: !mark.flipped })}>
-                        向きを反転
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onChange({
+                            fieldWeldMarks: marks.map((m) =>
+                              m.id === mark.id ? { ...m, rotation: (m.rotation + 90) % 360 } : m,
+                            ),
+                          })
+                        }
+                      >
+                        90°回転
                       </button>
-                      {(mark.offsetX != null || mark.offsetY != null) && (
-                        <button
-                          type="button"
-                          onClick={() => setMark({ offsetX: undefined, offsetY: undefined })}
-                        >
-                          位置をリセット
-                        </button>
-                      )}
                       <button
                         type="button"
                         onClick={() =>
                           onChange({ fieldWeldMarks: marks.filter((m) => m.id !== mark.id) })
                         }
                       >
-                        削除
+                        消去
                       </button>
                     </div>
                   )
