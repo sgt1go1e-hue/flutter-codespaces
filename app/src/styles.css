@@ -152,6 +152,18 @@ body {
   min-height: 56px;
 }
 
+.launcher-support {
+  margin-top: 10px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 50px;
+}
+
 .launcher-quickcalc {
   margin-top: 10px;
   background: var(--panel);
@@ -380,6 +392,7 @@ body {
 
 /* フラットデザイン: 影や立体表現を使わないぶん、操作可能な要素であることと
    状態の変化(ホバー・押下・キーボードフォーカス)を色だけで明確に伝える。 */
+.launcher-support:hover,
 .launcher-quickcalc:hover,
 .launcher-nitrogen:hover,
 .launcher-import:hover,
@@ -393,6 +406,7 @@ body {
   background: #0d9c6f;
 }
 .launcher-new:focus-visible,
+.launcher-support:focus-visible,
 .launcher-quickcalc:focus-visible,
 .launcher-nitrogen:focus-visible,
 .launcher-import:focus-visible,
@@ -2745,6 +2759,47 @@ fieldset.panel-grid:disabled {
 
 .n2-disclaimer {
   font-size: 11.5px;
+}
+
+/* サポート架台図面（app/src/features/support）専用のスタイル。
+   フォームの土台(.qc-*, .field, .round-toggle, .n2-row*)は既存の
+   クイック計算・窒素計算と共通のものをそのまま流用し、ここでは
+   このページ固有のもの(ゲージのプリセットチップ・図面用紙)だけを足す。 */
+.support-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.support-chip {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 36px;
+}
+
+.support-chip.active {
+  background: var(--accent);
+  color: #04222e;
+  border-color: var(--accent);
+}
+
+/* 図面はアイソメ図の印刷プレビュー等と同じく「用紙」として白背景のまま
+   見せる(黒線・寸法文字が用紙前提の色になっているため)。
+   .qc-bodyはflex-direction:columnのスクロール領域のため、overflow:hiddenを
+   持つ子は自動最小高さが0扱いになり(CSS Flexboxの仕様)、他の兄弟要素に
+   押し潰されてしまう(.n2-panelと同じ理由。実機で発生を確認)。
+   押し潰されないよう固定する。 */
+.support-figure-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow: hidden;
+  flex-shrink: 0;
 }
 
 .n2-cascade .panel-body {

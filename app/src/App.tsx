@@ -10,6 +10,7 @@ import { DEFAULT_MENU_ORDER, sanitizeMenuOrder, type MenuItemId } from './lib/me
 import { DrawingLauncher } from './components/DrawingLauncher'
 import { QuickCalc } from './components/QuickCalc'
 import { NitrogenCalc } from './components/NitrogenCalc'
+import { SupportDrawingPage } from './features/support/SupportDrawingPage'
 import { ShareExportModal } from './components/ShareExportModal'
 import { NotePanel } from './components/NotePanel'
 import {
@@ -253,7 +254,9 @@ function markSingleFlange(
 export default function App() {
   // 起動時は必ず「新規作成／過去の図面」を選ぶ画面から始める。
   // 図面は名前を付けず自動保存され、複数を切り替えて管理できる。
-  const [screen, setScreen] = useState<'launcher' | 'drawing' | 'quickcalc' | 'nitrogen'>('launcher')
+  const [screen, setScreen] = useState<'launcher' | 'drawing' | 'quickcalc' | 'nitrogen' | 'support'>(
+    'launcher',
+  )
   const [drawingIndex, setDrawingIndex] = useState<DrawingMeta[]>(() =>
     migrateLegacyDrawing(),
   )
@@ -580,6 +583,16 @@ export default function App() {
 
   // 窒素計算を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
   function closeNitrogenCalc() {
+    setScreen(drawingId ? 'drawing' : 'launcher')
+  }
+
+  function openSupportDrawing() {
+    setEraserMode(false)
+    setScreen('support')
+  }
+
+  // サポート架台図面を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
+  function closeSupportDrawing() {
     setScreen(drawingId ? 'drawing' : 'launcher')
   }
 
@@ -1277,6 +1290,7 @@ export default function App() {
             onCreate={createNewDrawing}
             onQuickCalc={openQuickCalc}
             onNitrogenCalc={openNitrogenCalc}
+            onSupportDrawing={openSupportDrawing}
             onImportFile={importShareFile}
           />
         ) : (
@@ -1309,6 +1323,8 @@ export default function App() {
       {screen === 'quickcalc' && <QuickCalc onClose={closeQuickCalc} />}
 
       {screen === 'nitrogen' && <NitrogenCalc onClose={closeNitrogenCalc} />}
+
+      {screen === 'support' && <SupportDrawingPage onClose={closeSupportDrawing} />}
 
       {screen === 'drawing' && (
         <>

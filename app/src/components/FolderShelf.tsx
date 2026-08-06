@@ -9,6 +9,7 @@ interface Props {
   onRenameFolder: (id: string) => void
   onDeleteFolder: (id: string) => void
   onCreate: () => void
+  onSupportDrawing: () => void
   onQuickCalc: () => void
   onNitrogenCalc: () => void
   onImportFile: (file: File) => void
@@ -34,6 +35,7 @@ export function FolderShelf({
   onRenameFolder,
   onDeleteFolder,
   onCreate,
+  onSupportDrawing,
   onQuickCalc,
   onNitrogenCalc,
   onImportFile,
@@ -49,6 +51,9 @@ export function FolderShelf({
       <div className="launcher-title">配管アイソメ図</div>
       <button className="launcher-new" onClick={onCreate}>
         ＋ 新規作成
+      </button>
+      <button className="launcher-support" onClick={onSupportDrawing}>
+        🏗️ サポート架台図面
       </button>
       <button className="launcher-quickcalc" onClick={onQuickCalc}>
         🧮 クイック計算（芯引き）
