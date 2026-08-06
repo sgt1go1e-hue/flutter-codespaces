@@ -23,10 +23,10 @@ const PAD_R = 40;
 const Y_HANGER = 78;
 const Y_CENTER = 112;
 const BAR_TOP = 146;
-const BAR_H = 28;
+const BAR_H = 34;
 const BAR_BOTTOM = BAR_TOP + BAR_H;
-const Y_HOLES = 206;
-const Y_TOTAL = 240;
+const Y_HOLES = 210;
+const Y_TOTAL = 244;
 
 const COL_LINE = '#222222';
 const COL_THIN = '#8a8a8a';
@@ -141,14 +141,14 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
   const dir = d.memberChannel ? '背向き' : '刃向き';
   const blade = `　${dir}:${d.bladeTop ? '奥' : '手前'}`;
   const hangerNote = d.hasHanger ? '' : '　吊り穴なし';
-  svg.push(txt('hdr', PAD_L, 8, `${material}　${d.modeB ? '吊り元基準' : '配管芯々基準'}${blade}${hangerNote}`, { size: 11, bold: true }));
+  svg.push(txt('hdr', PAD_L, 8, `${material}　${d.modeB ? '吊り元基準' : '配管芯々基準'}${blade}${hangerNote}`, { size: 13, bold: true }));
 
   // 凡例
   {
     let lx = PAD_L;
-    const ly = 24;
-    svg.push(txt('lg', lx, ly, '穴:', { size: 9 }));
-    lx += 16;
+    const ly = 28;
+    svg.push(txt('lg', lx, ly, '穴:', { size: 10 }));
+    lx += 18;
     let k = 0;
     for (const e of legendSpecs(d)) {
       const cy = ly + 5;
@@ -160,8 +160,8 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
       }
       lx += 14;
       const t = `${e.key} ${holeNotation(e.spec)}`;
-      svg.push(txt(`lgt-${k}`, lx, ly, t, { size: 9, color }));
-      lx += t.length * 6 + 12;
+      svg.push(txt(`lgt-${k}`, lx, ly, t, { size: 10, color }));
+      lx += t.length * 6.5 + 12;
       k++;
     }
   }
@@ -200,7 +200,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     if (interactive) {
       chips.push({ key: 'gauge', cx: xg - 12, cy: (edgeY + holeY) / 2, text: gtext, target: { kind: 'gauge' } });
     } else {
-      svg.push(txt('gvt', xg - 30, (edgeY + holeY) / 2 - 6, gtext, { size: 9, bold: true }));
+      svg.push(txt('gvt', xg - 34, (edgeY + holeY) / 2 - 6, gtext, { size: 11, bold: true }));
     }
   }
 
@@ -230,7 +230,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     if (isEndHanger || isEndUhole) target = { kind: 'end', side: i === 0 ? 'L' : 'R' };
     else if (isHangerHole && !d.modeB) target = { kind: 'hg', side: i < st.length / 2 ? 'L' : 'R' };
     const ty = Y_HOLES - 12 - (i % 2 === 1 ? 10 : 0);
-    label(`hdt-${i}`, (x1 + x2) / 2, ty, fmtMm(st[i + 1] - st[i]), target, 9);
+    label(`hdt-${i}`, (x1 + x2) / 2, ty, fmtMm(st[i + 1] - st[i]), target, 11);
   }
 
   // 切り寸
@@ -239,7 +239,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
   svg.push(<line key="tld" x1={xOf(0)} y1={Y_TOTAL} x2={xOf(total)} y2={Y_TOTAL} stroke={COL_LINE} strokeWidth={1} />);
   svg.push(arrowH('tla', xOf(0), Y_TOTAL, 1));
   svg.push(arrowH('tlb', xOf(total), Y_TOTAL, -1));
-  svg.push(txt('tlt', (xOf(0) + xOf(total)) / 2, Y_TOTAL - 14, `切り寸 ${fmtMm(total)}`, { size: 12, bold: true, center: true }));
+  svg.push(txt('tlt', (xOf(0) + xOf(total)) / 2, Y_TOTAL - 16, `切り寸 ${fmtMm(total)}`, { size: 15, bold: true, center: true }));
 
   // 中段チェーン
   const center = d.modeB ? [hL, ...r.pipeCenters, hR] : [...r.pipeCenters];
@@ -268,7 +268,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
         target = { kind: 'span', index: i };
         text = `芯々${fmtMm(v)}`;
       }
-      label(`cdt-${i}`, (x1 + x2) / 2, Y_CENTER - 13, text, target, 10);
+      label(`cdt-${i}`, (x1 + x2) / 2, Y_CENTER - 15, text, target, 12);
     }
   }
 
@@ -280,7 +280,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     svg.push(arrowH('hha', xOf(hL), Y_HANGER, 1));
     svg.push(arrowH('hhb', xOf(hR), Y_HANGER, -1));
     const t = `吊元芯々 ${fmtMm(hR - hL)}`;
-    label('hht', (xOf(hL) + xOf(hR)) / 2, Y_HANGER - 13, t, d.modeB ? { kind: 'hangerPitch' } : null, 10);
+    label('hht', (xOf(hL) + xOf(hR)) / 2, Y_HANGER - 15, t, d.modeB ? { kind: 'hangerPitch' } : null, 12);
   }
 
   // 配管ラベル（タップで配管編集）
@@ -289,7 +289,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     if (interactive) {
       chips.push({ key: `pl-${i}`, cx: xOf(c), cy: BAR_TOP + BAR_H / 2, text: t, target: { kind: 'pipe', index: i } });
     } else {
-      svg.push(txt(`pl-${i}`, xOf(c), BAR_TOP + BAR_H / 2 - 6, d.pipeSizes[i], { size: 11, bold: true, center: true }));
+      svg.push(txt(`pl-${i}`, xOf(c), BAR_TOP + BAR_H / 2 - 7, d.pipeSizes[i], { size: 13, bold: true, center: true }));
     }
   });
 
@@ -311,9 +311,15 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     );
   }
 
-  // タップ編集チップを % 座標で重ねる
+  // タップ編集チップを % 座標で重ねる。
+  // 幅を画面幅に合わせて縮めてしまうと文字・チップが現場で読めないほど
+  // 小さくなるため、W(=820)px を実寸の下限にして自然な大きさを保つ。
+  // 画面より広い分は親側(.support-figure-card)の横スクロールに任せる。
   return (
-    <div className={className} style={{ position: 'relative', width: '100%', aspectRatio: `${W} / ${H}`, ...style }}>
+    <div
+      className={className}
+      style={{ position: 'relative', width: W, minWidth: W, aspectRatio: `${W} / ${H}`, ...style }}
+    >
       {svgEl}
       {chips.map((c) => (
         <button
@@ -324,13 +330,13 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
             left: `${(c.cx / W) * 100}%`,
             top: `${(c.cy / H) * 100}%`,
             transform: 'translate(-50%, -50%)',
-            padding: '2px 6px',
-            borderRadius: 6,
+            padding: '4px 9px',
+            borderRadius: 8,
             border: 'none',
             background: EDIT,
             color: '#fff',
-            fontSize: 12,
-            fontWeight: 700,
+            fontSize: 14,
+            fontWeight: 800,
             lineHeight: 1.1,
             whiteSpace: 'nowrap',
             cursor: 'pointer',
@@ -361,16 +367,16 @@ function heightTable(d: HangerDesign, r: ReturnType<typeof compute>): El[] {
   }
   if (rows.length < 2) return [];
 
-  const x = W - 140;
+  const x = W - 150;
   let y = 4;
   const els: El[] = [];
-  els.push(txt('ht-h', x, y, '高低差(一番高い=0)', { size: 9, bold: true }));
-  y += 12;
+  els.push(txt('ht-h', x, y, '高低差(一番高い=0)', { size: 10, bold: true }));
+  y += 14;
   rows.forEach((row, i) => {
-    els.push(txt(`ht-l-${i}`, x, y, row.label, { size: 10 }));
+    els.push(txt(`ht-l-${i}`, x, y, row.label, { size: 11 }));
     const isTop = row.value >= refMax - 0.001;
-    els.push(txt(`ht-v-${i}`, x + 52, y, isTop ? '0' : `−${fmtMm(refMax - row.value)}`, { size: 10, bold: true, color: isTop ? '#000' : '#c62828' }));
-    y += 12;
+    els.push(txt(`ht-v-${i}`, x + 58, y, isTop ? '0' : `−${fmtMm(refMax - row.value)}`, { size: 11, bold: true, color: isTop ? '#000' : '#c62828' }));
+    y += 14;
   });
   return els;
 }

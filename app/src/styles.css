@@ -2819,13 +2819,18 @@ fieldset.panel-grid:disabled {
    .qc-bodyはflex-direction:columnのスクロール領域のため、overflow:hiddenを
    持つ子は自動最小高さが0扱いになり(CSS Flexboxの仕様)、他の兄弟要素に
    押し潰されてしまう(.n2-panelと同じ理由。実機で発生を確認)。
-   押し潰されないよう固定する。 */
+   押し潰されないよう固定する。
+   図面(SupportFigure)は画面幅に合わせて縮めず実寸(820px相当)で描くため、
+   狭い画面ではみ出す。横スクロールで全体を確認できるようにする
+   (幅いっぱいに縮めると現場で数字が読めないほど小さくなっていた)。 */
 .support-figure-card {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .n2-cascade .panel-body {
