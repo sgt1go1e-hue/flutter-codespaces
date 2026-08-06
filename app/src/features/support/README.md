@@ -8,24 +8,26 @@ Flutter版（別リポジトリ、`-55`）の吊り架台図面機能を、こ�
 ## この段階で入っているもの
 - ✅ 計算ロジック（穴々・Z・切り寸・芯高・モードA/B・スリーパー・Uボルト表・吊り穴有無）
 - ✅ 図面描画（SVG。バー・穴〔丸/長・色〕・刃/背向き破線・ゲージ寸法・寸法チェーン・切り寸・芯々・吊元芯々・高低差表・凡例）
-- ✅ 1画面（材料/基準/吊り穴/向き/ゲージ/配管/端寸法の入力＋図面表示）
-- ⏳ PDF出力：後回し（Flutter版 `support_pdf.dart` にあり。必要になったら `pdf-lib` 等で移植）
-- ⏳ 図の数字を直接タップして編集：次段（今はフォームの入力欄で編集）
+- ✅ **図から寸法入力**：図の水色の数字・配管をタップ→モーダルで編集（ゲージは15〜30の候補＋手入力、配管はサイズ/スリーパー/削除）
+- ✅ 1画面（材料/吊り穴/基準/向きトグル＋タップ編集図面＋配管追加）
+- ⏳ PDF出力：後回し（Flutter版 `support_pdf.dart` にあり。次段で `pdf-lib` 等へ移植。`SupportFigure` は `onEdit` を省くと静的SVGとして描けるので、そのままPDFスナップショットに再利用できる）
 
 ## ファイル
 | ファイル | 役割 | 依存 |
 |---|---|---|
 | `supportSpec.ts` | 計算エンジン（純関数。UI非依存） | なし |
 | `hangerDesign.ts` | モデル（HangerDesign）＋ compute 等 | supportSpec |
-| `SupportFigure.tsx` | 図面（SVG表示・静的） | React, hangerDesign |
-| `SupportDrawingPage.tsx` | ページ本体（入力＋図面） | React, 上記すべて |
+| `SupportFigure.tsx` | 図面（SVG＋タップ編集チップ。`onEdit`省略で静的表示） | React, hangerDesign |
+| `SupportDrawingPage.tsx` | ページ本体（トグル＋タップ編集図面＋配管追加＋モーダル） | React, 上記すべて |
 
 `SupportFigure.tsx` はFlutter版と同じ「用紙(白背景)に黒線で描く」見た目を
 そのまま保っている（アイソメ図の印刷プレビュー等、既存の図面出力と同じ
-考え方）。`SupportDrawingPage.tsx` の周り（フォーム部分）だけ、このアプリの
-既存クラス（`.qc-screen` / `.qc-body` / `.field` / `.round-toggle` /
-`.n2-row*` 等、クイック計算・窒素計算と共通の土台）に合わせてダーク
-テーマ化してある。
+考え方）。編集チップの水色(`#1565C0`)もFlutter版から踏襲し、「タップできる
+＝水色」という操作感を統一している。`SupportDrawingPage.tsx` の周り
+（トグル・モーダル）は、このアプリの既存クラスに合わせてダークテーマ化
+してある：`.qc-screen`/`.qc-body`/`.field`/`.round-toggle`（クイック計算・
+窒素計算と共通の土台）、モーダルは`.disclaimer-*`（免責事項モーダル等と
+共通の土台）を流用。
 
 ## 組み込み方（このアプリはreact-routerではなく画面切替のstateで管理）
 `App.tsx` の `screen` state（`'launcher' | 'drawing' | 'quickcalc' |

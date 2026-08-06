@@ -2788,6 +2788,32 @@ fieldset.panel-grid:disabled {
   border-color: var(--accent);
 }
 
+/* モーダル(数値入力・ゲージ・配管編集)のボタン。.menu-order-actions(flex行)の
+   子として使う前提(flex:1はそちら側で付く)。 */
+.support-btn {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 10px;
+}
+
+.support-btn-primary {
+  background: var(--accent);
+  color: #04222e;
+  border: none;
+  border-radius: 10px;
+}
+
+.support-btn-danger {
+  background: transparent;
+  border: 1px solid #7f1d1d;
+  border-radius: 8px;
+  color: var(--danger);
+  padding: 4px 10px;
+  font-size: 12.5px;
+  min-height: 32px;
+}
+
 /* 図面はアイソメ図の印刷プレビュー等と同じく「用紙」として白背景のまま
    見せる(黒線・寸法文字が用紙前提の色になっているため)。
    .qc-bodyはflex-direction:columnのスクロール領域のため、overflow:hiddenを
