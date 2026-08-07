@@ -46,7 +46,13 @@ export type EditTarget =
   | { kind: 'hg'; side: 'L' | 'R' }
   | { kind: 'hangerPitch' }
   | { kind: 'refToPipe'; side: 'L' | 'R' }
-  | { kind: 'pipe'; index: number };
+  | { kind: 'pipe'; index: number }
+  | { kind: 'holeSpec'; field: 'hole3' | 'hole4' | 'holeHanger' };
+
+/** 凡例のキー('3分'/'4分'/'吊')から、対応するHangerDesignのフィールド名へ。 */
+function holeFieldForLegendKey(key: string): 'hole3' | 'hole4' | 'holeHanger' {
+  return key === '3分' ? 'hole3' : key === '4分' ? 'hole4' : 'holeHanger';
+}
 
 type El = React.ReactNode;
 
@@ -106,6 +112,8 @@ interface Chip {
   cy: number;
   text: string;
   target: EditTarget;
+  /** 既定(EDIT色)と違う背景色にしたいとき(凡例チップを穴の色で塗るため)。 */
+  bg?: string;
 }
 
 export interface SupportFigureProps {
@@ -152,25 +160,39 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
   svg.push(txt('hdr1', PAD_L, 6, `${material}　${d.modeB ? '吊り元基準' : '配管芯々基準'}`, { size: 14, bold: true }));
   svg.push(txt('hdr2', PAD_L, 25, `${dir}:${d.bladeTop ? '奥' : '手前'}${hangerNote}`, { size: 12 }));
 
-  // 凡例
+  // 凡例（タップで穴の径・丸穴/長穴を編集。編集不可時は色付きの記号+文字のみ）
   {
     let lx = PAD_L;
     const ly = 44;
-    svg.push(txt('lg', lx, ly, '穴:', { size: 10 }));
-    lx += 18;
+    if (!interactive) {
+      svg.push(txt('lg', lx, ly, '穴:', { size: 10 }));
+      lx += 18;
+    }
     let k = 0;
     for (const e of legendSpecs(d)) {
       const cy = ly + 5;
       const color = holeColor(e.spec);
-      if (e.spec.slot) {
-        svg.push(<rect key={`lgm-${k}`} x={lx} y={cy - 2} width={10} height={4} rx={2} fill="none" stroke={color} strokeWidth={1.1} />);
-      } else {
-        svg.push(<circle key={`lgm-${k}`} cx={lx + 5} cy={cy} r={3.5} fill="none" stroke={color} strokeWidth={1.1} />);
-      }
-      lx += 14;
       const t = `${e.key} ${holeNotation(e.spec)}`;
-      svg.push(txt(`lgt-${k}`, lx, ly, t, { size: 10, color }));
-      lx += t.length * 6.5 + 14;
+      if (interactive) {
+        chips.push({
+          key: `lg-${k}`,
+          cx: lx + (t.length * 5.5 + 18) / 2,
+          cy,
+          text: t,
+          target: { kind: 'holeSpec', field: holeFieldForLegendKey(e.key) },
+          bg: color,
+        });
+        lx += t.length * 5.5 + 18 + 8;
+      } else {
+        if (e.spec.slot) {
+          svg.push(<rect key={`lgm-${k}`} x={lx} y={cy - 2} width={10} height={4} rx={2} fill="none" stroke={color} strokeWidth={1.1} />);
+        } else {
+          svg.push(<circle key={`lgm-${k}`} cx={lx + 5} cy={cy} r={3.5} fill="none" stroke={color} strokeWidth={1.1} />);
+        }
+        lx += 14;
+        svg.push(txt(`lgt-${k}`, lx, ly, t, { size: 10, color }));
+        lx += t.length * 6.5 + 14;
+      }
       k++;
     }
   }
@@ -344,7 +366,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
             padding: '4px 9px',
             borderRadius: 8,
             border: 'none',
-            background: EDIT,
+            background: c.bg ?? EDIT,
             color: '#fff',
             fontSize: 14,
             fontWeight: 800,

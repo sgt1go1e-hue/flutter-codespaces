@@ -8,6 +8,7 @@ import { useState } from 'react'
 import SupportFigure, { type EditTarget } from './SupportFigure'
 import {
   HangerDesign,
+  HoleSpec,
   createHangerDesign,
   compute,
   addPipe,
@@ -35,8 +36,8 @@ function hangerOverflow(d: HangerDesign, r: HangerCalcResult): boolean {
 
 type Editing =
   | { type: 'num'; title: string; value: number; apply: (v: number) => HangerDesign }
-  | { type: 'gauge' }
   | { type: 'pipe'; index: number }
+  | { type: 'holeSpec'; field: 'hole3' | 'hole4' | 'holeHanger' }
   | null
 
 interface Props {
@@ -54,10 +55,13 @@ export function SupportDrawingPage({ onClose }: Props) {
   const handleEdit = (t: EditTarget) => {
     switch (t.kind) {
       case 'gauge':
-        setEditing({ type: 'gauge' })
+        openNum(`${d.memberChannel ? '背側' : '刃側'}から穴まで（ゲージ）`, d.gauge, (v) => ({ ...d, gauge: v }))
         break
       case 'pipe':
         setEditing({ type: 'pipe', index: t.index })
+        break
+      case 'holeSpec':
+        setEditing({ type: 'holeSpec', field: t.field })
         break
       case 'span':
         openNum(`配管${t.index + 1}→${t.index + 2} 芯々`, d.spans[t.index], (v) => {
@@ -201,19 +205,16 @@ export function SupportDrawingPage({ onClose }: Props) {
           }}
         />
       )}
-      {editing?.type === 'gauge' && (
-        <GaugeModal
-          value={d.gauge}
-          isChannel={d.memberChannel}
-          onCancel={() => setEditing(null)}
-          onPick={(v) => {
-            patch({ gauge: v })
-            setEditing(null)
-          }}
-        />
-      )}
       {editing?.type === 'pipe' && (
         <PipeModal d={d} index={editing.index} onClose={() => setEditing(null)} onChange={(next) => setD(next)} />
+      )}
+      {editing?.type === 'holeSpec' && (
+        <HoleSpecModal
+          d={d}
+          field={editing.field}
+          onClose={() => setEditing(null)}
+          onChange={(next) => setD(next)}
+        />
       )}
     </div>
   )
@@ -271,48 +272,75 @@ function NumModal({
   )
 }
 
-function GaugeModal({
-  value,
-  isChannel,
-  onPick,
-  onCancel,
+const HOLE_FIELD_TITLES: Record<'hole3' | 'hole4' | 'holeHanger', string> = {
+  hole3: '3分ボルトの穴',
+  hole4: '4分ボルトの穴',
+  holeHanger: '吊り穴',
+}
+
+function HoleSpecModal({
+  d,
+  field,
+  onChange,
+  onClose,
 }: {
-  value: number
-  isChannel: boolean
-  onPick: (v: number) => void
-  onCancel: () => void
+  d: HangerDesign
+  field: 'hole3' | 'hole4' | 'holeHanger'
+  onChange: (next: HangerDesign) => void
+  onClose: () => void
 }) {
-  const common = [15, 18, 20, 22, 23, 25, 28, 30]
-  const [text, setText] = useState(String(fmtMm(value)))
+  const spec = d[field]
+  const patch = (p: Partial<HoleSpec>) => onChange({ ...d, [field]: { ...spec, ...p } })
   return (
-    <Overlay title={`${isChannel ? '背側' : '刃側'}から穴まで（ゲージ）`} onClose={onCancel}>
-      <p className="field-note">50幅の目安は15〜30。会社・幅で変わります</p>
-      <div className="support-chip-row">
-        {common.map((v) => (
-          <button
-            key={v}
-            type="button"
-            className={`support-chip${Math.abs(value - v) < 0.001 ? ' active' : ''}`}
-            onClick={() => onPick(v)}
-          >
-            {v}
-          </button>
-        ))}
+    <Overlay title={HOLE_FIELD_TITLES[field]} onClose={onClose}>
+      <div className="field">
+        <span className="field-label">穴の形状</span>
+        <Seg
+          value={spec.slot}
+          options={[
+            [false, '丸穴'],
+            [true, '長穴'],
+          ]}
+          onChange={(v) => patch({ slot: v })}
+        />
       </div>
-      <label className="field">
-        <span className="field-label">その他(mm)</span>
-        <div style={{ display: 'flex', gap: 8 }}>
+      {!spec.slot ? (
+        <label className="field">
+          <span className="field-label">径 φ(mm)</span>
           <input
             type="number"
             className="num-input"
-            value={text}
-            onChange={(e) => setText(e.target.value)}
+            value={spec.dia}
+            onChange={(e) => patch({ dia: Number(e.target.value) || 0 })}
           />
-          <button type="button" className="support-btn-primary" onClick={() => onPick(Number(text) || 0)}>
-            OK
-          </button>
+        </label>
+      ) : (
+        <div className="panel-grid">
+          <label className="field">
+            <span className="field-label">長穴 幅(mm)</span>
+            <input
+              type="number"
+              className="num-input"
+              value={spec.slotW}
+              onChange={(e) => patch({ slotW: Number(e.target.value) || 0 })}
+            />
+          </label>
+          <label className="field">
+            <span className="field-label">長穴 長さ(mm)</span>
+            <input
+              type="number"
+              className="num-input"
+              value={spec.slotL}
+              onChange={(e) => patch({ slotL: Number(e.target.value) || 0 })}
+            />
+          </label>
         </div>
-      </label>
+      )}
+      <div className="menu-order-actions">
+        <button type="button" className="support-btn-primary" onClick={onClose}>
+          閉じる
+        </button>
+      </div>
     </Overlay>
   )
 }
