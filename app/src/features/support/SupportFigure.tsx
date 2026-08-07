@@ -172,12 +172,13 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
   // バー
   svg.push(<rect key="bar" x={xOf(0)} y={BAR_TOP} width={xOf(total) - xOf(0)} height={BAR_H} fill="none" stroke={COL_LINE} strokeWidth={1} />);
 
-  // 刃/背 破線
-  const dashY = d.bladeTop ? BAR_TOP + 4 : BAR_BOTTOM - 4;
+  // 刃/背 破線（破線側=背、破線の無い側=刃。手前/奥のタップ結果が逆だったため
+  // bladeTopとの対応を反転した）
+  const dashY = d.bladeTop ? BAR_BOTTOM - 4 : BAR_TOP + 4;
   svg.push(<line key="blade" x1={xOf(0)} y1={dashY} x2={xOf(total)} y2={dashY} stroke={COL_LINE} strokeWidth={1} strokeDasharray="6 4" />);
 
   // ゲージ基準エッジ
-  const refTop = d.memberChannel ? d.bladeTop : !d.bladeTop;
+  const refTop = d.memberChannel ? !d.bladeTop : d.bladeTop;
   const edgeY = refTop ? BAR_TOP : BAR_BOTTOM;
   const holeY = refTop ? BAR_TOP + BAR_H * 0.62 : BAR_BOTTOM - BAR_H * 0.62;
 
@@ -287,13 +288,15 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     label('hht', (xOf(hL) + xOf(hR)) / 2, Y_HANGER - 15, t, d.modeB ? { kind: 'hangerPitch' } : null, 12);
   }
 
-  // 配管ラベル（タップで配管編集）
+  // 配管ラベル（タップで配管編集）。バーの内側(穴の高さ)に置くと、口径が
+  // 近い配管(穴々が狭い)ではラベルの帯が自分の穴を隠してしまうため、
+  // バーの外(上)に置いて穴と重ならないようにする。
   r.pipeCenters.forEach((c, i) => {
     const t = `${d.pipeSizes[i]}${d.sleepers[i] > 0 ? ` T${d.sleepers[i]}` : ''}`;
     if (interactive) {
-      chips.push({ key: `pl-${i}`, cx: xOf(c), cy: BAR_TOP + BAR_H / 2, text: t, target: { kind: 'pipe', index: i } });
+      chips.push({ key: `pl-${i}`, cx: xOf(c), cy: BAR_TOP - 18, text: t, target: { kind: 'pipe', index: i } });
     } else {
-      svg.push(txt(`pl-${i}`, xOf(c), BAR_TOP + BAR_H / 2 - 7, d.pipeSizes[i], { size: 13, bold: true, center: true }));
+      svg.push(txt(`pl-${i}`, xOf(c), BAR_TOP - 28, d.pipeSizes[i], { size: 13, bold: true, center: true }));
     }
   });
 
