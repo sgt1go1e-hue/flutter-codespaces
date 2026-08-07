@@ -15,11 +15,14 @@ import {
 } from './hangerDesign';
 import { fmtMm } from './supportSpec';
 
-// レイアウト（固定キャンバス 440×540）。
-// 横スクロールなしで画面幅にきっちり収め、その分だけ縦を大きく使う
-// (現場で数字が読めることを優先し、幅の狭い・縦長のレイアウトにしてある)。
-const W = 440;
+// レイアウト。縦(H)は固定、横(W)は配管の並び(総長)に応じて伸ばす。
+// 幅を画面幅に無理やり合わせて縮めると、配管が増えて総長が伸びるたびに
+// 文字・チップがどんどん小さくなって現場で読めなくなる(実際にそうなった)。
+// 逆に「1mmあたり何pxで描くか」を固定してしまえば、短い構成は画面内に
+// 収まり、長い構成だけ横スクロールが必要になる(短い方が圧倒的に多いはず)。
 const H = 540;
+const PX_PER_MM = 0.55;
+const MIN_W = 310;
 const PAD_L = 34;
 const PAD_R = 22;
 const Y_HEIGHT_TABLE = 66;
@@ -121,12 +124,15 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
 
   if (total <= 0) {
     return (
-      <svg viewBox={`0 0 ${W} ${H}`} className={className} style={style} width="100%">
+      <svg viewBox={`0 0 ${MIN_W} ${H}`} className={className} style={style} width="100%">
         {txt('empty', PAD_L, 20, '配管を入力してください', { size: 14, bold: true })}
       </svg>
     );
   }
 
+  // 1mmあたりPX_PER_MM px の固定縮尺。総長が短いときは画面に収まる程度の
+  // 最小幅(MIN_W)を確保する(短い構成でも用紙が極端に細くならないように)。
+  const W = Math.max(MIN_W, PAD_L + PAD_R + total * PX_PER_MM);
   const scale = (W - PAD_L - PAD_R) / total;
   const xOf = (mm: number) => PAD_L + mm * scale;
 
@@ -319,11 +325,12 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
   }
 
   // タップ編集チップを % 座標で重ねる。
-  // 画面幅ぴったりに収まり横スクロールが要らないよう、キャンバス自体を
-  // 縦長(W=440×H=540)にしてある。幅は画面に合わせて縮めてよいが、その分
-  // 縦を大きく使うことで文字・チップが現場で読めるサイズを保つ。
+  // 幅(W)は固定縮尺で総長から決まる実寸なので、画面に収まらない場合は
+  // 縮めず親側(.support-figure-card)の横スクロールに任せる(縮めると
+  // 配管が増えるたびに文字が読めなくなるため)。短い構成はMIN_Wの範囲で
+  // 画面内に収まる。
   return (
-    <div className={className} style={{ position: 'relative', width: '100%', aspectRatio: `${W} / ${H}`, ...style }}>
+    <div className={className} style={{ position: 'relative', width: W, minWidth: W, aspectRatio: `${W} / ${H}`, ...style }}>
       {svgEl}
       {chips.map((c) => (
         <button

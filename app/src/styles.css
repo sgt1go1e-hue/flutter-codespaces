@@ -2820,14 +2820,17 @@ fieldset.panel-grid:disabled {
    持つ子は自動最小高さが0扱いになり(CSS Flexboxの仕様)、他の兄弟要素に
    押し潰されてしまう(.n2-panelと同じ理由。実機で発生を確認)。
    押し潰されないよう固定する。
-   図面(SupportFigure)は画面幅にきっちり収まる縦長キャンバスなので、
-   横スクロールは不要(overflow:hidden で十分)。 */
+   図面(SupportFigure)は1mmあたり固定pxの実寸で描くため、配管が増えて
+   総長が伸びると画面幅を超えることがある。縮めて文字を読めなくするより
+   横スクロールで見てもらう方を優先する(短い構成は元々画面内に収まる)。 */
 .support-figure-card {
   background: #fff;
   border: 1px solid var(--border);
   border-radius: 10px;
-  overflow: hidden;
+  overflow-x: auto;
+  overflow-y: hidden;
   flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
 }
 
 .n2-cascade .panel-body {

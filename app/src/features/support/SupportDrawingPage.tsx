@@ -174,7 +174,7 @@ export function SupportDrawingPage({ onClose }: Props) {
             <div className="support-figure-card">
               <SupportFigure design={d} onEdit={handleEdit} />
             </div>
-            <div className="field-note">水色の数字・配管をタップして入力</div>
+            <div className="field-note">水色の数字・配管をタップして入力／長い構成は図を横にスクロールできます</div>
           </>
         )}
 
