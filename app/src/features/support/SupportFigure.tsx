@@ -15,18 +15,21 @@ import {
 } from './hangerDesign';
 import { fmtMm } from './supportSpec';
 
-// レイアウト（固定キャンバス 820×300）
-const W = 820;
-const H = 300;
-const PAD_L = 40;
-const PAD_R = 40;
-const Y_HANGER = 78;
-const Y_CENTER = 112;
-const BAR_TOP = 146;
-const BAR_H = 34;
+// レイアウト（固定キャンバス 440×540）。
+// 横スクロールなしで画面幅にきっちり収め、その分だけ縦を大きく使う
+// (現場で数字が読めることを優先し、幅の狭い・縦長のレイアウトにしてある)。
+const W = 440;
+const H = 540;
+const PAD_L = 34;
+const PAD_R = 22;
+const Y_HEIGHT_TABLE = 66;
+const Y_HANGER = 112;
+const Y_CENTER = 188;
+const BAR_TOP = 258;
+const BAR_H = 54;
 const BAR_BOTTOM = BAR_TOP + BAR_H;
-const Y_HOLES = 210;
-const Y_TOTAL = 244;
+const Y_HOLES = 378;
+const Y_TOTAL = 440;
 
 const COL_LINE = '#222222';
 const COL_THIN = '#8a8a8a';
@@ -71,12 +74,12 @@ function txt(
 
 function arrowH(key: string, tipX: number, y: number, dir: 1 | -1): El {
   return (
-    <polyline key={key} points={`${tipX + 6 * dir},${y - 3} ${tipX},${y} ${tipX + 6 * dir},${y + 3}`} fill="none" stroke={COL_LINE} strokeWidth={1} />
+    <polyline key={key} points={`${tipX + 8 * dir},${y - 4} ${tipX},${y} ${tipX + 8 * dir},${y + 4}`} fill="none" stroke={COL_LINE} strokeWidth={1.2} />
   );
 }
 function arrowV(key: string, x: number, tipY: number, dir: 1 | -1): El {
   return (
-    <polyline key={key} points={`${x - 3},${tipY + 6 * dir} ${x},${tipY} ${x + 3},${tipY + 6 * dir}`} fill="none" stroke={COL_LINE} strokeWidth={1} />
+    <polyline key={key} points={`${x - 4},${tipY + 8 * dir} ${x},${tipY} ${x + 4},${tipY + 8 * dir}`} fill="none" stroke={COL_LINE} strokeWidth={1.2} />
   );
 }
 function dashedCircle(key: string, cx: number, cy: number, r: number, color: string): El {
@@ -86,11 +89,11 @@ function holeMark(key: string, cx: number, cy: number, spec: HoleSpec, through: 
   const els: El[] = [];
   const color = holeColor(spec);
   if (spec.slot) {
-    els.push(<rect key={`${key}-r`} x={cx - 6} y={cy - 2.5} width={12} height={5} rx={2.5} fill="#fff" stroke={color} strokeWidth={1.1} />);
+    els.push(<rect key={`${key}-r`} x={cx - 7} y={cy - 3} width={14} height={6} rx={3} fill="#fff" stroke={color} strokeWidth={1.2} />);
   } else {
-    els.push(<circle key={`${key}-c`} cx={cx} cy={cy} r={4} fill="#fff" stroke={color} strokeWidth={1.1} />);
+    els.push(<circle key={`${key}-c`} cx={cx} cy={cy} r={5} fill="#fff" stroke={color} strokeWidth={1.2} />);
   }
-  if (through) els.push(dashedCircle(`${key}-t`, cx, cy, 2.3, color));
+  if (through) els.push(dashedCircle(`${key}-t`, cx, cy, 3, color));
   return els;
 }
 
@@ -136,17 +139,17 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     }
   };
 
-  // ヘッダー
+  // ヘッダー（長くなりがちなので、幅に収まるよう2行に分ける）
   const material = d.memberChannel ? 'チャンネル' : 'アングル';
   const dir = d.memberChannel ? '背向き' : '刃向き';
-  const blade = `　${dir}:${d.bladeTop ? '奥' : '手前'}`;
   const hangerNote = d.hasHanger ? '' : '　吊り穴なし';
-  svg.push(txt('hdr', PAD_L, 8, `${material}　${d.modeB ? '吊り元基準' : '配管芯々基準'}${blade}${hangerNote}`, { size: 13, bold: true }));
+  svg.push(txt('hdr1', PAD_L, 6, `${material}　${d.modeB ? '吊り元基準' : '配管芯々基準'}`, { size: 14, bold: true }));
+  svg.push(txt('hdr2', PAD_L, 25, `${dir}:${d.bladeTop ? '奥' : '手前'}${hangerNote}`, { size: 12 }));
 
   // 凡例
   {
     let lx = PAD_L;
-    const ly = 28;
+    const ly = 44;
     svg.push(txt('lg', lx, ly, '穴:', { size: 10 }));
     lx += 18;
     let k = 0;
@@ -161,7 +164,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
       lx += 14;
       const t = `${e.key} ${holeNotation(e.spec)}`;
       svg.push(txt(`lgt-${k}`, lx, ly, t, { size: 10, color }));
-      lx += t.length * 6.5 + 12;
+      lx += t.length * 6.5 + 14;
       k++;
     }
   }
@@ -185,8 +188,8 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     const through = d.memberChannel && h.isHanger;
     holeMark(`hole-${i}`, cx, holeY, spec, through).forEach((e) => svg.push(e));
     if (h.isHanger) {
-      svg.push(<line key={`rod-${i}`} x1={cx} y1={BAR_TOP} x2={cx} y2={BAR_TOP - 14} stroke={COL_LINE} strokeWidth={1} />);
-      svg.push(<line key={`rodt-${i}`} x1={cx - 5} y1={BAR_TOP - 13} x2={cx + 5} y2={BAR_TOP - 13} stroke={COL_LINE} strokeWidth={1} />);
+      svg.push(<line key={`rod-${i}`} x1={cx} y1={BAR_TOP} x2={cx} y2={BAR_TOP - 20} stroke={COL_LINE} strokeWidth={1} />);
+      svg.push(<line key={`rodt-${i}`} x1={cx - 7} y1={BAR_TOP - 19} x2={cx + 7} y2={BAR_TOP - 19} stroke={COL_LINE} strokeWidth={1} />);
     }
   });
 
@@ -229,7 +232,8 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     let target: EditTarget | null = null;
     if (isEndHanger || isEndUhole) target = { kind: 'end', side: i === 0 ? 'L' : 'R' };
     else if (isHangerHole && !d.modeB) target = { kind: 'hg', side: i < st.length / 2 ? 'L' : 'R' };
-    const ty = Y_HOLES - 12 - (i % 2 === 1 ? 10 : 0);
+    // チップ・文字が大きくなった分、交互の段差も広げて隣同士が重ならないようにする。
+    const ty = Y_HOLES - 14 - (i % 2 === 1 ? 34 : 0);
     label(`hdt-${i}`, (x1 + x2) / 2, ty, fmtMm(st[i + 1] - st[i]), target, 11);
   }
 
@@ -293,7 +297,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     }
   });
 
-  // 高低差の表（右上）
+  // 高低差の表（凡例の下、横1行）
   heightTable(d, r).forEach((e) => svg.push(e));
 
   const svgEl = (
@@ -312,14 +316,11 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
   }
 
   // タップ編集チップを % 座標で重ねる。
-  // 幅を画面幅に合わせて縮めてしまうと文字・チップが現場で読めないほど
-  // 小さくなるため、W(=820)px を実寸の下限にして自然な大きさを保つ。
-  // 画面より広い分は親側(.support-figure-card)の横スクロールに任せる。
+  // 画面幅ぴったりに収まり横スクロールが要らないよう、キャンバス自体を
+  // 縦長(W=440×H=540)にしてある。幅は画面に合わせて縮めてよいが、その分
+  // 縦を大きく使うことで文字・チップが現場で読めるサイズを保つ。
   return (
-    <div
-      className={className}
-      style={{ position: 'relative', width: W, minWidth: W, aspectRatio: `${W} / ${H}`, ...style }}
-    >
+    <div className={className} style={{ position: 'relative', width: '100%', aspectRatio: `${W} / ${H}`, ...style }}>
       {svgEl}
       {chips.map((c) => (
         <button
@@ -367,16 +368,22 @@ function heightTable(d: HangerDesign, r: ReturnType<typeof compute>): El[] {
   }
   if (rows.length < 2) return [];
 
-  const x = W - 150;
-  let y = 4;
+  // 凡例の下に横1行で並べる（例: 高低差: 100A 0  /  80A −12.6）。
+  const y = Y_HEIGHT_TABLE;
   const els: El[] = [];
-  els.push(txt('ht-h', x, y, '高低差(一番高い=0)', { size: 10, bold: true }));
-  y += 14;
+  let x = PAD_L;
+  els.push(txt('ht-h', x, y, '高低差:', { size: 10, bold: true }));
+  x += 46;
   rows.forEach((row, i) => {
-    els.push(txt(`ht-l-${i}`, x, y, row.label, { size: 11 }));
+    if (i > 0) {
+      x += 6;
+    }
+    els.push(txt(`ht-l-${i}`, x, y, row.label, { size: 10 }));
+    x += row.label.length * 6.5 + 4;
     const isTop = row.value >= refMax - 0.001;
-    els.push(txt(`ht-v-${i}`, x + 58, y, isTop ? '0' : `−${fmtMm(refMax - row.value)}`, { size: 11, bold: true, color: isTop ? '#000' : '#c62828' }));
-    y += 14;
+    const vtext = isTop ? '0' : `−${fmtMm(refMax - row.value)}`;
+    els.push(txt(`ht-v-${i}`, x, y, vtext, { size: 10, bold: true, color: isTop ? '#000' : '#c62828' }));
+    x += vtext.length * 6.5 + 14;
   });
   return els;
 }
