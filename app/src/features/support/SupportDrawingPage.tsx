@@ -14,7 +14,24 @@ import {
   removePipe,
   missing,
 } from './hangerDesign'
-import { PIPE_SIZES, SLEEPER_THICKNESSES, fmtMm } from './supportSpec'
+import { PIPE_SIZES, SLEEPER_THICKNESSES, fmtMm, type HangerCalcResult } from './supportSpec'
+
+/**
+ * 吊り元基準(モードB)で、配管の穴が吊り元(ハンガー間隔)の外側に
+ * はみ出していないか確認する。配管を追加しても吊り元芯々は自動では
+ * 広がらないため、配管の並びが元の吊り元芯々に収まらなくなることがある
+ * (この場合、穴同士が重なって見えたり、端の寸法チップが正しく出なく
+ * なったりする)。計算結果自体は壊れていないので描画はそのまま出しつつ、
+ * 原因と直し方が分かるよう注意書きを添える。
+ */
+function hangerOverflow(d: HangerDesign, r: HangerCalcResult): boolean {
+  if (!d.modeB || !d.hasHanger) return false
+  const hangers = r.holes.filter((h) => h.isHanger)
+  if (hangers.length < 2) return false
+  const lo = Math.min(hangers[0].x, hangers[hangers.length - 1].x)
+  const hi = Math.max(hangers[0].x, hangers[hangers.length - 1].x)
+  return r.holes.some((h) => !h.isHanger && (h.x < lo - 0.01 || h.x > hi + 0.01))
+}
 
 type Editing =
   | { type: 'num'; title: string; value: number; apply: (v: number) => HangerDesign }
@@ -80,6 +97,7 @@ export function SupportDrawingPage({ onClose }: Props) {
 
   const miss = missing(d)
   const r = miss.length === 0 ? compute(d) : null
+  const overflow = r ? hangerOverflow(d, r) : false
 
   return (
     <div className="qc-screen">
@@ -145,6 +163,14 @@ export function SupportDrawingPage({ onClose }: Props) {
           <div className="n2-total-row">穴々が未登録です：{miss.join(', ')}</div>
         ) : (
           <>
+            {overflow && (
+              <div className="socket-gap-warn">
+                <p>
+                  配管の並びが吊り元芯々からはみ出しています（配管を追加しても吊り元芯々は自動で広がりません）。
+                  「吊り元芯々」を広げるか、「基準吊元→配管」を調整してください。
+                </p>
+              </div>
+            )}
             <div className="support-figure-card">
               <SupportFigure design={d} onEdit={handleEdit} />
             </div>
