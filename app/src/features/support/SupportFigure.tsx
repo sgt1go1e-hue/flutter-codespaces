@@ -109,6 +109,8 @@ interface Chip {
   target: EditTarget;
   /** 既定(EDIT色)と違う背景色にしたいとき(凡例チップを穴の色で塗るため)。 */
   bg?: string;
+  /** 見出しエリアの凡例チップ用。寸法チップより控えめ(細め・小さめ)にする。 */
+  thin?: boolean;
 }
 
 export interface SupportFigureProps {
@@ -152,8 +154,8 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
   const material = d.memberChannel ? 'チャンネル' : 'アングル';
   const dir = d.memberChannel ? '背向き' : '刃向き';
   const hangerNote = d.hasHanger ? '' : '　吊り穴なし';
-  svg.push(txt('hdr1', PAD_L, 6, `${material}　${d.modeB ? '吊り元基準' : '配管芯々基準'}`, { size: 14, bold: true }));
-  svg.push(txt('hdr2', PAD_L, 25, `${dir}:${d.bladeTop ? '奥' : '手前'}${hangerNote}`, { size: 12 }));
+  svg.push(txt('hdr1', PAD_L, 6, `${material}　${d.modeB ? '吊り元基準' : '配管芯々基準'}`, { size: 13, color: '#333' }));
+  svg.push(txt('hdr2', PAD_L, 25, `${dir}:${d.bladeTop ? '奥' : '手前'}${hangerNote}`, { size: 11, color: '#555' }));
 
   // 凡例（タップで穴の径・丸穴/長穴を編集。編集不可時は色付きの記号+文字のみ）
   {
@@ -171,13 +173,14 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
       if (interactive) {
         chips.push({
           key: `lg-${k}`,
-          cx: lx + (t.length * 5.5 + 18) / 2,
+          cx: lx + (t.length * 5 + 14) / 2,
           cy,
           text: t,
           target: { kind: 'holeSettings' },
           bg: color,
+          thin: true,
         });
-        lx += t.length * 5.5 + 18 + 8;
+        lx += t.length * 5 + 14 + 8;
       } else {
         if (e.spec.slot) {
           svg.push(<rect key={`lgm-${k}`} x={lx} y={cy - 2} width={10} height={4} rx={2} fill="none" stroke={color} strokeWidth={1.1} />);
@@ -358,13 +361,13 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
             left: `${(c.cx / W) * 100}%`,
             top: `${(c.cy / H) * 100}%`,
             transform: 'translate(-50%, -50%)',
-            padding: '4px 9px',
-            borderRadius: 8,
+            padding: c.thin ? '2px 7px' : '4px 9px',
+            borderRadius: c.thin ? 6 : 8,
             border: 'none',
             background: c.bg ?? EDIT,
             color: '#fff',
-            fontSize: 14,
-            fontWeight: 800,
+            fontSize: c.thin ? 11.5 : 14,
+            fontWeight: c.thin ? 500 : 800,
             lineHeight: 1.1,
             whiteSpace: 'nowrap',
             cursor: 'pointer',
