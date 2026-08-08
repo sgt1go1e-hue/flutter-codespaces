@@ -273,6 +273,7 @@ function NumModal({
           className="num-input"
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onFocus={(e) => e.target.select()}
         />
       </label>
       <div className="menu-order-actions">
@@ -323,6 +324,7 @@ function NumberField({
           const n = Number(s)
           if (s !== '' && !Number.isNaN(n)) onChange(n)
         }}
+        onFocus={(e) => e.target.select()}
         onBlur={() => setText(String(value))}
       />
     </label>
