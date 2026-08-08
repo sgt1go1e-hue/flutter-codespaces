@@ -718,6 +718,20 @@ body {
   stroke-width: calc(3.5px * var(--ui-scale, 1));
 }
 
+/* 現合区間の補足メモ(印刷専用)。画面上はタップして確認するアイコンで
+   済むが、印刷は操作できないため2行目(通常は切り寸法が入る、現合では
+   未使用のレーン)にそのまま文字で出す。確定寸法の.dim-cutと混同され
+   ないよう、控えめな色・細め・イタリックにする。 */
+.dim-gengou-note {
+  fill: var(--label-sub);
+  font-size: calc(9.5px * var(--ui-scale, 1));
+  font-weight: 500;
+  font-style: italic;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3px * var(--ui-scale, 1));
+}
+
 /* 現合区間の補足メモアイコン。既存の相番バッジ(assembly-badge)と同じ
    「円+文字」の構成を流用し、視覚言語を増やしすぎないようにする。 */
 .gengou-note-icon circle {

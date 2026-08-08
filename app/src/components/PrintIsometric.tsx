@@ -20,6 +20,13 @@ import {
 } from '../lib/fieldMarks'
 import { genGouLabelText } from '../lib/genGou'
 
+// 現合区間の補足メモは自由入力(長さ無制限)だが、印刷では2行目レーンに
+// 収まる程度に短くする(長いままだと隣の区間のラベルと重なるため)。
+const GENGOU_NOTE_MAX = 18
+function truncateGenGouNote(text: string): string {
+  return text.length > GENGOU_NOTE_MAX ? `${text.slice(0, GENGOU_NOTE_MAX)}…` : text
+}
+
 interface Props {
   segments: Segment[]
   effectiveById: Record<string, Effective>
@@ -161,8 +168,14 @@ export function PrintIsometric({
       const mx = s.start.x + (s.end.x - s.start.x) * t
       const my = s.start.y + (s.end.y - s.start.y) * t
       const line1 = `${c.mode} ${c.center}`
-      const line2 =
-        c.status === 'ok'
+      // 現合(現物合わせ)区間は切り寸法を出さないため2行目レーンが空くが、
+      // 印刷では画面のようにタップしてメモを確認できないため、この空きレーン
+      // に補足メモをそのまま文字で出す(当たり判定の幅もメモの長さで見積もる)。
+      const line2 = s.isGenGou
+        ? s.genGouNote
+          ? `メモ: ${truncateGenGouNote(s.genGouNote)}`
+          : ''
+        : c.status === 'ok'
           ? c.threadTooShortForPipe
             ? '加工不可能（丸ニップル使用）'
             : c.vpTsTooShortForPipe
@@ -173,7 +186,11 @@ export function PrintIsometric({
               ? `レジューサー H=${c.reducerH}（継手直結）`
               : 'パイプ0（継手直結）'
             : '継手不足'
-      const fs2 = c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11
+      const fs2 = s.isGenGou
+        ? 9.5
+        : c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe
+          ? 12.5
+          : 11
       const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
       const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
       const geom = dimGeometry(s.start, s.end, side, 1)
@@ -663,18 +680,32 @@ export function PrintIsometric({
                   {/* 現合(現物合わせ)区間: 画面表示と同じく、確定寸法として誤読
                       されないよう専用の1行注記表示にする（印刷でこそ誤読を
                       避ける意味が大きいため、画面と同じロジックを使う）。
-                      補足メモのアイコンは画面上でタップして確認する用途のため
-                      印刷には出さない。 */}
+                      補足メモは画面上ではタップして確認するアイコンだが、
+                      印刷は操作できないため、2行目レーン(現合では未使用)に
+                      そのまま文字で出す。 */}
                   {s.isGenGou ? (
-                    <text
-                      className="dim-gengou"
-                      x={line1X}
-                      y={line1Y}
-                      textAnchor="middle"
-                      transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
-                    >
-                      {genGouLabelText(s.genGouQualifier, s.genGouDimension)}
-                    </text>
+                    <>
+                      <text
+                        className="dim-gengou"
+                        x={line1X}
+                        y={line1Y}
+                        textAnchor="middle"
+                        transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
+                      >
+                        {genGouLabelText(s.genGouQualifier, s.genGouDimension)}
+                      </text>
+                      {s.genGouNote && (
+                        <text
+                          className="dim-gengou-note"
+                          x={line2X}
+                          y={line2Y}
+                          textAnchor="middle"
+                          transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                        >
+                          {`メモ: ${truncateGenGouNote(s.genGouNote)}`}
+                        </text>
+                      )}
+                    </>
                   ) : (
                     <>
                   <text
