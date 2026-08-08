@@ -2833,6 +2833,97 @@ fieldset.panel-grid:disabled {
   -webkit-overflow-scrolling: touch;
 }
 
+/* 「穴」欄：現在の穴仕様（色付きの記号+文字）を一覧し、「変更する」で
+   穴の設定モーダル(全種類まとめて編集)を開く。フォーム内では図面の
+   凡例と同じ配色で表示し、タップ編集(図側)との見た目の一貫性を保つ。 */
+.support-hole-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.support-hole-summary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+.support-hole-summary-item {
+  font-size: 13.5px;
+  font-weight: 700;
+}
+
+/* 穴の設定モーダル：3分/4分/吊りの各穴種をまとめて編集する区画。 */
+.support-hole-editor {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.support-hole-editor:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.support-hole-editor-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.support-hole-editor-preview {
+  color: var(--hint);
+  font-size: 12.5px;
+  margin-top: 4px;
+}
+
+/* 径の±ステッパー。数値を直接テキスト入力させないことで先頭0の
+   ちらつき（消して打ち直すと"0"から始まる見た目になる）を避ける。 */
+.support-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.support-stepper-btn {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 44px;
+  min-height: 44px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.support-stepper-value {
+  min-width: 56px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.support-color-row {
+  display: flex;
+  gap: 10px;
+}
+
+.support-color-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+.support-color-swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--field-bg);
+}
+
 .n2-cascade .panel-body {
   padding: 12px;
   gap: 12px;

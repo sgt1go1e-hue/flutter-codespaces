@@ -14,6 +14,10 @@ import {
   addPipe,
   removePipe,
   missing,
+  legendSpecs,
+  holeColor,
+  holeNotation,
+  holeColorPalette,
 } from './hangerDesign'
 import { PIPE_SIZES, SLEEPER_THICKNESSES, fmtMm, type HangerCalcResult } from './supportSpec'
 
@@ -37,7 +41,7 @@ function hangerOverflow(d: HangerDesign, r: HangerCalcResult): boolean {
 type Editing =
   | { type: 'num'; title: string; value: number; apply: (v: number) => HangerDesign }
   | { type: 'pipe'; index: number }
-  | { type: 'holeSpec'; field: 'hole3' | 'hole4' | 'holeHanger' }
+  | { type: 'holeSettings' }
   | null
 
 interface Props {
@@ -60,8 +64,8 @@ export function SupportDrawingPage({ onClose }: Props) {
       case 'pipe':
         setEditing({ type: 'pipe', index: t.index })
         break
-      case 'holeSpec':
-        setEditing({ type: 'holeSpec', field: t.field })
+      case 'holeSettings':
+        setEditing({ type: 'holeSettings' })
         break
       case 'span':
         openNum(`配管${t.index + 1}→${t.index + 2} 芯々`, d.spans[t.index], (v) => {
@@ -163,6 +167,22 @@ export function SupportDrawingPage({ onClose }: Props) {
           />
         </div>
 
+        <div className="field">
+          <span className="field-label">穴</span>
+          <div className="support-hole-summary">
+            <div className="support-hole-summary-list">
+              {legendSpecs(d).map((e) => (
+                <span key={e.key} className="support-hole-summary-item" style={{ color: holeColor(e.spec) }}>
+                  {e.key} {holeNotation(e.spec)}
+                </span>
+              ))}
+            </div>
+            <button type="button" className="support-btn" onClick={() => setEditing({ type: 'holeSettings' })}>
+              変更する
+            </button>
+          </div>
+        </div>
+
         {miss.length > 0 ? (
           <div className="n2-total-row">穴々が未登録です：{miss.join(', ')}</div>
         ) : (
@@ -208,13 +228,8 @@ export function SupportDrawingPage({ onClose }: Props) {
       {editing?.type === 'pipe' && (
         <PipeModal d={d} index={editing.index} onClose={() => setEditing(null)} onChange={(next) => setD(next)} />
       )}
-      {editing?.type === 'holeSpec' && (
-        <HoleSpecModal
-          d={d}
-          field={editing.field}
-          onClose={() => setEditing(null)}
-          onChange={(next) => setD(next)}
-        />
+      {editing?.type === 'holeSettings' && (
+        <HoleSettingsModal d={d} onClose={() => setEditing(null)} onChange={(next) => setD(next)} />
       )}
     </div>
   )
@@ -273,26 +288,84 @@ function NumModal({
 }
 
 const HOLE_FIELD_TITLES: Record<'hole3' | 'hole4' | 'holeHanger', string> = {
-  hole3: '3分ボルトの穴',
-  hole4: '4分ボルトの穴',
+  hole3: '3分 Uボルト穴',
+  hole4: '4分 Uボルト穴',
   holeHanger: '吊り穴',
 }
 
-function HoleSpecModal({
-  d,
-  field,
+/**
+ * 数値を直接<input value>に束縛すると、空にした瞬間に0扱いになり
+ * 次に打った数字が「0」の後ろに付く見た目になる(例: "12"を消して"3"→"03")。
+ * NumModalと同じく、表示用の文字列はローカルstateに持たせ、有効な数値の
+ * ときだけ上位へ反映する(空や入力途中はまだ反映しない)。
+ */
+function NumberField({
+  label,
+  value,
   onChange,
-  onClose,
 }: {
-  d: HangerDesign
-  field: 'hole3' | 'hole4' | 'holeHanger'
-  onChange: (next: HangerDesign) => void
-  onClose: () => void
+  label: string
+  value: number
+  onChange: (v: number) => void
 }) {
-  const spec = d[field]
-  const patch = (p: Partial<HoleSpec>) => onChange({ ...d, [field]: { ...spec, ...p } })
+  const [text, setText] = useState(String(value))
   return (
-    <Overlay title={HOLE_FIELD_TITLES[field]} onClose={onClose}>
+    <label className="field">
+      <span className="field-label">{label}</span>
+      <input
+        type="number"
+        inputMode="decimal"
+        className="num-input"
+        value={text}
+        onChange={(e) => {
+          const s = e.target.value
+          setText(s)
+          const n = Number(s)
+          if (s !== '' && !Number.isNaN(n)) onChange(n)
+        }}
+        onBlur={() => setText(String(value))}
+      />
+    </label>
+  )
+}
+
+function Stepper({
+  value,
+  onChange,
+  step = 1,
+  min = 1,
+}: {
+  value: number
+  onChange: (v: number) => void
+  step?: number
+  min?: number
+}) {
+  return (
+    <div className="support-stepper">
+      <button type="button" className="support-stepper-btn" onClick={() => onChange(Math.max(min, value - step))}>
+        −
+      </button>
+      <span className="support-stepper-value">{fmtMm(value)}</span>
+      <button type="button" className="support-stepper-btn" onClick={() => onChange(value + step)}>
+        ＋
+      </button>
+    </div>
+  )
+}
+
+function HoleTypeEditor({
+  title,
+  spec,
+  onChange,
+}: {
+  title: string
+  spec: HoleSpec
+  onChange: (next: HoleSpec) => void
+}) {
+  const patch = (p: Partial<HoleSpec>) => onChange({ ...spec, ...p })
+  return (
+    <div className="support-hole-editor">
+      <div className="support-hole-editor-title">{title}</div>
       <div className="field">
         <span className="field-label">穴の形状</span>
         <Seg
@@ -305,36 +378,55 @@ function HoleSpecModal({
         />
       </div>
       {!spec.slot ? (
-        <label className="field">
+        <div className="field">
           <span className="field-label">径 φ(mm)</span>
-          <input
-            type="number"
-            className="num-input"
-            value={spec.dia}
-            onChange={(e) => patch({ dia: Number(e.target.value) || 0 })}
-          />
-        </label>
+          <Stepper value={spec.dia} onChange={(v) => patch({ dia: v })} />
+        </div>
       ) : (
         <div className="panel-grid">
-          <label className="field">
-            <span className="field-label">長穴 幅(mm)</span>
-            <input
-              type="number"
-              className="num-input"
-              value={spec.slotW}
-              onChange={(e) => patch({ slotW: Number(e.target.value) || 0 })}
-            />
-          </label>
-          <label className="field">
-            <span className="field-label">長穴 長さ(mm)</span>
-            <input
-              type="number"
-              className="num-input"
-              value={spec.slotL}
-              onChange={(e) => patch({ slotL: Number(e.target.value) || 0 })}
-            />
-          </label>
+          <NumberField label="長穴 幅(mm)" value={spec.slotW} onChange={(v) => patch({ slotW: v })} />
+          <NumberField label="長穴 長さ(mm)" value={spec.slotL} onChange={(v) => patch({ slotL: v })} />
         </div>
+      )}
+      <div className="field">
+        <span className="field-label">色</span>
+        <div className="support-color-row">
+          {holeColorPalette.map((c, i) => (
+            <button
+              key={c}
+              type="button"
+              className={`support-color-swatch${spec.colorIndex === i ? ' active' : ''}`}
+              style={{ background: c }}
+              aria-label={`色 ${i + 1}`}
+              onClick={() => patch({ colorIndex: i })}
+            />
+          ))}
+        </div>
+      </div>
+      <div className="support-hole-editor-preview">表記: {holeNotation(spec)}</div>
+    </div>
+  )
+}
+
+function HoleSettingsModal({
+  d,
+  onChange,
+  onClose,
+}: {
+  d: HangerDesign
+  onChange: (next: HangerDesign) => void
+  onClose: () => void
+}) {
+  return (
+    <Overlay title="穴の設定" onClose={onClose}>
+      <HoleTypeEditor title={HOLE_FIELD_TITLES.hole3} spec={d.hole3} onChange={(next) => onChange({ ...d, hole3: next })} />
+      <HoleTypeEditor title={HOLE_FIELD_TITLES.hole4} spec={d.hole4} onChange={(next) => onChange({ ...d, hole4: next })} />
+      {d.hasHanger && (
+        <HoleTypeEditor
+          title={HOLE_FIELD_TITLES.holeHanger}
+          spec={d.holeHanger}
+          onChange={(next) => onChange({ ...d, holeHanger: next })}
+        />
       )}
       <div className="menu-order-actions">
         <button type="button" className="support-btn-primary" onClick={onClose}>

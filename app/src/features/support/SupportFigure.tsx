@@ -47,12 +47,7 @@ export type EditTarget =
   | { kind: 'hangerPitch' }
   | { kind: 'refToPipe'; side: 'L' | 'R' }
   | { kind: 'pipe'; index: number }
-  | { kind: 'holeSpec'; field: 'hole3' | 'hole4' | 'holeHanger' };
-
-/** 凡例のキー('3分'/'4分'/'吊')から、対応するHangerDesignのフィールド名へ。 */
-function holeFieldForLegendKey(key: string): 'hole3' | 'hole4' | 'holeHanger' {
-  return key === '3分' ? 'hole3' : key === '4分' ? 'hole4' : 'holeHanger';
-}
+  | { kind: 'holeSettings' };
 
 type El = React.ReactNode;
 
@@ -179,7 +174,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
           cx: lx + (t.length * 5.5 + 18) / 2,
           cy,
           text: t,
-          target: { kind: 'holeSpec', field: holeFieldForLegendKey(e.key) },
+          target: { kind: 'holeSettings' },
           bg: color,
         });
         lx += t.length * 5.5 + 18 + 8;
