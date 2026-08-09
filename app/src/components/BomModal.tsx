@@ -50,7 +50,17 @@ export function BomModal({
   // 使う（それ以外の組み合わせは従来通りの出力のまま変更しない）。
   const [paperSize, setPaperSize] = useState<'a4' | 'a3'>('a4')
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait')
+  // 「詳細」モードでは区間数の目安(A4=10本/A3=20本)でアイソメ図をページ分割
+  // するが、1枚に収めたい(加工場に渡す図が割れていると分かりにくい)場合が
+  // 多いため、分割せず1枚に収めるかを選べるようにする。分割しない場合は
+  // 図が縮むだけで、明細(パイプ1本ごとの切り寸法)は詳細のまま残る
+  // （「1ページに集約」は明細も小計だけに省略されてしまうため、それとは別物）。
+  const [splitIso, setSplitIso] = useState(true)
   const a3Landscape1Page = paperSize === 'a3' && orientation === 'landscape' && compact
+  // 「分割する」を選んだままだとアイソメ図が何ページに分かれるか（設定画面で
+  // 事前に知らせるため。実際の分割は印刷レイアウト側で同じ関数を使って行う）。
+  const isoPageCount =
+    segments.length > 0 ? chunkSegmentsForPrint(segments, segmentsPerIsoPage(paperSize)).length : 0
   // 「PDFで見る」は、現場ではすぐに印刷できず「まず画面で確認→LINE等で
   // 加工場へ送る→印刷」という順番で使うため、押してすぐ印刷ダイアログを
   // 開くのではなく、まず画面プレビューを表示する。実際の印刷/PDF化は
@@ -286,6 +296,33 @@ export function BomModal({
             </button>
           </div>
         </div>
+        {/* 「1ページに集約」は元々アイソメ図を分割しないため、この選択肢は
+            「詳細（複数ページ）」のときだけ意味を持つ。 */}
+        {!compact && (
+          <div className="pdf-paper-row">
+            <div className="pdf-paper-group">
+              <span className="pdf-paper-label">アイソメ図</span>
+              <button
+                className={`pdf-mode-btn${!splitIso ? ' active' : ''}`}
+                onClick={() => setSplitIso(false)}
+              >
+                1枚に収める
+              </button>
+              <button
+                className={`pdf-mode-btn${splitIso ? ' active' : ''}`}
+                onClick={() => setSplitIso(true)}
+              >
+                分割する
+              </button>
+            </div>
+          </div>
+        )}
+        {!compact && splitIso && isoPageCount > 1 && (
+          <p className="panel-hint pdf-a3-hint">
+            この図面は{segments.length}区間あるため、アイソメ図が{isoPageCount}
+            ページに分かれます。1枚にしたい場合は「1枚に収める」を選んでください（図は小さくなりますが、明細はそのままです）。
+          </p>
+        )}
         {a3Landscape1Page && (
           <p className="panel-hint pdf-a3-hint">
             A3横向き・1ページに集約: 左2/3にアイソメ図、右1/3に明細を並べた1枚のPDFになります。
@@ -335,11 +372,12 @@ export function BomModal({
           // 途中では絶対に切れないよう、必ずセグメント単位でまとめる
           // （chunkSegmentsForPrint）。「1ページに集約」(compact)や
           // A3横1ページレイアウトは、これまで通り1枚のSVGに全体を収める。
-          const isoPages = compact
-            ? segments.length > 0
-              ? [segments]
-              : []
-            : chunkSegmentsForPrint(segments, segmentsPerIsoPage(paperSize))
+          const isoPages =
+            compact || !splitIso
+              ? segments.length > 0
+                ? [segments]
+                : []
+              : chunkSegmentsForPrint(segments, segmentsPerIsoPage(paperSize))
           const isoBlock = isoPages.length > 0 && (
             <>
               {isoPages.map((pageSegments, i) => (
