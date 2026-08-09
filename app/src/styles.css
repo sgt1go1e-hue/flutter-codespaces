@@ -2333,6 +2333,77 @@ fieldset.panel-grid:disabled {
     height: 145mm;
   }
 
+  /* 上下中央寄せ（アイソメ図・明細とも）。
+     左右は元々中央だが、上下は上詰めで下だけ余白が残り、バランスが悪く
+     見えていた（実機のPDFで確認）。
+     centering に flex(justify-content:center)を使うと、内容が箱より高い
+     ときに上へもあふれ、ページ送りで上側が切れて消える。table-cellの
+     vertical-align:middle は height が「最小値」として扱われるため、
+     内容が高いときは箱が伸びて上詰めに戻るだけで、絶対に上へあふれない。
+     過去にあふれ由来で白紙ページ・明細消失を起こしているため、ここでは
+     安全側に倒せる table-cell 方式を採る。
+     高さは「印刷可能領域 − 表題分 − 安全余裕」。1枚目だけ表題(h1+作成日、
+     実測14mm)と同居するのでその分を引く。実機の印刷エンジンによる用紙・
+     余白の誤差を見込み、安全余裕を必ず残す(余裕の分だけ真の中央より僅かに
+     上寄りになるが、あふれて壊れるより優先する)。 */
+  /* アイソメ図は「見出し＋高さ固定のSVG」で中身の高さが確定しており、箱より
+     必ず低いのであふれ得ない。素直にflexで中央寄せする。 */
+  .bom-print-only:not(.compact) .print-iso-inner {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  /* 明細(BOM)は行数で高さが変わりあふれ得るため、flexではなくtable-cellを使う
+     (heightが最小値扱いになり、内容が高いときは箱が伸びて上詰めに戻るだけで、
+     上側へあふれて消えることが無い)。 */
+  .bom-print-only:not(.compact) .bom-detail-block {
+    display: table;
+    width: 100%;
+  }
+  .bom-print-only:not(.compact) .bom-detail-inner {
+    display: table-cell;
+    vertical-align: middle;
+  }
+  /* A4縦: 297 − 余白12×2 = 273mm。1枚目は表題(h1+作成日)と同居するため
+     その分を引く。 */
+  .bom-print-only:not(.compact) .print-iso-inner,
+  .bom-print-only:not(.compact) .bom-detail-inner {
+    height: 261mm;
+  }
+  .bom-print-only:not(.compact) .print-iso-wrap:first-of-type .print-iso-inner {
+    height: 249mm;
+  }
+  /* A4横: 210 − 12×2 = 186mm */
+  .bom-print-only.paper-a4-landscape:not(.compact) .print-iso-inner,
+  .bom-print-only.paper-a4-landscape:not(.compact) .bom-detail-inner {
+    height: 174mm;
+  }
+  .bom-print-only.paper-a4-landscape:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-inner {
+    height: 162mm;
+  }
+  /* A3縦: 420 − 10×2 = 400mm */
+  .bom-print-only.paper-a3-portrait:not(.compact) .print-iso-inner,
+  .bom-print-only.paper-a3-portrait:not(.compact) .bom-detail-inner {
+    height: 388mm;
+  }
+  .bom-print-only.paper-a3-portrait:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-inner {
+    height: 376mm;
+  }
+  /* A3横: 297 − 10×2 = 277mm */
+  .bom-print-only.paper-a3-landscape:not(.compact) .print-iso-inner,
+  .bom-print-only.paper-a3-landscape:not(.compact) .bom-detail-inner {
+    height: 265mm;
+  }
+  .bom-print-only.paper-a3-landscape:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-inner {
+    height: 253mm;
+  }
+
   /* アプリ本体(#root)は fixed/absolute配置と 100vh 固定+overflow:hidden の
      1画面レイアウトなので、これを印刷対象に含めると1ページ分の高さで
      切り取られてしまう。印刷時は#root自体を非表示にし、.bom-print-only は
@@ -2342,6 +2413,11 @@ fieldset.panel-grid:disabled {
   body {
     height: auto !important;
     overflow: visible !important;
+    /* アプリ本体はダークテーマ(body背景が濃紺)。印刷用の .bom-print-only は
+       通常フローの要素なので、その下端より先(最終ページの余った部分など)は
+       body の背景がそのまま用紙に出てしまい、黒い帯として印刷される。
+       用紙は必ず白にする。 */
+    background: #fff !important;
   }
   #root {
     display: none !important;

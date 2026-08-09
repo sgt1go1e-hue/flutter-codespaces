@@ -343,18 +343,23 @@ export function BomModal({
           const isoBlock = isoPages.length > 0 && (
             <>
               {isoPages.map((pageSegments, i) => (
+                // print-iso-inner は印刷時の上下中央寄せ(table-cell +
+                // vertical-align:middle)のための入れ物。画面プレビューでは
+                // ただのdivとして何も影響しない。
                 <div className="print-iso-wrap" key={i}>
-                  <h2>
-                    アイソメ図
-                    {isoPages.length > 1 ? `（${i + 1}/${isoPages.length}）` : ''}
-                  </h2>
-                  <PrintIsometric
-                    segments={pageSegments}
-                    effectiveById={effectiveById}
-                    crossoverGaps={crossoverGaps}
-                    cutById={cutById}
-                    baseSlopeDenom={baseSlopeDenom}
-                  />
+                  <div className="print-iso-inner">
+                    <h2>
+                      アイソメ図
+                      {isoPages.length > 1 ? `（${i + 1}/${isoPages.length}）` : ''}
+                    </h2>
+                    <PrintIsometric
+                      segments={pageSegments}
+                      effectiveById={effectiveById}
+                      crossoverGaps={crossoverGaps}
+                      cutById={cutById}
+                      baseSlopeDenom={baseSlopeDenom}
+                    />
+                  </div>
                 </div>
               ))}
             </>
@@ -497,10 +502,21 @@ export function BomModal({
           return (
             <>
               {isoBlock}
-              {pipesBlock}
-              {fittingsBlock}
-              {flangesBlock}
-              {assemblyBlock}
+              {/* 明細(BOM)側もアイソメ図と同じく、印刷時に紙の上下中央へ
+                  寄せる。中央寄せの仕組みは print-iso-inner と同じ
+                  (bom-detail-inner を table-cell にする)。
+                  中身が空のときに囲みだけ出すと、高さ指定だけが残って
+                  白紙ページになってしまうため、1つでも表があるときだけ出す。 */}
+              {(pipesBlock || fittingsBlock || flangesBlock || assemblyBlock) && (
+                <div className="bom-detail-block">
+                  <div className="bom-detail-inner">
+                    {pipesBlock}
+                    {fittingsBlock}
+                    {flangesBlock}
+                    {assemblyBlock}
+                  </div>
+                </div>
+              )}
             </>
           )
         })()}
