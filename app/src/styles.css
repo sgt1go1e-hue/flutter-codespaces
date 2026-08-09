@@ -2357,10 +2357,23 @@ fieldset.panel-grid:disabled {
   .preview-toolbar {
     display: none !important;
   }
+  /* 「PDFで見る」のプレビュー(.preview)から印刷すると、画面用オーバーレイの
+     暗い背景(#0b1220)とセーフエリア余白がそのまま用紙に乗り、黒い枠として
+     印刷されてしまう(実機のiPhoneで発生を確認)。
+     上の .bom-print-only のリセットは position/inset/overflow を !important で
+     打ち消しているが、background と padding には !important が無いため、
+     詳細度の高い .bom-print-only.preview (クラス2つ)側が勝って残っていた。
+     ここで同じ詳細度の指定として明示的に打ち消す(用紙は常に白・余白は
+     @page の margin だけに任せる)。 */
+  .bom-print-only.preview {
+    background: #fff;
+    padding: 0;
+  }
   .bom-print-only.preview .preview-page {
     max-width: none;
     margin: 0;
     padding: 0;
+    border-radius: 0;
     box-shadow: none;
   }
 }
