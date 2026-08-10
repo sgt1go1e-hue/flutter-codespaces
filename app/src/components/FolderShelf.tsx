@@ -98,7 +98,7 @@ export function FolderShelf({
             aria-expanded={settingsOpen}
             onClick={() => setSettingsOpen((v) => !v)}
           >
-            ⚙
+            設定
           </button>
         </div>
         <input

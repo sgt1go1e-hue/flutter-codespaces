@@ -225,8 +225,11 @@ body {
   /* 手袋のままでも押せるよう最小48px を確保する */
   min-width: 48px;
   min-height: 48px;
-  font-size: 18px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
   line-height: 1;
+  white-space: nowrap;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -414,7 +417,8 @@ body {
   position: relative;
   background: var(--home-surface);
   border-radius: var(--home-r-md);
-  overflow: hidden;
+  /* overflow:hidden は付けない。付けると ⋯ メニューがカードの外へ出られず
+     「削除」が見切れてしまう(実機で報告)。色帯は自分で角を丸める。 */
 }
 
 /* カード上端の色帯。フォルダ自体の識別色はまだデータに無いため中立色。 */
@@ -422,6 +426,7 @@ body {
   display: block;
   height: 5px;
   background: var(--home-status-white);
+  border-radius: var(--home-r-md) var(--home-r-md) 0 0;
 }
 
 .home-folder-main {
@@ -529,7 +534,7 @@ body {
   display: flex;
   background: var(--home-surface);
   border-radius: var(--home-r-md);
-  overflow: hidden;
+  /* overflow:hidden は付けない(上の .home-folder-card と同じ理由) */
 }
 
 /* ステータス色は左端の縦帯で表す（色の意味は定義しない＝ユーザー任せ） */
@@ -537,6 +542,7 @@ body {
   flex-shrink: 0;
   width: 4px;
   background: var(--home-status-white);
+  border-radius: var(--home-r-md) 0 0 var(--home-r-md);
 }
 
 .home-drawing-card.status-red .home-drawing-band {

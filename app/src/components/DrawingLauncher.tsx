@@ -68,7 +68,7 @@ export function DrawingLauncher({
           </button>
           {folderId != null && onEditFolderColors && (
             <button type="button" className="home-gear" aria-label="このフォルダの色設定" onClick={onEditFolderColors}>
-              🎨
+              色設定
             </button>
           )}
         </div>

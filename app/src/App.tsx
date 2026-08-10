@@ -1277,7 +1277,7 @@ export default function App() {
     ),
     quickCalc: (
       <button key="quickCalc" onClick={openQuickCalc}>
-        🧮 クイック計算
+        クイック計算
       </button>
     ),
     undo: (
@@ -1307,7 +1307,7 @@ export default function App() {
         disabled={segments.length === 0 || !canEditStructure}
         title="オンの間は線をタップするとその場で即削除します"
       >
-        🧹 消しゴム{eraserMode ? '中' : ''}
+        消しゴム{eraserMode ? '中' : ''}
       </button>
     ),
     bom: (
@@ -1332,7 +1332,7 @@ export default function App() {
         }}
         disabled={segments.length === 0}
       >
-        📤 共有
+        共有
       </button>
     ),
     throughDim: (
@@ -1345,7 +1345,7 @@ export default function App() {
         }}
         title="チーズ・フランジで分かれた区間をまたいだ、曲がるまでの全体の芯々を表示します"
       >
-        {showThroughDim ? '📐 通り寸法 中' : '📐 通り寸法'}
+        {showThroughDim ? '通り寸法 中' : '通り寸法'}
       </button>
     ),
     disclaimer: (
@@ -1368,7 +1368,7 @@ export default function App() {
         }}
         title="屋外の明るい場所では「明るい画面」が見やすくなります"
       >
-        {theme === 'dark' ? '☀️ 明るい画面' : '🌙 暗い画面'}
+        {theme === 'dark' ? '明るい画面' : '暗い画面'}
       </button>
     ),
   }
