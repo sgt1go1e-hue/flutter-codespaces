@@ -117,11 +117,17 @@ function splitForDoubleFlange(
   // A の終点はP(フランジ接合部)に変わるため、元の終点側にだけ意味を持つ
   // endFitting個別上書きはAには残せない。元の終点はB側が引き継ぐ
   // （splitSegmentAt / splitForReducer と同じ扱い）。
+  // 芯々寸法は、分割後のAにそのまま残すと「短くなったのに元の全長のまま」に
+  // なってしまうため、いったん未入力にする。元の全長は flangeSpanLength として
+  // B側に凍結し、上流/下流のどちらか一方を入れればもう一方を自動算出できる
+  // ようにする（現場では全長が分かっていて、そこから都合の良い位置で切り分ける
+  // ことが多いため。レジューサーの reducerSpanLength と同じ考え方）。
   const A: Segment = {
     ...target,
     end: P,
     endFlange: 'double',
     endFitting: undefined,
+    centerLength: undefined,
     fieldWeldMarks: marks.a,
   }
   const B: Segment = {
@@ -140,6 +146,8 @@ function splitForDoubleFlange(
     // 元の終点側の個別上書き(フランジ・継手)はB側の終点として引き継ぐ。
     endFlange: target.endFlange,
     endFitting: target.endFitting,
+    // 分割前の全長を凍結（未入力なら undefined ＝「個別入力」モードで始まる）
+    flangeSpanLength: target.centerLength,
     // pipeType/size/fitting は持たせない → A から継承・自動
   }
   A.connection = target.connection ?? 'flange'
@@ -834,6 +842,71 @@ export default function App() {
     )
   }
 
+  // 両フランジで分割された区間のペア(上流A/下流B)。詳細パネルで全長と
+  // 上流側/下流側の寸法を1箇所で入力できるようにするために使う。
+  const flangePartner = useMemo(() => {
+    if (!selected) return undefined
+    if (selected.startFlange === 'double' && selected.parentId) {
+      const a = segments.find((s) => s.id === selected.parentId)
+      if (a && a.endFlange === 'double') {
+        return { upstream: a, downstream: selected, selectedRole: 'downstream' as const }
+      }
+    }
+    if (selected.endFlange === 'double') {
+      const b = segments.find((s) => s.parentId === selected.id && s.startFlange === 'double')
+      if (b) return { upstream: selected, downstream: b, selectedRole: 'upstream' as const }
+    }
+    return undefined
+  }, [selected, segments])
+
+  // 両フランジ区間の上流側/下流側の芯々寸法をまとめて更新する。片方だけ渡せば
+  // その区間だけ更新し、もう一方は cutlength.ts 側の deriveFlangeCenterLength が
+  // 全長から自動算出する（データは書き換えない）。
+  function updateFlangePair(aId: string, bId: string, patch: { up?: number; down?: number }) {
+    setSegments((prev) =>
+      prev.map((s) => {
+        if (s.id === aId && 'up' in patch) return { ...s, centerLength: patch.up }
+        if (s.id === bId && 'down' in patch) return { ...s, centerLength: patch.down }
+        return s
+      }),
+    )
+  }
+
+  /** 両フランジ区間の全長(分割前の寸法)を更新する。全長は下流側(B)が持つ。 */
+  function updateFlangeSpan(bId: string, span: number | undefined) {
+    setSegments((prev) => prev.map((s) => (s.id === bId ? { ...s, flangeSpanLength: span } : s)))
+  }
+
+  /**
+   * 両フランジ区間の入力方法(全長基準／個別入力)を切り替える。
+   * 「個別入力」へ移すときは、それまで全長から自動算出して画面に出ていた値を
+   * 実データとして書き込んでから切り替える（切り替えた瞬間に数字が消えると
+   * 現場で何を入れていたか分からなくなるため）。
+   */
+  function setFlangeSpanMode(aId: string, bId: string, mode: 'total' | 'each') {
+    setSegments((prev) =>
+      prev.map((s) => {
+        if (s.id === aId && mode === 'each' && s.centerLength == null) {
+          return { ...s, centerLength: cutById[aId]?.derivedCenter }
+        }
+        if (s.id === bId) {
+          const next = { ...s, flangeSpanMode: mode === 'each' ? ('each' as const) : undefined }
+          if (mode === 'each' && next.centerLength == null) {
+            next.centerLength = cutById[bId]?.derivedCenter
+          }
+          if (mode === 'total' && next.flangeSpanLength == null) {
+            // 全長が未設定なら、今表示されている上流+下流の合計を初期値にする
+            const up = prev.find((x) => x.id === aId)?.centerLength ?? cutById[aId]?.derivedCenter
+            const down = s.centerLength ?? cutById[bId]?.derivedCenter
+            if (up != null && down != null) next.flangeSpanLength = Math.round((up + down) * 10) / 10
+          }
+          return next
+        }
+        return s
+      }),
+    )
+  }
+
   // 材料集計(BOM)。モーダルを開いたときに使う。
   const bom = useMemo(
     () => computeBom(segments, effectiveById, cutById),
@@ -1458,6 +1531,18 @@ export default function App() {
           onSetTeeSize={setSizeForSegments}
           reducerPartner={reducerPartner}
           onChangeReducerPair={updateReducerPair}
+          flangePartner={flangePartner}
+          flangePartnerCuts={
+            flangePartner
+              ? {
+                  upstream: cutById[flangePartner.upstream.id],
+                  downstream: cutById[flangePartner.downstream.id],
+                }
+              : undefined
+          }
+          onChangeFlangePair={updateFlangePair}
+          onChangeFlangeSpan={updateFlangeSpan}
+          onChangeFlangeSpanMode={setFlangeSpanMode}
           baseSlopeDenom={defaults.slopeDenom}
           roundMode={defaults.roundMode ?? 'round'}
           onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}

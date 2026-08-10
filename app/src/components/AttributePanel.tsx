@@ -227,6 +227,23 @@ interface SegmentPanelProps {
   }
   /** レジューサーのメイン側/先端側の芯々寸法をまとめて更新する */
   onChangeReducerPair: (mainId: string, tipId: string, patch: { main?: number; tip?: number }) => void
+  /**
+   * 選択中の区間が両フランジで分割されたペアの一方なら、その上流側・下流側の
+   * 区間。全長と上流/下流の寸法を1箇所でまとめて入力できるようにするために使う。
+   */
+  flangePartner?: {
+    upstream: Segment
+    downstream: Segment
+    selectedRole: 'upstream' | 'downstream'
+  }
+  /** 上記ペアの切り寸法（自動算出値をプレースホルダーで見せるために使う） */
+  flangePartnerCuts?: { upstream?: CutResult; downstream?: CutResult }
+  /** 両フランジ区間の上流側/下流側の芯々寸法をまとめて更新する */
+  onChangeFlangePair: (aId: string, bId: string, patch: { up?: number; down?: number }) => void
+  /** 両フランジ区間の全長(分割前の寸法)を更新する */
+  onChangeFlangeSpan: (bId: string, span: number | undefined) => void
+  /** 両フランジ区間の入力方法(全長基準／個別入力)を切り替える */
+  onChangeFlangeSpanMode: (aId: string, bId: string, mode: 'total' | 'each') => void
   /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
   baseSlopeDenom?: number
   /** 切り寸法の丸め方（全体設定・既定=四捨五入） */
@@ -281,6 +298,11 @@ export function SegmentPanel({
   onSetTeeSize,
   reducerPartner,
   onChangeReducerPair,
+  flangePartner,
+  flangePartnerCuts,
+  onChangeFlangePair,
+  onChangeFlangeSpan,
+  onChangeFlangeSpanMode,
   baseSlopeDenom,
   roundMode,
   onRoundModeChange,
@@ -667,7 +689,94 @@ export function SegmentPanel({
 
         {/* ② 寸法入力 */}
         <div className="panel-grid">
-          {reducerPartner ? (
+          {flangePartner ? (
+            (() => {
+              // 両フランジで分割した区間は、上流側・下流側の2つの寸法に分かれる。
+              // 現場では「全長は分かっていて、そこから都合の良い位置で切り分ける」
+              // ことが多いため、既定は全長基準（全長と片側を入れれば、もう片側は
+              // 自動算出）。実測を両側それぞれ入れたい場合のために個別入力へも
+              // 切り替えられる。どちらの区間を選んでいても同じ内容を出す。
+              const { upstream: up, downstream: down } = flangePartner
+              const upCut = flangePartnerCuts?.upstream
+              const downCut = flangePartnerCuts?.downstream
+              const isEach = down.flangeSpanMode === 'each'
+              return (
+                <>
+                  <div className="field round-field">
+                    <span className="field-label">
+                      寸法の入れ方
+                      <span className="field-note">両フランジで分割した区間</span>
+                    </span>
+                    <div className="round-toggle">
+                      <button
+                        type="button"
+                        className={!isEach ? 'active' : ''}
+                        onClick={() => onChangeFlangeSpanMode(up.id, down.id, 'total')}
+                      >
+                        全長基準
+                      </button>
+                      <button
+                        type="button"
+                        className={isEach ? 'active' : ''}
+                        onClick={() => onChangeFlangeSpanMode(up.id, down.id, 'each')}
+                      >
+                        個別入力
+                      </button>
+                    </div>
+                  </div>
+                  {!isEach && (
+                    <label className="field dim-field">
+                      <span className="field-label">
+                        全長(mm)
+                        <span className="field-note">分割前の寸法</span>
+                      </span>
+                      <DimCalcInput
+                        className="num-input"
+                        placeholder="例: 2450"
+                        value={down.flangeSpanLength}
+                        onCommit={(v) => onChangeFlangeSpan(down.id, v)}
+                      />
+                    </label>
+                  )}
+                  <label className="field dim-field">
+                    <span className="field-label">
+                      上流側寸法(mm)
+                      <span className="field-note">手前〜フランジ</span>
+                    </span>
+                    <DimCalcInput
+                      className="num-input"
+                      placeholder={
+                        upCut?.derivedCenter != null ? `自動算出 ${upCut.derivedCenter}` : '例: 1000'
+                      }
+                      value={up.centerLength}
+                      onCommit={(v) => onChangeFlangePair(up.id, down.id, { up: v })}
+                    />
+                  </label>
+                  <label className="field dim-field">
+                    <span className="field-label">
+                      下流側寸法(mm)
+                      <span className="field-note">フランジ〜先</span>
+                    </span>
+                    <DimCalcInput
+                      className="num-input"
+                      placeholder={
+                        downCut?.derivedCenter != null
+                          ? `自動算出 ${downCut.derivedCenter}`
+                          : '例: 1450'
+                      }
+                      value={down.centerLength}
+                      onCommit={(v) => onChangeFlangePair(up.id, down.id, { down: v })}
+                    />
+                  </label>
+                  {!isEach && (upCut?.needsReducerSpanInput || downCut?.needsReducerSpanInput) && (
+                    <div className="socket-gap-warn">
+                      <p>全長と、上流側・下流側のどちらか一方の寸法を入力してください。</p>
+                    </div>
+                  )}
+                </>
+              )
+            })()
+          ) : reducerPartner ? (
             (() => {
               // レジューサー区間は「メイン側」(継手〜レジューサー太い方)と
               // 「先端側」(レジューサー細い方〜先)の2つの寸法に分けて入力する。

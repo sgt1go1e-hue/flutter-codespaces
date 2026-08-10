@@ -381,6 +381,44 @@ function isReducerPairMember(s: Segment, segments: Segment[]): boolean {
   return segments.some((x) => x.parentId === s.id && isReducerId(x.fitting))
 }
 
+/** 両フランジで分割された下流側(B)を探す。sがA(上流)ならBを返す。 */
+function flangePairDownstream(s: Segment, segments: Segment[]): Segment | undefined {
+  return segments.find((x) => x.parentId === s.id && x.startFlange === 'double')
+}
+
+/**
+ * 両フランジ区間(上流A/下流B)のうち、自分の芯々寸法(centerLength)が未入力の
+ * 側について、もう一方の実測値と flangeSpanLength(分割前の全長)から
+ * 「flangeSpanLength − もう一方の実測値」で自動算出する。
+ * フランジ同士は同じ点で接するため、レジューサーのような面間寸法(H)の
+ * 差し引きは無い。両方入力済み・全長未設定(=個別入力モード)・もう一方が
+ * 未入力で算出できない場合は undefined を返す（セグメントのデータ自体は
+ * 書き換えず、読み取り時にだけ都度算出する）。
+ */
+function deriveFlangeCenterLength(s: Segment, segments: Segment[]): number | undefined {
+  // s が下流側(B)のとき: 全長は自分が持ち、相手は親(A)。
+  if (s.startFlange === 'double' && s.parentId) {
+    if (s.flangeSpanMode === 'each' || s.flangeSpanLength == null) return undefined
+    const a = segments.find((x) => x.id === s.parentId)
+    if (!a || a.centerLength == null) return undefined
+    return round1(s.flangeSpanLength - a.centerLength)
+  }
+  // s が上流側(A)のとき: 全長は下流側(B)が持つ。
+  const b = flangePairDownstream(s, segments)
+  if (!b || b.flangeSpanMode === 'each') return undefined
+  if (b.flangeSpanLength == null || b.centerLength == null) return undefined
+  return round1(b.flangeSpanLength - b.centerLength)
+}
+
+/** sが両フランジ区間のペア(全長基準モード)に属しているか */
+function isFlangeSpanPairMember(s: Segment, segments: Segment[]): boolean {
+  if (s.startFlange === 'double' && s.parentId) {
+    return s.flangeSpanMode !== 'each' && s.flangeSpanLength != null
+  }
+  const b = flangePairDownstream(s, segments)
+  return !!b && b.flangeSpanMode !== 'each' && b.flangeSpanLength != null
+}
+
 /**
  * 全セグメントの切断（加工）寸法を、端ごと（per-end）に計算する。
  * 各端の取り出し寸法は、その端のノードの役割（エルボ/チーズ/レジューサー/直管/フリー端）と
@@ -431,11 +469,17 @@ export function computeAllCut(
       isVertical ? round1(slopeDrops[s.id].start + slopeDrops[s.id].end) : 0
     // レジューサー区間(メイン側/先端側)で自分の芯々寸法が未入力なら、もう一方の
     // 実測値と分割前の全体寸法(reducerSpanLength)から自動算出する。
+    // 両フランジ区間(全長基準)も同じく、未入力側を分割前の全長から自動算出する。
     const derivedCenter =
-      s.centerLength == null ? deriveReducerCenterLength(s, segments, effectiveById) : undefined
+      s.centerLength == null
+        ? (deriveReducerCenterLength(s, segments, effectiveById) ??
+          deriveFlangeCenterLength(s, segments))
+        : undefined
     const center = s.centerLength ?? derivedCenter
     const needsReducerSpanInput =
-      s.centerLength == null && derivedCenter == null && isReducerPairMember(s, segments)
+      s.centerLength == null &&
+      derivedCenter == null &&
+      (isReducerPairMember(s, segments) || isFlangeSpanPairMember(s, segments))
     const adjustedCenter = center != null ? center - slopeAdjust : undefined
     const { rawCut, cut, status } = computeCutFromAllowances(
       adjustedCenter,
