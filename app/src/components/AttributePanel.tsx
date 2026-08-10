@@ -228,22 +228,21 @@ interface SegmentPanelProps {
   /** レジューサーのメイン側/先端側の芯々寸法をまとめて更新する */
   onChangeReducerPair: (mainId: string, tipId: string, patch: { main?: number; tip?: number }) => void
   /**
-   * 選択中の区間が両フランジで分割されたペアの一方なら、その上流側・下流側の
-   * 区間。全長と上流/下流の寸法を1箇所でまとめて入力できるようにするために使う。
+   * 選択中の区間が属する「通り」(曲がるまで一直線に続くまとまり)の構成区間。
+   * 2区間以上に分かれているときだけ渡される。全長と各区間の寸法を1箇所で
+   * まとめて入力できるようにするために使う。
    */
-  flangePartner?: {
-    upstream: Segment
-    downstream: Segment
-    selectedRole: 'upstream' | 'downstream'
-  }
-  /** 上記ペアの切り寸法（自動算出値をプレースホルダーで見せるために使う） */
-  flangePartnerCuts?: { upstream?: CutResult; downstream?: CutResult }
-  /** 両フランジ区間の上流側/下流側の芯々寸法をまとめて更新する */
-  onChangeFlangePair: (aId: string, bId: string, patch: { up?: number; down?: number }) => void
-  /** 両フランジ区間の全長(分割前の寸法)を更新する */
-  onChangeFlangeSpan: (bId: string, span: number | undefined) => void
-  /** 両フランジ区間の入力方法(全長基準／個別入力)を切り替える */
-  onChangeFlangeSpanMode: (aId: string, bId: string, mode: 'total' | 'each') => void
+  spanRunMembers?: Segment[]
+  /** 通りの全長を持っている区間（未設定なら undefined） */
+  spanRunHolder?: Segment
+  /** 自動算出値をプレースホルダーで見せるための切り寸法一覧 */
+  spanRunCuts?: Record<string, CutResult>
+  /** 指定した区間の芯々寸法を更新する */
+  onChangeSegmentCenter: (id: string, v: number | undefined) => void
+  /** 通りの全長を更新する */
+  onChangeRunSpan: (span: number | undefined) => void
+  /** 通りの入力方法(全長基準／個別入力)を切り替える */
+  onChangeRunSpanMode: (mode: 'total' | 'each') => void
   /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
   baseSlopeDenom?: number
   /** 切り寸法の丸め方（全体設定・既定=四捨五入） */
@@ -298,11 +297,12 @@ export function SegmentPanel({
   onSetTeeSize,
   reducerPartner,
   onChangeReducerPair,
-  flangePartner,
-  flangePartnerCuts,
-  onChangeFlangePair,
-  onChangeFlangeSpan,
-  onChangeFlangeSpanMode,
+  spanRunMembers,
+  spanRunHolder,
+  spanRunCuts,
+  onChangeSegmentCenter,
+  onChangeRunSpan,
+  onChangeRunSpanMode,
   baseSlopeDenom,
   roundMode,
   onRoundModeChange,
@@ -689,46 +689,42 @@ export function SegmentPanel({
 
         {/* ② 寸法入力 */}
         <div className="panel-grid">
-          {flangePartner ? (
+          {/* レジューサーも一直線に分割されるため「通り」に該当してしまうが、
+              レジューサーはメイン側/先端側の専用入力(reducerSpanLength)を
+              持っているので、そちらを優先する。 */}
+          {!reducerPartner && spanRunMembers && spanRunMembers.length >= 2 ? (
             (() => {
-              // 両フランジで分割した区間は、上流側・下流側の2つの寸法に分かれる。
-              // 現場では「全長は分かっていて、そこから都合の良い位置で切り分ける」
-              // ことが多いため、既定は全長基準（全長と片側を入れれば、もう片側は
-              // 自動算出）。実測を両側それぞれ入れたい場合のために個別入力へも
-              // 切り替えられる。どちらの区間を選んでいても同じ内容を出す。
-              const { upstream: up, downstream: down, selectedRole } = flangePartner
-              const upCut = flangePartnerCuts?.upstream
-              const downCut = flangePartnerCuts?.downstream
-              const isEach = down.flangeSpanMode === 'each'
-              // 2つの区間は「上流/下流」では呼ばない。どちらが上流かは parentId
-              // ＝描いた順序で決まってしまい、実際の流れと逆になることがある
-              // （長手が上流側として出てしまう、と実機で報告された）。
-              // 代わりに「いま選んでいる区間（図でオレンジ）」と「もう一方」で
-              // 示す。これなら描いた順序に関係なく取り違えようがない。
-              const selIsUp = selectedRole === 'upstream'
-              const selSeg = selIsUp ? up : down
-              const othSeg = selIsUp ? down : up
-              const selCut = selIsUp ? upCut : downCut
-              const othCut = selIsUp ? downCut : upCut
+              // チーズ・フランジで分かれた区間は「通り」(曲がるまでのまとまり)
+              // としてまとめて扱う。現場では「全長は分かっていて、そこから
+              // 都合の良い位置で切り分ける」ことが多いため、既定は全長基準
+              // （全長を入れ、残り1区間だけ空にしておくとそこが自動算出）。
+              // 実測を各区間それぞれ入れたい場合は個別入力へ切り替える。
+              // どの区間を選んでいても同じ内容を出す。
+              const members = spanRunMembers
+              const isEach = members.some((m) => m.flangeSpanMode === 'each')
+              const selCut = spanRunCuts?.[segment.id]
+              const others = members.filter((m) => m.id !== segment.id)
               return (
                 <>
                   <div className="field round-field">
                     <span className="field-label">
                       寸法の入れ方
-                      <span className="field-note">両フランジで分割した区間</span>
+                      <span className="field-note">
+                        つながった{members.length}区間（曲がるまで）
+                      </span>
                     </span>
                     <div className="round-toggle">
                       <button
                         type="button"
                         className={!isEach ? 'active' : ''}
-                        onClick={() => onChangeFlangeSpanMode(up.id, down.id, 'total')}
+                        onClick={() => onChangeRunSpanMode('total')}
                       >
                         全長基準
                       </button>
                       <button
                         type="button"
                         className={isEach ? 'active' : ''}
-                        onClick={() => onChangeFlangeSpanMode(up.id, down.id, 'each')}
+                        onClick={() => onChangeRunSpanMode('each')}
                       >
                         個別入力
                       </button>
@@ -738,13 +734,13 @@ export function SegmentPanel({
                     <label className="field dim-field">
                       <span className="field-label">
                         全長(mm)
-                        <span className="field-note">分割前の寸法</span>
+                        <span className="field-note">曲がるまでの通し</span>
                       </span>
                       <DimCalcInput
                         className="num-input"
                         placeholder="例: 2450"
-                        value={down.flangeSpanLength}
-                        onCommit={(v) => onChangeFlangeSpan(down.id, v)}
+                        value={spanRunHolder?.flangeSpanLength}
+                        onCommit={(v) => onChangeRunSpan(v)}
                       />
                     </label>
                   )}
@@ -760,33 +756,35 @@ export function SegmentPanel({
                           ? `自動算出 ${selCut.derivedCenter}`
                           : '例: 1000'
                       }
-                      value={selSeg.centerLength}
-                      onCommit={(v) =>
-                        onChangeFlangePair(up.id, down.id, selIsUp ? { up: v } : { down: v })
-                      }
+                      value={segment.centerLength}
+                      onCommit={(v) => onChangeSegmentCenter(segment.id, v)}
                     />
                   </label>
-                  <label className="field dim-field">
-                    <span className="field-label">
-                      もう一方(mm)
-                      <span className="field-note">フランジの反対側</span>
-                    </span>
-                    <DimCalcInput
-                      className="num-input"
-                      placeholder={
-                        othCut?.derivedCenter != null
-                          ? `自動算出 ${othCut.derivedCenter}`
-                          : '例: 1450'
-                      }
-                      value={othSeg.centerLength}
-                      onCommit={(v) =>
-                        onChangeFlangePair(up.id, down.id, selIsUp ? { down: v } : { up: v })
-                      }
-                    />
-                  </label>
-                  {!isEach && (upCut?.needsReducerSpanInput || downCut?.needsReducerSpanInput) && (
+                  {others.map((m, i) => {
+                    const c = spanRunCuts?.[m.id]
+                    return (
+                      <label className="field dim-field" key={m.id}>
+                        <span className="field-label">
+                          {others.length === 1 ? 'もう一方(mm)' : `他の区間${i + 1}(mm)`}
+                          <span className="field-note">同じ通りの中</span>
+                        </span>
+                        <DimCalcInput
+                          className="num-input"
+                          placeholder={
+                            c?.derivedCenter != null ? `自動算出 ${c.derivedCenter}` : '例: 1450'
+                          }
+                          value={m.centerLength}
+                          onCommit={(v) => onChangeSegmentCenter(m.id, v)}
+                        />
+                      </label>
+                    )
+                  })}
+                  {!isEach && selCut?.needsReducerSpanInput && (
                     <div className="socket-gap-warn">
-                      <p>全長と、どちらか一方の区間の寸法を入力してください。</p>
+                      <p>
+                        全長と、この通りの区間のうち1つを残して全ての寸法を入力してください
+                        （残した1つが全長から自動計算されます）。
+                      </p>
                     </div>
                   )}
                 </>

@@ -4,6 +4,7 @@ import { reducerCounterpart, reducerLargeAtStart } from './inheritance'
 import { computeEnds, resolveReducerH, isReducerId, type EndRole } from './takeout'
 import { getFitting, nominalOf, reducerKey, type ReducerDim } from '../data/masters'
 import { computeChainedSlopeDrop } from './slope'
+import { groupRuns, runSpanHolder, type RunGroup } from './throughRun'
 
 export interface EccentricInfo {
   offset?: number
@@ -381,42 +382,37 @@ function isReducerPairMember(s: Segment, segments: Segment[]): boolean {
   return segments.some((x) => x.parentId === s.id && isReducerId(x.fitting))
 }
 
-/** 両フランジで分割された下流側(B)を探す。sがA(上流)ならBを返す。 */
-function flangePairDownstream(s: Segment, segments: Segment[]): Segment | undefined {
-  return segments.find((x) => x.parentId === s.id && x.startFlange === 'double')
-}
-
 /**
- * 両フランジ区間(上流A/下流B)のうち、自分の芯々寸法(centerLength)が未入力の
- * 側について、もう一方の実測値と flangeSpanLength(分割前の全長)から
- * 「flangeSpanLength − もう一方の実測値」で自動算出する。
- * フランジ同士は同じ点で接するため、レジューサーのような面間寸法(H)の
- * 差し引きは無い。両方入力済み・全長未設定(=個別入力モード)・もう一方が
- * 未入力で算出できない場合は undefined を返す（セグメントのデータ自体は
- * 書き換えず、読み取り時にだけ都度算出する）。
+ * 「全長基準」で入力された通り(曲がるまで一直線に続く区間のまとまり)のうち、
+ * 自分の芯々寸法(centerLength)が未入力の区間について、
+ * 「全長 − 他の区間の合計」で自動算出する。
+ * 未入力が2つ以上ある場合はどちらに割り振るか決まらないので算出しない。
+ * 通りに全長が設定されていない/「個別入力」に切り替えてある場合も算出しない。
+ * セグメントのデータ自体は書き換えず、読み取り時にだけ都度算出する。
+ *
+ * 両フランジで分けたときだけでなく、その後チーズで更に分けても同じ全長を
+ * 使い続けられる（分割しても通り全体の長さは変わらないため）。
  */
-function deriveFlangeCenterLength(s: Segment, segments: Segment[]): number | undefined {
-  // s が下流側(B)のとき: 全長は自分が持ち、相手は親(A)。
-  if (s.startFlange === 'double' && s.parentId) {
-    if (s.flangeSpanMode === 'each' || s.flangeSpanLength == null) return undefined
-    const a = segments.find((x) => x.id === s.parentId)
-    if (!a || a.centerLength == null) return undefined
-    return round1(s.flangeSpanLength - a.centerLength)
+function deriveRunCenterLength(s: Segment, runs: RunGroup[]): number | undefined {
+  const run = runs.find((g) => g.members.some((m) => m.id === s.id))
+  if (!run || run.members.length < 2) return undefined
+  const holder = runSpanHolder(run)
+  if (!holder || holder.flangeSpanLength == null) return undefined
+  let sum = 0
+  for (const m of run.members) {
+    if (m.id === s.id) continue
+    if (m.centerLength == null) return undefined // 未入力が2つ以上 → 決まらない
+    sum += m.centerLength
   }
-  // s が上流側(A)のとき: 全長は下流側(B)が持つ。
-  const b = flangePairDownstream(s, segments)
-  if (!b || b.flangeSpanMode === 'each') return undefined
-  if (b.flangeSpanLength == null || b.centerLength == null) return undefined
-  return round1(b.flangeSpanLength - b.centerLength)
+  return round1(holder.flangeSpanLength - sum)
 }
 
-/** sが両フランジ区間のペア(全長基準モード)に属しているか */
-function isFlangeSpanPairMember(s: Segment, segments: Segment[]): boolean {
-  if (s.startFlange === 'double' && s.parentId) {
-    return s.flangeSpanMode !== 'each' && s.flangeSpanLength != null
-  }
-  const b = flangePairDownstream(s, segments)
-  return !!b && b.flangeSpanMode !== 'each' && b.flangeSpanLength != null
+/** sが「全長基準」の通り(全長が設定済み・2区間以上)に属しているか */
+function isRunSpanMember(s: Segment, runs: RunGroup[]): boolean {
+  const run = runs.find((g) => g.members.some((m) => m.id === s.id))
+  if (!run || run.members.length < 2) return false
+  const holder = runSpanHolder(run)
+  return !!holder && holder.flangeSpanLength != null
 }
 
 /**
@@ -444,6 +440,8 @@ export function computeAllCut(
 ): Record<string, CutResult> {
   const ends = computeEnds(segments, effectiveById)
   const slopeDrops = computeChainedSlopeDrop(segments, effectiveById, baseSlopeDenom)
+  // 「全長基準」の自動算出に使う通り(曲がるまでのまとまり)。全区間で1回だけ求める。
+  const runs = groupRuns(segments)
   const out: Record<string, CutResult> = {}
 
   for (const s of segments) {
@@ -473,13 +471,13 @@ export function computeAllCut(
     const derivedCenter =
       s.centerLength == null
         ? (deriveReducerCenterLength(s, segments, effectiveById) ??
-          deriveFlangeCenterLength(s, segments))
+          deriveRunCenterLength(s, runs))
         : undefined
     const center = s.centerLength ?? derivedCenter
     const needsReducerSpanInput =
       s.centerLength == null &&
       derivedCenter == null &&
-      (isReducerPairMember(s, segments) || isFlangeSpanPairMember(s, segments))
+      (isReducerPairMember(s, segments) || isRunSpanMember(s, runs))
     const adjustedCenter = center != null ? center - slopeAdjust : undefined
     const { rawCut, cut, status } = computeCutFromAllowances(
       adjustedCenter,

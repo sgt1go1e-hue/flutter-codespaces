@@ -22,7 +22,7 @@ import {
 } from './lib/shareFile'
 import { loadShareMeta, saveShareMeta } from './lib/shareStore'
 import { computeBom } from './lib/bom'
-import { computeThroughRuns } from './lib/throughRun'
+import { computeThroughRuns, runOf, runSpanHolder } from './lib/throughRun'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
   type DrawingMeta,
@@ -850,67 +850,45 @@ export default function App() {
     )
   }
 
-  // 両フランジで分割された区間のペア(上流A/下流B)。詳細パネルで全長と
-  // 上流側/下流側の寸法を1箇所で入力できるようにするために使う。
-  const flangePartner = useMemo(() => {
+  // 選択中の区間が属する「通り」(曲がるまで一直線に続くまとまり)。
+  // 2区間以上に分かれているときだけ、詳細パネルで全長基準の入力を出す。
+  const spanRun = useMemo(() => {
     if (!selected) return undefined
-    if (selected.startFlange === 'double' && selected.parentId) {
-      const a = segments.find((s) => s.id === selected.parentId)
-      if (a && a.endFlange === 'double') {
-        return { upstream: a, downstream: selected, selectedRole: 'downstream' as const }
-      }
-    }
-    if (selected.endFlange === 'double') {
-      const b = segments.find((s) => s.parentId === selected.id && s.startFlange === 'double')
-      if (b) return { upstream: selected, downstream: b, selectedRole: 'upstream' as const }
-    }
-    return undefined
+    const run = runOf(selected.id, segments)
+    if (!run || run.members.length < 2) return undefined
+    return run
   }, [selected, segments])
 
-  // 両フランジ区間の上流側/下流側の芯々寸法をまとめて更新する。片方だけ渡せば
-  // その区間だけ更新し、もう一方は cutlength.ts 側の deriveFlangeCenterLength が
-  // 全長から自動算出する（データは書き換えない）。
-  function updateFlangePair(aId: string, bId: string, patch: { up?: number; down?: number }) {
+  /** 通りの全長を更新する。全長は「今それを持っている区間」に保存する
+      （まだ無ければ選択中の区間に持たせる）。 */
+  function updateRunSpan(span: number | undefined) {
+    if (!spanRun || !selected) return
+    const holderId = runSpanHolder(spanRun)?.id ?? selected.id
     setSegments((prev) =>
-      prev.map((s) => {
-        if (s.id === aId && 'up' in patch) return { ...s, centerLength: patch.up }
-        if (s.id === bId && 'down' in patch) return { ...s, centerLength: patch.down }
-        return s
-      }),
+      prev.map((s) => (s.id === holderId ? { ...s, flangeSpanLength: span } : s)),
     )
   }
 
-  /** 両フランジ区間の全長(分割前の寸法)を更新する。全長は下流側(B)が持つ。 */
-  function updateFlangeSpan(bId: string, span: number | undefined) {
-    setSegments((prev) => prev.map((s) => (s.id === bId ? { ...s, flangeSpanLength: span } : s)))
-  }
-
   /**
-   * 両フランジ区間の入力方法(全長基準／個別入力)を切り替える。
+   * 通りの入力方法(全長基準／個別入力)を切り替える。
    * 「個別入力」へ移すときは、それまで全長から自動算出して画面に出ていた値を
    * 実データとして書き込んでから切り替える（切り替えた瞬間に数字が消えると
    * 現場で何を入れていたか分からなくなるため）。
    */
-  function setFlangeSpanMode(aId: string, bId: string, mode: 'total' | 'each') {
+  function setRunSpanMode(mode: 'total' | 'each') {
+    if (!spanRun) return
+    const ids = new Set(spanRun.members.map((m) => m.id))
     setSegments((prev) =>
       prev.map((s) => {
-        if (s.id === aId && mode === 'each' && s.centerLength == null) {
-          return { ...s, centerLength: cutById[aId]?.derivedCenter }
+        if (!ids.has(s.id)) return s
+        const next: Segment = { ...s }
+        if (mode === 'each') {
+          if (next.centerLength == null) next.centerLength = cutById[s.id]?.derivedCenter
+          next.flangeSpanMode = 'each'
+        } else {
+          next.flangeSpanMode = undefined
         }
-        if (s.id === bId) {
-          const next = { ...s, flangeSpanMode: mode === 'each' ? ('each' as const) : undefined }
-          if (mode === 'each' && next.centerLength == null) {
-            next.centerLength = cutById[bId]?.derivedCenter
-          }
-          if (mode === 'total' && next.flangeSpanLength == null) {
-            // 全長が未設定なら、今表示されている上流+下流の合計を初期値にする
-            const up = prev.find((x) => x.id === aId)?.centerLength ?? cutById[aId]?.derivedCenter
-            const down = s.centerLength ?? cutById[bId]?.derivedCenter
-            if (up != null && down != null) next.flangeSpanLength = Math.round((up + down) * 10) / 10
-          }
-          return next
-        }
-        return s
+        return next
       }),
     )
   }
@@ -1559,18 +1537,14 @@ export default function App() {
           onSetTeeSize={setSizeForSegments}
           reducerPartner={reducerPartner}
           onChangeReducerPair={updateReducerPair}
-          flangePartner={flangePartner}
-          flangePartnerCuts={
-            flangePartner
-              ? {
-                  upstream: cutById[flangePartner.upstream.id],
-                  downstream: cutById[flangePartner.downstream.id],
-                }
-              : undefined
+          spanRunMembers={spanRun?.members}
+          spanRunHolder={spanRun ? runSpanHolder(spanRun) : undefined}
+          spanRunCuts={cutById}
+          onChangeSegmentCenter={(id, v) =>
+            setSegments((prev) => prev.map((x) => (x.id === id ? { ...x, centerLength: v } : x)))
           }
-          onChangeFlangePair={updateFlangePair}
-          onChangeFlangeSpan={updateFlangeSpan}
-          onChangeFlangeSpanMode={setFlangeSpanMode}
+          onChangeRunSpan={updateRunSpan}
+          onChangeRunSpanMode={setRunSpanMode}
           baseSlopeDenom={defaults.slopeDenom}
           roundMode={defaults.roundMode ?? 'round'}
           onRoundModeChange={(mode) => updateDefaults({ roundMode: mode })}

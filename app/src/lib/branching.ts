@@ -21,16 +21,16 @@ export function splitSegmentAt(
   // 元の終点はB側が引き継ぐので、endFitting・endFlangeもBへ移す。
   // endFlangeを残していたため、「チーズを入れると分岐点にフランジマークが
   // 出てくる」不具合になっていた(実機で報告)。
-  // flangeSpanLength(両フランジの分割前の全長)は、この区間がチーズで更に
-  // 短くなると合計が合わなくなり自動算出が狂うため、ここで解除して
-  // 「個別入力」に戻す(黙って間違った寸法を出すより安全側に倒す)。
+  // 「全長基準」の全長(flangeSpanLength)は、チーズで更に分割しても
+  // 通り全体の長さは変わらないため、そのままAへ持ち越す（以前は破棄して
+  // いたが、全長を入れた後にチーズを入れると全長が消えてしまっていた）。
+  // 自動算出はペア単位ではなく通り(曲がるまでのまとまり)単位で行うので、
+  // 3区間以上に分かれても同じ全長を使い続けられる。
   const A: Segment = {
     ...target,
     end: P,
     endFitting: undefined,
     endFlange: undefined,
-    flangeSpanLength: undefined,
-    flangeSpanMode: undefined,
     fieldWeldMarks: marks.a,
   }
   const B: Segment = {
