@@ -114,7 +114,16 @@ function splitForDoubleFlange(
   // 現場溶接マークは分割後の区間長に合わせてA/Bへ振り分ける（詳細は
   // splitFieldWeldMarks のコメント参照）。
   const marks = splitFieldWeldMarks(target.fieldWeldMarks, t)
-  const A: Segment = { ...target, end: P, endFlange: 'double', fieldWeldMarks: marks.a }
+  // A の終点はP(フランジ接合部)に変わるため、元の終点側にだけ意味を持つ
+  // endFitting個別上書きはAには残せない。元の終点はB側が引き継ぐ
+  // （splitSegmentAt / splitForReducer と同じ扱い）。
+  const A: Segment = {
+    ...target,
+    end: P,
+    endFlange: 'double',
+    endFitting: undefined,
+    fieldWeldMarks: marks.a,
+  }
   const B: Segment = {
     id: bId,
     start: P,
@@ -124,6 +133,13 @@ function splitForDoubleFlange(
     startFlange: 'double',
     connection: 'flange',
     fieldWeldMarks: marks.b,
+    // 系統色(colorId)は継承の仕組み(Effective)を持たない直接指定の属性なので、
+    // ここで明示的にコピーしないと分割後のB側だけ色が消える（実機で
+    // 「両フランジを入れると色が戻る」として報告された不具合）。
+    colorId: target.colorId,
+    // 元の終点側の個別上書き(フランジ・継手)はB側の終点として引き継ぐ。
+    endFlange: target.endFlange,
+    endFitting: target.endFitting,
     // pipeType/size/fitting は持たせない → A から継承・自動
   }
   A.connection = target.connection ?? 'flange'
@@ -214,6 +230,9 @@ function splitForReducer(
     connection: target.connection,
     reducerSpanLength: target.centerLength,
     fieldWeldMarks: marks.b,
+    // 両フランジ側と同じ理由で系統色を明示的に引き継ぐ（継承の仕組みが
+    // 効かない直接指定の属性のため、コピーしないとB側だけ色が消える）。
+    colorId: target.colorId,
   }
   const result: Segment[] = []
   for (const s of segments) {
