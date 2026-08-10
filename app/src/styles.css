@@ -39,6 +39,7 @@
   --label-terminus: #fbbf24;
   --label-elbow45: #f472b6;
   --label-elbow-short: #2dd4bf;
+  --label-through: #c084fc;
 }
 
 /* 屋外の明るい場所でも見やすいライトテーマ。トップバーの切替ボタンで選べる。 */
@@ -77,6 +78,7 @@
   --label-terminus: #b45309;
   --label-elbow45: #be185d;
   --label-elbow-short: #0f766e;
+  --label-through: #7e22ce;
 }
 
 * {
@@ -960,6 +962,19 @@ body {
 
 .dim-cut.tight {
   fill: var(--label-tight);
+}
+
+/* 通り寸法(曲がるまでの全体の芯々)。チーズ・フランジで区間が分かれていても
+   通しの寸法が知りたい、という現場の要望で追加した。個別の寸法線より外側の
+   レーンに出す。個別の芯々(.dim-center)や切り寸(.dim-cut)と取り違えないよう、
+   「通し」の接頭辞に加えて色も分ける。 */
+.dim-through {
+  fill: var(--label-through);
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3.2px * var(--ui-scale, 1));
 }
 
 /* 現合(現物合わせ)区間の注記表示。通常の芯々/切り寸法(.dim-center/.dim-cut)

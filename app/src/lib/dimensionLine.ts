@@ -15,6 +15,13 @@ import type { Point } from '../types'
 /** 寸法線のパイプからの基準距離(px)。実際はscale倍して使う。以前の外側レーンの位置を踏襲。 */
 export const DIM_STANDOFF = 21
 
+/**
+ * 「通り寸法」(曲がるまでの全体の芯々)を出す外側レーンの距離(px)。
+ * 通常の寸法線(DIM_STANDOFF)＋その上に積む2行分の文字を完全に越える位置に
+ * 置き、既存の寸法表示と重ならないようにする。
+ */
+export const DIM_THROUGH_STANDOFF = 68
+
 const EXT_LINE_GAP = 2 // パイプ本体からの隙間(基準値, px)
 const EXT_LINE_OVERSHOOT = 3 // 寸法線を少し超えて伸ばす量(基準値, px)
 const ARROW_LEN = 6 // 矢羽根の長さ(基準値, px)
@@ -91,9 +98,16 @@ function arrowPoints(tip: Point, dir: Point, len: number, width: number): string
 }
 
 /** 寸法線(1本)・矢羽根・2行分の文字位置ジオメトリを求める。 */
-export function dimGeometry(start: Point, end: Point, side: DimSide, scale: number): DimGeometry {
+export function dimGeometry(
+  start: Point,
+  end: Point,
+  side: DimSide,
+  scale: number,
+  /** パイプからの距離。通り寸法の外側レーン等に使う（既定=通常の寸法線） */
+  standoff: number = DIM_STANDOFF,
+): DimGeometry {
   const { nx, ny } = side
-  const s = DIM_STANDOFF * scale
+  const s = standoff * scale
   const p1 = { x: start.x + nx * s, y: start.y + ny * s }
   const p2 = { x: end.x + nx * s, y: end.y + ny * s }
   const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1
@@ -125,9 +139,10 @@ export function dimExtensionLine(
   point: Point,
   side: DimSide,
   scale: number,
+  standoff: number = DIM_STANDOFF,
 ): { x1: number; y1: number; x2: number; y2: number } {
   const gap = EXT_LINE_GAP * scale
-  const to = (DIM_STANDOFF + EXT_LINE_OVERSHOOT) * scale
+  const to = (standoff + EXT_LINE_OVERSHOOT) * scale
   return {
     x1: point.x + side.nx * gap,
     y1: point.y + side.ny * gap,

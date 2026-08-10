@@ -22,7 +22,14 @@ import {
   type LabelBox,
   type LabelJob,
 } from '../lib/labelLayout'
-import { chooseDimSide, dimExtensionLine, dimGeometry, DIM_STANDOFF } from '../lib/dimensionLine'
+import {
+  chooseDimSide,
+  dimExtensionLine,
+  dimGeometry,
+  DIM_STANDOFF,
+  DIM_THROUGH_STANDOFF,
+} from '../lib/dimensionLine'
+import type { ThroughRun } from '../lib/throughRun'
 import {
   fieldFitDoubleLines,
   fieldFitEndMarkGeometry,
@@ -85,6 +92,11 @@ interface Props {
   assemblyNumberActive?: boolean
   /** 区間ごとの実効相番。芯々未入力の区間には含まれない。 */
   assemblyNumberById?: Record<string, number>
+  /**
+   * 通り寸法(曲がるまで一直線に続く区間の合計)。空配列なら表示しない。
+   * 表示専用で、寸法・切り寸法の計算結果には一切関与しない。
+   */
+  throughRuns?: ThroughRun[]
   /** 現場溶接マークの三角をタップしたとき、90°回す（表示専用）。 */
   onRotateFieldWeldMark?: (segId: string, markId: string) => void
   /** 消しゴム中に現場溶接マークの三角をタップしたとき、そのマークだけ消す。 */
@@ -242,6 +254,7 @@ export function DrawingCanvas({
   disableDraw = false,
   assemblyNumberActive = false,
   assemblyNumberById = {},
+  throughRuns = [],
   onRotateFieldWeldMark,
   onDeleteFieldWeldMark,
   onToggleFieldFitFlip,
@@ -1566,6 +1579,38 @@ export function DrawingCanvas({
                 </g>
               )
             })()}
+          </g>
+        )
+      })}
+
+      {/* 通り寸法（曲がるまで一直線に続く区間の合計。既存の寸法線より外側の
+          レーンに1本だけ引く）。表示専用で計算には関与しない。 */}
+      {throughRuns.map((run) => {
+        if (run.total == null) return null
+        // 出す側は構成区間の1本目に合わせる（バラバラの側に出ると読みにくい）。
+        const first = segments.find((x) => x.id === run.ids[0])
+        if (!first) return null
+        const markPos = nearestElbow45Mark(elbow45Marks, (run.start.x + run.end.x) / 2, (run.start.y + run.end.y) / 2)
+        const side = chooseDimSide(first.start, first.end, markPos ?? undefined)
+        const g = dimGeometry(run.start, run.end, side, uiScale, DIM_THROUGH_STANDOFF)
+        const e1 = dimExtensionLine(run.start, side, uiScale, DIM_THROUGH_STANDOFF)
+        const e2 = dimExtensionLine(run.end, side, uiScale, DIM_THROUGH_STANDOFF)
+        return (
+          <g key={`through-${run.ids[0]}`} className="dim-group" pointerEvents="none">
+            <line className="dim-ext-line" x1={e1.x1} y1={e1.y1} x2={e1.x2} y2={e1.y2} />
+            <line className="dim-ext-line" x1={e2.x1} y1={e2.y1} x2={e2.x2} y2={e2.y2} />
+            <line className="dim-line" x1={g.line.x1} y1={g.line.y1} x2={g.line.x2} y2={g.line.y2} />
+            <polygon className="dim-arrow" points={g.arrowStart} />
+            <polygon className="dim-arrow" points={g.arrowEnd} />
+            <text
+              className="dim-through"
+              x={g.text1X}
+              y={g.text1Y}
+              textAnchor="middle"
+              transform={`rotate(${g.textRotateDeg} ${g.text1X} ${g.text1Y})`}
+            >
+              通し {run.total}
+            </text>
           </g>
         )
       })}

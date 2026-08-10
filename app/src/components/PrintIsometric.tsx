@@ -12,7 +12,13 @@ import {
   type LabelBox,
   type LabelJob,
 } from '../lib/labelLayout'
-import { chooseDimSide, dimExtensionLine, dimGeometry } from '../lib/dimensionLine'
+import {
+  chooseDimSide,
+  dimExtensionLine,
+  dimGeometry,
+  DIM_THROUGH_STANDOFF,
+} from '../lib/dimensionLine'
+import { computeThroughRuns } from '../lib/throughRun'
 import {
   fieldFitDoubleLines,
   fieldFitEndMarkGeometry,
@@ -34,6 +40,8 @@ interface Props {
   cutById: Record<string, CutResult>
   /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
   baseSlopeDenom?: number
+  /** 通り寸法(曲がるまでの全体の芯々)を出すか。画面の切替と共通。 */
+  showThroughDim?: boolean
 }
 
 const CROSS_GAP = 9
@@ -127,7 +135,13 @@ export function PrintIsometric({
   crossoverGaps,
   cutById,
   baseSlopeDenom,
+  showThroughDim = false,
 }: Props) {
+  // 通り寸法(曲がるまで一直線に続く区間の合計)。表示専用。
+  const throughRuns = useMemo(
+    () => (showThroughDim ? computeThroughRuns(segments, cutById) : []),
+    [showThroughDim, segments, cutById],
+  )
   // 実際に描かれる45°マークの位置（寸法線を出す側の判定に使う。重なり回避の
   // 対象位置計算(resolvedLabels)と実際の寸法線描画(レンダー側)の両方で同じ
   // 値を参照する）。
@@ -781,6 +795,41 @@ export function PrintIsometric({
                 </g>
               )
             })()}
+          </g>
+        )
+      })}
+
+      {/* 通り寸法（曲がるまで一直線に続く区間の合計）。既存の寸法線より
+          外側のレーンに1本引く。画面側(DrawingCanvas)と同じ考え方。 */}
+      {throughRuns.map((run) => {
+        if (run.total == null) return null
+        const first = segments.find((x) => x.id === run.ids[0])
+        if (!first) return null
+        const markPos = nearestElbow45Mark(
+          elbow45Marks,
+          (run.start.x + run.end.x) / 2,
+          (run.start.y + run.end.y) / 2,
+        )
+        const side = chooseDimSide(first.start, first.end, markPos ?? undefined)
+        const g = dimGeometry(run.start, run.end, side, 1, DIM_THROUGH_STANDOFF)
+        const e1 = dimExtensionLine(run.start, side, 1, DIM_THROUGH_STANDOFF)
+        const e2 = dimExtensionLine(run.end, side, 1, DIM_THROUGH_STANDOFF)
+        return (
+          <g key={`through-${run.ids[0]}`} className="dim-group">
+            <line className="dim-ext-line" x1={e1.x1} y1={e1.y1} x2={e1.x2} y2={e1.y2} />
+            <line className="dim-ext-line" x1={e2.x1} y1={e2.y1} x2={e2.x2} y2={e2.y2} />
+            <line className="dim-line" x1={g.line.x1} y1={g.line.y1} x2={g.line.x2} y2={g.line.y2} />
+            <polygon className="dim-arrow" points={g.arrowStart} />
+            <polygon className="dim-arrow" points={g.arrowEnd} />
+            <text
+              className="dim-through"
+              x={g.text1X}
+              y={g.text1Y}
+              textAnchor="middle"
+              transform={`rotate(${g.textRotateDeg} ${g.text1X} ${g.text1Y})`}
+            >
+              通し {run.total}
+            </text>
           </g>
         )
       })}

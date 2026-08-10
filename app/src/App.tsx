@@ -22,6 +22,7 @@ import {
 } from './lib/shareFile'
 import { loadShareMeta, saveShareMeta } from './lib/shareStore'
 import { computeBom } from './lib/bom'
+import { computeThroughRuns } from './lib/throughRun'
 import { useLocalStorage } from './hooks/useLocalStorage'
 import {
   type DrawingMeta,
@@ -314,6 +315,13 @@ export default function App() {
   // 経由せずその場で即削除する（ルート変更等で何本もまとめて消したい場面向け）。
   // 他のメニュー操作を行うと自動的に解除する（誤操作防止）。
   const [eraserMode, setEraserMode] = useState(false)
+  // 通り寸法(曲がるまでの全体の芯々)を出すか。チーズ・フランジで区間が
+  // 分かれていても通しの寸法が知りたい、という現場の要望で追加した。
+  // 数字が密集して見づらいときのために切り替えられるようにしてある。
+  const [showThroughDim, setShowThroughDim] = useLocalStorage<boolean>(
+    'piping-iso:throughDim',
+    true,
+  )
   // 表示テーマ（暗い/明るい）。屋外の日差しの下では暗い画面が見づらいため、
   // 端末ごとに好みを覚えておいて切り替えられるようにする。
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>(
@@ -907,6 +915,12 @@ export default function App() {
     )
   }
 
+  // 通り寸法(曲がるまで一直線に続く区間の合計)。表示専用。
+  const throughRuns = useMemo(
+    () => (showThroughDim ? computeThroughRuns(segments, cutById) : []),
+    [showThroughDim, segments, cutById],
+  )
+
   // 材料集計(BOM)。モーダルを開いたときに使う。
   const bom = useMemo(
     () => computeBom(segments, effectiveById, cutById),
@@ -1343,6 +1357,19 @@ export default function App() {
         📤 共有
       </button>
     ),
+    throughDim: (
+      <button
+        key="throughDim"
+        className={showThroughDim ? 'active' : ''}
+        onClick={() => {
+          setEraserMode(false)
+          setShowThroughDim((v) => !v)
+        }}
+        title="チーズ・フランジで分かれた区間をまたいだ、曲がるまでの全体の芯々を表示します"
+      >
+        {showThroughDim ? '📐 通り寸法 中' : '📐 通り寸法'}
+      </button>
+    ),
     disclaimer: (
       <button
         key="disclaimer"
@@ -1476,6 +1503,7 @@ export default function App() {
           onEraseSegment={eraseSegment}
           assemblyNumberActive={assemblyNumberActive}
           assemblyNumberById={assemblyNumberById}
+          throughRuns={throughRuns}
           onRotateFieldWeldMark={canEditStructure ? rotateFieldWeldMark : undefined}
           onDeleteFieldWeldMark={canEditStructure ? deleteFieldWeldMark : undefined}
           onToggleFieldFitFlip={canEditStructure ? toggleFieldFitFlip : undefined}
@@ -1602,6 +1630,7 @@ export default function App() {
           crossoverGaps={crossoverGaps}
           cutById={cutById}
           baseSlopeDenom={defaults.slopeDenom}
+          showThroughDim={showThroughDim}
           assemblyNumberById={assemblyNumberById}
           onRenumber={canEditStructure ? setAssemblyNumberOverride : () => {}}
           onClose={() => setShowBom(false)}

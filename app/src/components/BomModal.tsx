@@ -15,6 +15,8 @@ interface Props {
   cutById: Record<string, CutResult>
   /** 配管設定(ベース)の勾配(1/N のN)。区間自身に個別上書きが無いときに使う。 */
   baseSlopeDenom?: number
+  /** 通り寸法(曲がるまでの全体の芯々)を図に出すか。画面の切替と共通。 */
+  showThroughDim?: boolean
   /** 区間ごとの実効相番。芯々未入力または相番表示OFF中の区間は含まれない。 */
   assemblyNumberById: Record<string, number>
   /** 相番の手動上書き（undefinedで自動採番に戻す） */
@@ -31,6 +33,7 @@ export function BomModal({
   crossoverGaps,
   cutById,
   baseSlopeDenom,
+  showThroughDim = false,
   assemblyNumberById,
   onRenumber,
   onClose,
@@ -396,6 +399,7 @@ export function BomModal({
                       crossoverGaps={crossoverGaps}
                       cutById={cutById}
                       baseSlopeDenom={baseSlopeDenom}
+                      showThroughDim={showThroughDim}
                     />
                   </div>
                 </div>
