@@ -1292,6 +1292,9 @@ export default function App() {
             onNitrogenCalc={openNitrogenCalc}
             onSupportDrawing={openSupportDrawing}
             onImportFile={importShareFile}
+            theme={theme}
+            onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
+            onOpenDisclaimer={() => setReviewDisclaimer(true)}
           />
         ) : (
           <DrawingLauncher

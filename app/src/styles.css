@@ -110,311 +110,569 @@ body {
   height: 100%;
 }
 
-/* 起動画面（新規作成／過去の図面の選択）。図面には名前を付けないため、
-   一覧は更新日時とセグメント数だけで見分ける。 */
-.launcher {
+/* ================= ホーム画面（図面一覧／フォルダ一覧）=================
+   このブロックはホーム画面専用。作図画面・PDF出力・各計算タブとは
+   独立させるため、色は --home-* という専用トークンに閉じてある。
+   （このアプリの --bg / --accent 等はキャンバスやPDFを含む全画面共通の
+   変数なので、そこへホーム画面用の色を上書きすると作図画面やPDFまで
+   巻き添えで変わってしまう。名前を分けているのはそれを防ぐため。）
+
+   既定は暗い画面。トップの設定(⚙)から切り替えると
+   :root[data-theme='light'] 側の明るい配色になる。 */
+.home {
+  /* 面 */
+  --home-bg: #0f1722;
+  --home-surface: #1b2534;
+  --home-surface-sub: #26313f;
+  --home-header: #16304f;
+  --home-header-field: #22436b;
+  /* 文字 */
+  --home-ink: #e8edf3;
+  --home-ink-2: #a9b7c6;
+  --home-ink-3: #7a8798;
+  --home-on-header: #ffffff;
+  --home-on-header-sub: #8fa6c2;
+  /* アクセント */
+  --home-accent: #12a05a;
+  --home-accent-ink: #c9f0dc;
+  --home-tool-1: #3d7be8;
+  --home-tool-2: #9b6bf0;
+  --home-tool-3: #d98324;
+  /* 図面ステータス色（意味はユーザー定義） */
+  --home-status-white: #5b6878;
+  --home-status-red: #d64534;
+  --home-status-green: #12a05a;
+  --home-status-blue: #2e77db;
+  /* 形 */
+  --home-r-lg: 16px;
+  --home-r-md: 15px;
+  --home-r-sm: 13px;
+  --home-r-pill: 999px;
+  --home-gap: 12px;
+  --home-pad-x: 20px;
+  --home-shadow-accent: 0 8px 18px rgba(18, 160, 90, 0.3);
+
   flex: 1;
   display: flex;
   flex-direction: column;
   overflow-y: auto;
   -webkit-overflow-scrolling: touch;
-  padding: 24px 16px;
-  padding-top: max(24px, env(safe-area-inset-top));
+  background: var(--home-bg);
+  color: var(--home-ink);
+}
+
+/* 明るい画面（指示書の配色そのまま） */
+:root[data-theme='light'] .home {
+  --home-bg: #edf0f4;
+  --home-surface: #ffffff;
+  --home-surface-sub: #e1e6ed;
+  --home-ink: #16202e;
+  --home-ink-2: #48576a;
+  --home-ink-3: #8593a5;
+  --home-status-white: #c3cad4;
+}
+
+/* --- ヘッダーブロック --- */
+.home-header {
+  position: relative;
+  background: var(--home-header);
+  border-radius: 0 0 26px 26px;
+  padding: 34px var(--home-pad-x) 22px;
+  padding-top: max(34px, calc(env(safe-area-inset-top) + 14px));
+  flex-shrink: 0;
+}
+
+.home-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-brand-block {
+  min-width: 0;
+}
+
+.home-brand {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--home-on-header);
+}
+
+.home-brand-folder {
+  font-size: 22px;
+  margin-top: 10px;
+}
+
+.home-brand-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--home-on-header-sub);
+}
+
+.home-gear,
+.home-back {
+  background: var(--home-header-field);
+  color: var(--home-on-header);
+  border: none;
+  border-radius: var(--home-r-pill);
+  flex-shrink: 0;
+  /* 手袋のままでも押せるよう最小48px を確保する */
+  min-width: 48px;
+  min-height: 48px;
+  font-size: 18px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-back {
+  border-radius: var(--home-r-sm);
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-search {
+  margin-top: 16px;
+  width: 100%;
+  background: var(--home-header-field);
+  color: var(--home-on-header);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 15px;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 48px;
+  appearance: none;
+}
+
+.home-search::placeholder {
+  color: var(--home-on-header-sub);
+}
+
+/* --- 本体 --- */
+.home-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--home-gap);
+  padding: 18px var(--home-pad-x);
   padding-bottom: max(24px, env(safe-area-inset-bottom));
-  gap: 10px;
 }
 
-.launcher-title {
-  font-size: 20px;
-  font-weight: 800;
-  margin-bottom: 8px;
+/* --- 新規作成 CTA --- */
+.home-cta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  background: var(--home-accent);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--home-r-lg);
+  padding: 20px;
+  box-shadow: var(--home-shadow-accent);
+  text-align: left;
 }
 
-.launcher-title-row {
+.home-cta-badge {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-cta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.home-cta-title {
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.home-cta-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--home-accent-ink);
+}
+
+/* --- ツール 2カラム --- */
+.home-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--home-gap);
+}
+
+.home-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  background: var(--home-surface);
+  border: none;
+  border-radius: var(--home-r-md);
+  padding: 15px;
+  min-height: 96px;
+  text-align: left;
+  color: var(--home-ink);
+}
+
+/* 絵文字は機種依存で潰れるため、単色の角丸ブロックで表す */
+.home-tool-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+
+.home-tool-icon-1 {
+  background: var(--home-tool-1);
+}
+.home-tool-icon-2 {
+  background: var(--home-tool-2);
+}
+.home-tool-icon-3 {
+  background: var(--home-tool-3);
+}
+
+.home-tool-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.home-tool-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--home-ink-3);
+}
+
+/* --- 共有ファイルを開く（主要導線ではないので重みを落とす） --- */
+.home-import {
+  background: var(--home-surface-sub);
+  color: var(--home-ink-2);
+  border: none;
+  border-radius: var(--home-r-sm);
+  padding: 14px;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* --- フォルダセクション --- */
+.home-section-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 10px;
+  margin-top: 6px;
 }
 
-.launcher-title-row .launcher-title {
-  margin-bottom: 0;
-}
-
-.launcher-new {
-  background: #10b981;
-  color: #04231a;
-  border: none;
-  border-radius: 12px;
-  padding: 16px;
-  font-size: 17px;
-  font-weight: 800;
-  min-height: 56px;
-}
-
-.launcher-support {
-  margin-top: 10px;
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  font-size: 15px;
-  font-weight: 700;
-  min-height: 50px;
-}
-
-.launcher-quickcalc {
-  margin-top: 10px;
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  font-size: 15px;
-  font-weight: 700;
-  min-height: 50px;
-}
-
-.launcher-nitrogen {
-  margin-top: 10px;
-  background: var(--panel);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  font-size: 15px;
-  font-weight: 700;
-  min-height: 50px;
-}
-
-.launcher-sub {
-  margin-top: 16px;
-  color: var(--hint);
+.home-section-title {
   font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--home-ink-2);
 }
 
-.launcher-list {
+.home-folder-add {
+  background: var(--home-surface);
+  color: var(--home-ink-2);
+  border: none;
+  border-radius: var(--home-r-pill);
+  padding: 0 16px;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--home-gap);
+}
+
+.home-folder-card {
+  position: relative;
+  background: var(--home-surface);
+  border-radius: var(--home-r-md);
+  overflow: hidden;
+}
+
+/* カード上端の色帯。フォルダ自体の識別色はまだデータに無いため中立色。 */
+.home-folder-band {
+  display: block;
+  height: 5px;
+  background: var(--home-status-white);
+}
+
+.home-folder-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 14px 46px 14px 14px;
+  min-height: 76px;
+  text-align: left;
+  color: var(--home-ink);
+}
+
+.home-folder-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.home-folder-date {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--home-ink-3);
+}
+
+/* 削除は不可逆なので、カード脇に出しっぱなしにせずメニューの中に入れる */
+.home-folder-menu-btn {
+  position: absolute;
+  top: 5px;
+  right: 0;
+  width: 48px;
+  height: 48px;
+  background: transparent;
+  border: none;
+  color: var(--home-ink-3);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.home-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  z-index: 40;
+}
+
+.home-menu {
+  position: absolute;
+  top: 48px;
+  right: 8px;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+  background: var(--home-surface);
+  border-radius: var(--home-r-sm);
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+}
+
+.home-menu-settings {
+  top: auto;
+  right: var(--home-pad-x);
+  margin-top: 6px;
+}
+
+.home-menu button {
+  background: transparent;
+  border: none;
+  color: var(--home-ink);
+  padding: 0 16px;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.home-menu button.danger {
+  color: var(--home-status-red);
+}
+
+.home-empty {
+  margin: 4px 0;
+  font-size: 14px;
+  color: var(--home-ink-2);
+}
+
+/* --- 図面カード（フォルダを開いた先の一覧） --- */
+.home-drawing-list {
   list-style: none;
   margin: 0;
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: var(--home-gap);
 }
 
-.launcher-row {
+.home-drawing-card {
+  position: relative;
   display: flex;
-  align-items: stretch;
-  gap: 6px;
+  background: var(--home-surface);
+  border-radius: var(--home-r-md);
+  overflow: hidden;
 }
 
-.launcher-item {
+/* ステータス色は左端の縦帯で表す（色の意味は定義しない＝ユーザー任せ） */
+.home-drawing-band {
+  flex-shrink: 0;
+  width: 4px;
+  background: var(--home-status-white);
+}
+
+.home-drawing-card.status-red .home-drawing-band {
+  background: var(--home-status-red);
+}
+.home-drawing-card.status-green .home-drawing-band {
+  background: var(--home-status-green);
+}
+.home-drawing-card.status-blue .home-drawing-band {
+  background: var(--home-status-blue);
+}
+
+.home-drawing-body {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  justify-content: center;
-  gap: 2px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 16px;
-  min-height: 50px;
-  color: var(--text);
-  font-size: 14px;
-  text-align: left;
+  padding: 4px 46px 10px 0;
 }
 
-.launcher-item:active {
-  background: var(--panel-2);
-}
-
-.launcher-item-date {
-  font-weight: 600;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.launcher-item-count {
-  color: var(--hint);
-  font-size: 12.5px;
-}
-
-.launcher-action {
-  flex-shrink: 0;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  color: var(--hint);
-  font-size: 12.5px;
-  padding: 0 12px;
-  min-width: 52px;
-}
-
-.launcher-action.danger {
-  color: var(--danger);
-  border-color: #7f1d1d;
-}
-
-.launcher-action:active {
-  background: var(--panel-2);
-}
-
-/* フォルダの中の図面一覧に出る「← フォルダ一覧」。棚(FolderShelf)へ戻る。 */
-.launcher-back {
-  align-self: flex-start;
-  background: transparent;
-  border: none;
-  color: var(--accent);
-  font-size: 14px;
-  font-weight: 700;
-  padding: 4px 0;
-}
-
-/* --- 現場・案件フォルダの棚(FolderShelf) --- */
-.folder-shelf-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-top: 16px;
-}
-
-.folder-add-btn {
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 8px;
-  color: var(--text);
-  font-size: 13px;
-  padding: 6px 12px;
-}
-
-.folder-shelf {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
-  gap: 10px;
-  margin-top: 6px;
-}
-
-.folder-card-wrap {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-}
-
-.folder-card {
-  width: 100%;
+.home-drawing-main {
   display: flex;
   flex-direction: column;
   align-items: flex-start;
-  gap: 4px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 14px;
-  min-height: 72px;
-  color: var(--text);
+  gap: 3px;
+  background: transparent;
+  border: none;
+  padding: 12px 14px 8px;
+  min-height: 48px;
   text-align: left;
-}
-.folder-card:active {
-  background: var(--panel-2);
-}
-.folder-card-name {
-  font-weight: 700;
-  font-size: 14px;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  max-width: 100%;
-}
-.folder-card-date {
-  color: var(--hint);
-  font-size: 12px;
-}
-.folder-card-actions {
-  display: flex;
-  gap: 6px;
-}
-.folder-card-actions .launcher-action {
-  flex: 1;
+  color: var(--home-ink);
 }
 
-/* --- 図面カードのステータス色(白/赤/緑/青)＋フォルダ移動 --- */
-.launcher-row-group {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
+.home-drawing-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
 }
-.launcher-row-sub {
+
+.home-drawing-meta {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--home-ink-3);
+}
+
+.home-drawing-sub {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 8px;
-  padding: 0 4px;
+  gap: 10px;
+  padding: 0 14px;
 }
+
 .status-dot-row {
   display: flex;
-  gap: 6px;
+  gap: 8px;
 }
+
 .status-dot {
-  width: 18px;
-  height: 18px;
+  width: 24px;
+  height: 24px;
   border-radius: 50%;
-  border: 1px solid var(--border);
+  border: 2px solid transparent;
   padding: 0;
 }
+
 .status-dot.active {
-  box-shadow: 0 0 0 2px var(--accent);
+  border-color: var(--home-ink);
 }
+
 .status-dot-white {
-  background: #ffffff;
+  background: var(--home-status-white);
 }
 .status-dot-red {
-  background: #ef4444;
+  background: var(--home-status-red);
 }
 .status-dot-green {
-  background: #22c55e;
+  background: var(--home-status-green);
 }
 .status-dot-blue {
-  background: #3b82f6;
+  background: var(--home-status-blue);
 }
 
-.launcher-move-select {
-  background: var(--field-bg);
-  color: var(--text);
-  border: 1px solid var(--border);
+.home-move-select {
+  background: var(--home-surface-sub);
+  color: var(--home-ink-2);
+  border: none;
   border-radius: 8px;
-  font-size: 12px;
-  padding: 4px 8px;
-  max-width: 45%;
+  font-size: 14px;
+  padding: 8px 10px;
+  min-height: 40px;
+  max-width: 52%;
+  appearance: none;
 }
 
-/* フラットデザイン: 影や立体表現を使わないぶん、操作可能な要素であることと
-   状態の変化(ホバー・押下・キーボードフォーカス)を色だけで明確に伝える。 */
-.launcher-support:hover,
-.launcher-quickcalc:hover,
-.launcher-nitrogen:hover,
-.launcher-import:hover,
-.folder-add-btn:hover,
-.folder-card:hover,
-.launcher-item:hover,
-.launcher-action:hover {
-  background: var(--panel-2);
+/* --- タブレット幅ではカードが間延びしないよう列を増やす --- */
+@media (min-width: 700px) {
+  .home-folder-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .home-tools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
 }
-.launcher-new:hover {
-  background: #0d9c6f;
+
+@media (min-width: 980px) {
+  .home-folder-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
-.launcher-new:focus-visible,
-.launcher-support:focus-visible,
-.launcher-quickcalc:focus-visible,
-.launcher-nitrogen:focus-visible,
-.launcher-import:focus-visible,
-.folder-add-btn:focus-visible,
-.folder-card:focus-visible,
-.launcher-item:focus-visible,
-.launcher-action:focus-visible {
-  outline: 2px solid var(--accent);
+
+/* --- 操作可能であることを色で示す（フラットデザインを維持） --- */
+.home-tool:hover,
+.home-import:hover,
+.home-folder-add:hover,
+.home-folder-main:hover,
+.home-drawing-main:hover,
+.home-menu button:hover {
+  background: var(--home-surface-sub);
+}
+
+.home-cta:hover {
+  background: #0d8b4d;
+}
+
+.home-cta:focus-visible,
+.home-tool:focus-visible,
+.home-import:focus-visible,
+.home-folder-add:focus-visible,
+.home-folder-main:focus-visible,
+.home-drawing-main:focus-visible,
+.home-folder-menu-btn:focus-visible,
+.home-gear:focus-visible,
+.home-back:focus-visible,
+.home-search:focus-visible,
+.status-dot:focus-visible,
+.home-move-select:focus-visible {
+  outline: 2px solid var(--home-tool-1);
   outline-offset: 2px;
 }
 
