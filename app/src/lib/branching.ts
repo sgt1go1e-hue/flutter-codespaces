@@ -17,9 +17,22 @@ export function splitSegmentAt(
   const { t: tSplit } = projectOnSegment(P, target.start, target.end)
   const marks = splitFieldWeldMarks(target.fieldWeldMarks, tSplit)
   // A の終点はP(新しい分岐ノード)に変わるため、元の終点側だけに意味を持つ
-  // endFitting個別上書きはAには残せない(そのままだと分割点の継手に誤って
-  // 適用されてしまう)。元の終点はB側が引き継ぐので、endFittingもBへ移す。
-  const A: Segment = { ...target, end: P, endFitting: undefined, fieldWeldMarks: marks.a }
+  // 指定はAには残せない(そのままだと分割点へ誤って適用されてしまう)。
+  // 元の終点はB側が引き継ぐので、endFitting・endFlangeもBへ移す。
+  // endFlangeを残していたため、「チーズを入れると分岐点にフランジマークが
+  // 出てくる」不具合になっていた(実機で報告)。
+  // flangeSpanLength(両フランジの分割前の全長)は、この区間がチーズで更に
+  // 短くなると合計が合わなくなり自動算出が狂うため、ここで解除して
+  // 「個別入力」に戻す(黙って間違った寸法を出すより安全側に倒す)。
+  const A: Segment = {
+    ...target,
+    end: P,
+    endFitting: undefined,
+    endFlange: undefined,
+    flangeSpanLength: undefined,
+    flangeSpanMode: undefined,
+    fieldWeldMarks: marks.a,
+  }
   const B: Segment = {
     id: bId,
     start: P,
@@ -31,8 +44,9 @@ export function splitSegmentAt(
     // 系統色(colorId)だけは継承の仕組み(Effective)を持たない直接指定の属性
     // なので、ここで明示的にコピーしないと分割後のB側だけ色が消えてしまう。
     colorId: target.colorId,
-    // 元の終点側の個別上書き(endFitting)はB側の終点として引き継ぐ。
+    // 元の終点側の個別上書き(endFitting・endFlange)はB側の終点として引き継ぐ。
     endFitting: target.endFitting,
+    endFlange: target.endFlange,
     fieldWeldMarks: marks.b,
   }
   const result: Segment[] = []
