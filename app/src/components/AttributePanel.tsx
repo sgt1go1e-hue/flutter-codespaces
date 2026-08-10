@@ -696,10 +696,20 @@ export function SegmentPanel({
               // ことが多いため、既定は全長基準（全長と片側を入れれば、もう片側は
               // 自動算出）。実測を両側それぞれ入れたい場合のために個別入力へも
               // 切り替えられる。どちらの区間を選んでいても同じ内容を出す。
-              const { upstream: up, downstream: down } = flangePartner
+              const { upstream: up, downstream: down, selectedRole } = flangePartner
               const upCut = flangePartnerCuts?.upstream
               const downCut = flangePartnerCuts?.downstream
               const isEach = down.flangeSpanMode === 'each'
+              // 2つの区間は「上流/下流」では呼ばない。どちらが上流かは parentId
+              // ＝描いた順序で決まってしまい、実際の流れと逆になることがある
+              // （長手が上流側として出てしまう、と実機で報告された）。
+              // 代わりに「いま選んでいる区間（図でオレンジ）」と「もう一方」で
+              // 示す。これなら描いた順序に関係なく取り違えようがない。
+              const selIsUp = selectedRole === 'upstream'
+              const selSeg = selIsUp ? up : down
+              const othSeg = selIsUp ? down : up
+              const selCut = selIsUp ? upCut : downCut
+              const othCut = selIsUp ? downCut : upCut
               return (
                 <>
                   <div className="field round-field">
@@ -740,37 +750,43 @@ export function SegmentPanel({
                   )}
                   <label className="field dim-field">
                     <span className="field-label">
-                      上流側寸法(mm)
-                      <span className="field-note">手前〜フランジ</span>
+                      この区間(mm)
+                      <span className="field-note">図でオレンジの区間</span>
                     </span>
                     <DimCalcInput
                       className="num-input"
                       placeholder={
-                        upCut?.derivedCenter != null ? `自動算出 ${upCut.derivedCenter}` : '例: 1000'
+                        selCut?.derivedCenter != null
+                          ? `自動算出 ${selCut.derivedCenter}`
+                          : '例: 1000'
                       }
-                      value={up.centerLength}
-                      onCommit={(v) => onChangeFlangePair(up.id, down.id, { up: v })}
+                      value={selSeg.centerLength}
+                      onCommit={(v) =>
+                        onChangeFlangePair(up.id, down.id, selIsUp ? { up: v } : { down: v })
+                      }
                     />
                   </label>
                   <label className="field dim-field">
                     <span className="field-label">
-                      下流側寸法(mm)
-                      <span className="field-note">フランジ〜先</span>
+                      もう一方(mm)
+                      <span className="field-note">フランジの反対側</span>
                     </span>
                     <DimCalcInput
                       className="num-input"
                       placeholder={
-                        downCut?.derivedCenter != null
-                          ? `自動算出 ${downCut.derivedCenter}`
+                        othCut?.derivedCenter != null
+                          ? `自動算出 ${othCut.derivedCenter}`
                           : '例: 1450'
                       }
-                      value={down.centerLength}
-                      onCommit={(v) => onChangeFlangePair(up.id, down.id, { down: v })}
+                      value={othSeg.centerLength}
+                      onCommit={(v) =>
+                        onChangeFlangePair(up.id, down.id, selIsUp ? { down: v } : { up: v })
+                      }
                     />
                   </label>
                   {!isEach && (upCut?.needsReducerSpanInput || downCut?.needsReducerSpanInput) && (
                     <div className="socket-gap-warn">
-                      <p>全長と、上流側・下流側のどちらか一方の寸法を入力してください。</p>
+                      <p>全長と、どちらか一方の区間の寸法を入力してください。</p>
                     </div>
                   )}
                 </>

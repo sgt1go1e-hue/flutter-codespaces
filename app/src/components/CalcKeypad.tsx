@@ -42,7 +42,15 @@ function KeyButton({
       type="button"
       className={`qc-key${variant ? ` qc-key-${variant}` : ''}`}
       style={style}
-      onClick={onClick}
+      // clickではなくpointerdownで確定させる。iOSでは同じキーを続けて素早く
+      // 叩くと2回目がダブルタップとしてまとめられ、clickが遅れる/落ちることが
+      // あり、「次の数字を入れるのに一拍おく必要がある」状態になっていた
+      // (touch-action:manipulation だけでは防ぎきれない)。押した瞬間に
+      // 確定させ、preventDefaultで後続のclickが二重に発火しないようにする。
+      onPointerDown={(e) => {
+        e.preventDefault()
+        onClick()
+      }}
     >
       {label}
     </button>
