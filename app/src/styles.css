@@ -3661,3 +3661,244 @@ fieldset.panel-grid:disabled {
   color: var(--text);
   font-size: 12px;
 }
+
+/* ============================================================
+   発注書 / 見積もり依頼書（帳票PDF）
+   材料集計(.bom-print-only)と同じ仕組み（印刷専用DOMをbody直下へportalし、
+   @media print で表示を切り替えて window.print()）で出力する。
+   金額・単価・メーカーの列は一切持たない数量書類。
+   ============================================================ */
+.order-doc-print {
+  display: none;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.order-doc-print .doc-no {
+  text-align: right;
+  font-size: 9.5px;
+  color: #666;
+  margin-bottom: 2px;
+}
+.order-doc-print .issue-date {
+  text-align: right;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.order-doc-print .doc-title {
+  text-align: center;
+  font-size: 26px;
+  font-weight: 700;
+  /* 字間を広げると最後の1文字ぶんだけ右に寄るため、同じ量を左に足して戻す */
+  letter-spacing: 14px;
+  padding-left: 14px;
+  margin: 0 0 4px;
+}
+.order-doc-print .title-rule {
+  border: none;
+  border-top: 2.5px solid #1a1a1a;
+  margin: 0 0 18px;
+}
+.order-doc-print .meta-top {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+.order-doc-print .meta-top > tbody > tr > td {
+  vertical-align: top;
+  padding: 0;
+  border: none;
+}
+.order-doc-print .meta-left {
+  width: 58%;
+}
+.order-doc-print .meta-right {
+  width: 42%;
+}
+.order-doc-print .dest-box {
+  font-size: 17px;
+  font-weight: 700;
+  border-bottom: 2px solid #1a1a1a;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  display: inline-block;
+  min-width: 78%;
+}
+.order-doc-print .dest-sub {
+  font-size: 10.5px;
+  color: #555;
+  margin-top: 6px;
+}
+.order-doc-print .issuer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+}
+.order-doc-print .issuer-table td {
+  border: 1px solid #999;
+  padding: 4px 8px;
+}
+.order-doc-print .issuer-table .label {
+  background: #f0f0f0;
+  width: 34%;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.order-doc-print .site-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 14px;
+  font-size: 11px;
+}
+.order-doc-print .site-table td {
+  border: 1px solid #999;
+  padding: 6px 10px;
+}
+.order-doc-print .site-table .site-label {
+  background: #f0f0f0;
+  font-weight: 700;
+  width: 16%;
+  white-space: nowrap;
+}
+.order-doc-print table.items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+  margin-bottom: 4px;
+}
+.order-doc-print table.items th {
+  background: #333;
+  color: #fff;
+  border: 1px solid #333;
+  padding: 6px 4px;
+  font-weight: 700;
+}
+.order-doc-print table.items td {
+  border: 1px solid #999;
+  padding: 7px 6px;
+  height: 20px;
+}
+.order-doc-print .col-itemspec {
+  width: 48%;
+}
+.order-doc-print .col-size {
+  width: 16%;
+  text-align: center;
+}
+.order-doc-print .col-qty {
+  width: 14%;
+  text-align: right;
+}
+.order-doc-print .col-note {
+  width: 22%;
+}
+.order-doc-print table.items tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+.order-doc-print .note-line {
+  font-size: 9.5px;
+  color: #555;
+  margin-top: 10px;
+}
+.order-doc-print .foot-area {
+  margin-top: 16px;
+  display: flex;
+  gap: 18px;
+}
+.order-doc-print .foot-box {
+  flex: 1;
+  border: 1px solid #999;
+  min-height: 56px;
+  padding: 6px 8px;
+}
+.order-doc-print .foot-box .foot-label {
+  font-weight: 700;
+  font-size: 10px;
+  color: #444;
+  margin-bottom: 4px;
+}
+.order-doc-print .foot-box .foot-value {
+  font-size: 11px;
+}
+
+/* 画面プレビュー（「PDFで見る」）。材料集計のプレビューと同じ扱い。 */
+.order-doc-print.preview {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow-y: auto;
+  background: #0b1220;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.order-doc-print.preview .preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto 12px;
+}
+.order-doc-print.preview .preview-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  color: #1a1a1a;
+}
+
+@media print {
+  /* 帳票専用の用紙設定(A4縦・上16mm/左右14mm/下14mm)。既存の材料集計側の
+     @page 設定は変更せず、名前付きページとして独立させる。 */
+  @page order-doc {
+    size: A4;
+    margin: 16mm 14mm 14mm;
+  }
+  .order-doc-print {
+    page: order-doc;
+  }
+  /* 帳票を開いている間は、材料集計の印刷レイアウトが同時にDOM上に
+     残っていても印刷対象から外す（両方が1つのPDFに出てしまわないように）。 */
+  body.order-doc-open .bom-print-only {
+    display: none !important;
+  }
+  .order-doc-print {
+    display: block;
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    overflow: visible !important;
+  }
+  /* プレビューから印刷したときに画面用の暗い背景・余白が用紙へ乗らないよう
+     打ち消す（材料集計の印刷で実機に黒い枠が出た件と同じ対策）。 */
+  .order-doc-print.preview {
+    background: #fff;
+    padding: 0;
+  }
+  .order-doc-print.preview .preview-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .order-doc-print .preview-toolbar {
+    display: none !important;
+  }
+  /* 明細が長いときは行単位で改ページする（見出し行は各ページに繰り返す）。 */
+  .order-doc-print table.items thead {
+    display: table-header-group;
+  }
+  .order-doc-print table.items tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* 注記・フッターは明細表と切り離されないようにまとめる。 */
+  .order-doc-print .foot-area {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -30,8 +30,8 @@ const END_KIND_OPTIONS: { value: QuickFittingKind; label: string }[] = [
   { value: 'elbow90_long', label: '90°エルボ（ロング）' },
   { value: 'elbow90_short', label: '90°エルボ（ショート）' },
   { value: 'elbow45', label: '45°エルボ' },
-  { value: 'tee', label: 'チーズ（メイン側）' },
-  { value: 'tee_branch', label: 'チーズ（枝側）' },
+  { value: 'tee', label: 'T（メイン側）' },
+  { value: 'tee_branch', label: 'T（枝側）' },
   { value: 'flange', label: 'フランジ' },
 ]
 

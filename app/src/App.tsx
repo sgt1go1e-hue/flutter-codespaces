@@ -5,6 +5,7 @@ import { PartsPalette } from './components/PartsPalette'
 import { DisclaimerModal } from './components/DisclaimerModal'
 import { DailyGreetingModal } from './components/DailyGreetingModal'
 import { BomModal } from './components/BomModal'
+import { CompanyInfoModal } from './components/CompanyInfoModal'
 import { MenuOrderModal } from './components/MenuOrderModal'
 import { DEFAULT_MENU_ORDER, sanitizeMenuOrder, type MenuItemId } from './lib/menuOrder'
 import { DrawingLauncher } from './components/DrawingLauncher'
@@ -338,6 +339,8 @@ export default function App() {
   }>('piping-iso:consent', {})
   // 免責事項の再確認モーダル（設定からいつでも表示）
   const [reviewDisclaimer, setReviewDisclaimer] = useState(false)
+  // 自社情報(発注書・見積依頼書の差出人欄)。ホームの設定メニューから編集する。
+  const [showCompanyInfo, setShowCompanyInfo] = useState(false)
   // 日替わり挨拶メッセージ。最後に表示した日付(端末保存)と今日の日付が
   // 違えば、その日まだ見せていないので1回だけ表示する。
   const [lastGreetingDate, setLastGreetingDate] = useLocalStorage(
@@ -394,6 +397,12 @@ export default function App() {
     rootGap?: number
     /** 勾配(1/N のN)のベース値。区間ごとに個別上書きが無ければこれを継承する。 */
     slopeDenom?: number
+    /** 直管の色(白管/黒管)。発注書・見積依頼書の品目分けに使う。 */
+    pipeColor?: 'white' | 'black'
+    /** 直管のねじ加工。ねじ付は定尺4m固定。 */
+    pipeThread?: 'threaded' | 'plain'
+    /** 直管の定尺長(mm)。ねじ無しのときだけ 4000/5500 を選べる。 */
+    pipeStockMm?: number
     /**
      * 相番(合番)表示のON/OFF。未設定(auto)ならセグメント数が10本を超えたら
      * 自動でON、10本以下ならOFFにする。'on'/'off' で本数によらず固定できる。
@@ -942,6 +951,10 @@ export default function App() {
     // 系統色も同様に、設定している間は全ての新規線へ毎回適用する
     // （線を引くたびに詳細パネルで選び直さなくて済むようにするため）。
     if (defaults.colorId) applied.colorId = defaults.colorId
+    // 直管の調達属性(色・ねじ加工・定尺長)も接続方法と同じ扱い(継承せず毎回適用)
+    if (defaults.pipeColor) applied.pipeColor = defaults.pipeColor
+    if (defaults.pipeThread) applied.pipeThread = defaults.pipeThread
+    if (defaults.pipeStockMm) applied.pipeStockMm = defaults.pipeStockMm
     // 管種・サイズは基本、ルート(接続元なし)にのみ付与し、続きの線は上流から
     // 継承する（レジューサー等で下流のサイズが自動的に縮小反映される仕組みの
     // 土台のため）。ただし配管設定でたった今どちらかを変更した直後は、続きの
@@ -1343,7 +1356,7 @@ export default function App() {
           setEraserMode(false)
           setShowThroughDim((v) => !v)
         }}
-        title="チーズ・フランジで分かれた区間をまたいだ、曲がるまでの全体の芯々を表示します"
+        title="T・フランジで分かれた区間をまたいだ、曲がるまでの全体の芯々を表示します"
       >
         {showThroughDim ? '通り寸法 中' : '通り寸法'}
       </button>
@@ -1392,6 +1405,7 @@ export default function App() {
             theme={theme}
             onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             onOpenDisclaimer={() => setReviewDisclaimer(true)}
+            onOpenCompanyInfo={() => setShowCompanyInfo(true)}
           />
         ) : (
           <DrawingLauncher
@@ -1607,6 +1621,20 @@ export default function App() {
           showThroughDim={showThroughDim}
           assemblyNumberById={assemblyNumberById}
           onRenumber={canEditStructure ? setAssemblyNumberOverride : () => {}}
+          procurementDefaults={{
+            pipeColor: defaults.pipeColor,
+            pipeThread: defaults.pipeThread,
+            pipeStockMm: defaults.pipeStockMm,
+          }}
+          // 発注書・見積依頼書の「現場名」の初期値。現場＝案件フォルダなので
+          // フォルダ名を優先し、未分類(フォルダ無し)なら図面名を入れておく。
+          siteName={
+            (() => {
+              const meta = drawingIndex.find((d) => d.id === drawingId)
+              const folder = meta?.folderId ? folders.find((f) => f.id === meta.folderId) : undefined
+              return folder?.name ?? meta?.name ?? ''
+            })()
+          }
           onClose={() => setShowBom(false)}
         />
       )}
@@ -1648,6 +1676,7 @@ export default function App() {
           onClose={() => setReviewDisclaimer(false)}
         />
       )}
+      {showCompanyInfo && <CompanyInfoModal onClose={() => setShowCompanyInfo(false)} />}
       {/* 日替わり挨拶（初回同意が済んでいる通常画面でのみ、その日1回だけ表示） */}
       {!needConsent && showDailyGreeting && (
         <DailyGreetingModal onClose={closeDailyGreeting} />

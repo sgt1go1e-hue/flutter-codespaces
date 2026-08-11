@@ -85,7 +85,7 @@
     },
     {
       "id": "tee_equal",
-      "name": "チーズ（同径）",
+      "name": "同径T",
       "short": "TEE",
       "calc": "centerMinus",
       "source": "inoc_SUS304_buttweld",
@@ -151,7 +151,7 @@
     },
     {
       "id": "tee_reducing",
-      "name": "径違いチーズ",
+      "name": "径違いT",
       "short": "TEE-R",
       "calc": "centerMinus",
       "source": "inoc_SUS304_buttweld",
@@ -864,7 +864,7 @@
     },
     {
       "id": "tee_equal_socket",
-      "name": "チーズ（差込・同径）",
+      "name": "同径T（差込）",
       "short": "TEE(S)",
       "calc": "centerMinus",
       "source": "nippon_joint_socket_SCH80",
@@ -882,7 +882,7 @@
     },
     {
       "id": "tee_reducing_socket",
-      "name": "径違いチーズ（差込）",
+      "name": "径違いT（差込）",
       "short": "TEE-R(S)",
       "calc": "centerMinus",
       "source": "nippon_joint_socket_SCH80",
@@ -964,7 +964,7 @@
     },
     {
       "id": "tee_equal_thread",
-      "name": "チーズ（ねじ込み・同径）",
+      "name": "同径T（ねじ込み）",
       "short": "TEE(T)",
       "calc": "centerMinus",
       "source": "kuwana_thread_JISB2301",
@@ -983,7 +983,7 @@
     },
     {
       "id": "tee_reducing_thread",
-      "name": "径違いチーズ（ねじ込み）",
+      "name": "径違いT（ねじ込み）",
       "short": "TEE-R(T)",
       "calc": "centerMinus",
       "source": "kuwana_thread_JISB2301",
@@ -1181,7 +1181,7 @@
     },
     {
       "id": "tee_equal_vp_ts",
-      "name": "チーズ（同径・塩ビ・TS継手）",
+      "name": "同径T（塩ビTS）",
       "short": "TEE(VP-TS)",
       "calc": "centerMinus",
       "source": "kubotakemix_ts_vp",
@@ -1202,7 +1202,7 @@
     },
     {
       "id": "tee_reducing_vp_ts",
-      "name": "チーズ（径違い・塩ビ・TS継手）",
+      "name": "径違いT（塩ビTS）",
       "short": "TEE(VP-TS,R)",
       "calc": "centerMinus",
       "source": "kubotakemix_ts_vp",

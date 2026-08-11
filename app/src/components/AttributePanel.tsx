@@ -26,6 +26,8 @@ import {
 import { CalcKeypad } from './CalcKeypad'
 import { LINE_COLOR_PALETTE, lineColorHex } from '../data/lineColors'
 import { GEN_GOU_QUALIFIER_PRESETS } from '../lib/genGou'
+import { STOCK_LENGTHS_MM } from '../lib/stockCount'
+import { THREADED_STOCK_MM } from '../lib/orderDoc'
 
 const round1 = (x: number) => Math.round(x * 10) / 10
 
@@ -139,6 +141,14 @@ export interface DrawDefaults {
    * (接続方法・塩ビ継手タイプと同じ扱い)。
    */
   colorId?: string
+  /**
+   * 直管の調達属性(色・ねじ加工・定尺長)。発注書/見積依頼書の品目分けと
+   * 定尺の本数計算にだけ使い、切り寸法やBOMの継手カウントには関与しない。
+   * 系統色・接続方法と同じく、続きの線かどうかに関わらず毎回適用する。
+   */
+  pipeColor?: 'white' | 'black'
+  pipeThread?: 'threaded' | 'plain'
+  pipeStockMm?: number
 }
 
 function roleLabel(role: string): string {
@@ -154,11 +164,11 @@ function roleLabel(role: string): string {
     case 'reducer':
       return 'レジューサー'
     case 'tee-run':
-      return 'チーズ'
+      return 'T'
     case 'tee-run-reducer':
-      return 'チーズ＋レジューサー'
+      return 'T＋レジューサー'
     case 'tee-branch':
-      return 'チーズ'
+      return 'T'
     case 'wye-run':
       return 'Y継手'
     case 'wye-run-reducer':
@@ -1235,6 +1245,81 @@ export function SegmentPanel({
           </div>
         </fieldset>
 
+        {/* 直管の調達属性(色・ねじ加工・定尺長)。発注書/見積依頼書の品目分けと
+            定尺の必要本数の計算にだけ使う。切り寸法・BOMの継手カウントには
+            一切関与しない。未設定の項目は配管設定(既定)の値で扱う。 */}
+        <fieldset className="panel-grid" disabled={!canEditStructure}>
+          <label className="field">
+            <span className="field-label">
+              直管の色
+              <span className="field-note">発注書用</span>
+            </span>
+            <select
+              value={segment.pipeColor ?? ''}
+              onChange={(e) =>
+                onChange({
+                  pipeColor: (e.target.value || undefined) as 'white' | 'black' | undefined,
+                })
+              }
+            >
+              <option value="">未設定（配管設定に従う）</option>
+              <option value="white">白（白管）</option>
+              <option value="black">黒（黒管）</option>
+            </select>
+          </label>
+
+          <label className="field">
+            <span className="field-label">
+              ねじ加工
+              <span className="field-note">発注書用</span>
+            </span>
+            <select
+              value={segment.pipeThread ?? ''}
+              onChange={(e) => {
+                const v = (e.target.value || undefined) as 'threaded' | 'plain' | undefined
+                // ねじ付は定尺4m固定。切り替えた時点で定尺も揃えておく。
+                onChange({
+                  pipeThread: v,
+                  ...(v === 'threaded' ? { pipeStockMm: THREADED_STOCK_MM } : {}),
+                })
+              }}
+            >
+              <option value="">未設定（配管設定に従う）</option>
+              <option value="threaded">ねじ付</option>
+              <option value="plain">ねじ無し</option>
+            </select>
+          </label>
+
+          <label className="field">
+            <span className="field-label">
+              定尺長
+              {segment.pipeThread === 'threaded' && (
+                <span className="field-note">ねじ付は4m固定</span>
+              )}
+            </span>
+            <select
+              value={
+                segment.pipeThread === 'threaded'
+                  ? THREADED_STOCK_MM
+                  : (segment.pipeStockMm ?? '')
+              }
+              disabled={segment.pipeThread === 'threaded'}
+              onChange={(e) =>
+                onChange({
+                  pipeStockMm: e.target.value === '' ? undefined : Number(e.target.value),
+                })
+              }
+            >
+              <option value="">未設定（配管設定に従う）</option>
+              {STOCK_LENGTHS_MM.map((mm) => (
+                <option key={mm} value={mm}>
+                  {mm / 1000}m
+                </option>
+              ))}
+            </select>
+          </label>
+        </fieldset>
+
         {/* ⑦ パーツ（フランジ・レジューサー等） */}
         {/* ルートギャップ（接続方法が溶接のときだけ表示・全溶接箇所共通）。
             突き合わせ溶接で裏波を出すために設ける隙間分、切り寸法から追加で控除する。 */}
@@ -1659,6 +1744,80 @@ export function DrawSettingsPanel({
                 {connectionMethods.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* 直管の調達属性(色・ねじ加工・定尺長)。発注書/見積依頼書の
+                品目分けと定尺の必要本数の計算にだけ使う項目で、切り寸法や
+                継手の集計には一切影響しない。ねじ付は流通品が4m固定のため、
+                定尺は選べず4mの固定表示にする。 */}
+            <label className="field">
+              <span className="field-label">
+                直管の色
+                <span className="field-note">発注書用</span>
+              </span>
+              <select
+                value={defaults.pipeColor ?? ''}
+                onChange={(e) =>
+                  onChange({
+                    pipeColor: (e.target.value || undefined) as 'white' | 'black' | undefined,
+                  })
+                }
+              >
+                <option value="">未設定</option>
+                <option value="white">白（白管）</option>
+                <option value="black">黒（黒管）</option>
+              </select>
+            </label>
+
+            <label className="field">
+              <span className="field-label">
+                ねじ加工
+                <span className="field-note">発注書用</span>
+              </span>
+              <select
+                value={defaults.pipeThread ?? ''}
+                onChange={(e) => {
+                  const v = (e.target.value || undefined) as 'threaded' | 'plain' | undefined
+                  // ねじ付は定尺4m固定。切り替えた時点で定尺も揃えておく。
+                  onChange({
+                    pipeThread: v,
+                    ...(v === 'threaded' ? { pipeStockMm: THREADED_STOCK_MM } : {}),
+                  })
+                }}
+              >
+                <option value="">未設定</option>
+                <option value="threaded">ねじ付</option>
+                <option value="plain">ねじ無し</option>
+              </select>
+            </label>
+
+            <label className="field">
+              <span className="field-label">
+                定尺長
+                {defaults.pipeThread === 'threaded' && (
+                  <span className="field-note">ねじ付は4m固定</span>
+                )}
+              </span>
+              <select
+                value={
+                  defaults.pipeThread === 'threaded'
+                    ? THREADED_STOCK_MM
+                    : (defaults.pipeStockMm ?? '')
+                }
+                disabled={defaults.pipeThread === 'threaded'}
+                onChange={(e) =>
+                  onChange({
+                    pipeStockMm: e.target.value === '' ? undefined : Number(e.target.value),
+                  })
+                }
+              >
+                <option value="">未設定（4mで計算）</option>
+                {STOCK_LENGTHS_MM.map((mm) => (
+                  <option key={mm} value={mm}>
+                    {mm / 1000}m
                   </option>
                 ))}
               </select>

@@ -17,6 +17,8 @@ interface Props {
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onOpenDisclaimer: () => void
+  /** 自社情報(発注書・見積依頼書の差出人欄)の編集を開く。 */
+  onOpenCompanyInfo: () => void
 }
 
 function formatDate(ms: number): string {
@@ -47,6 +49,7 @@ export function FolderShelf({
   theme,
   onToggleTheme,
   onOpenDisclaimer,
+  onOpenCompanyInfo,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   // 開いているフォルダカードのメニュー(名前を変更/削除)のid。
@@ -127,6 +130,16 @@ export function FolderShelf({
                 }}
               >
                 {theme === 'dark' ? '明るい画面にする' : '暗い画面にする'}
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setSettingsOpen(false)
+                  onOpenCompanyInfo()
+                }}
+              >
+                自社情報（発注書の差出人）
               </button>
               <button
                 type="button"

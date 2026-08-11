@@ -3,6 +3,8 @@ import { createPortal } from 'react-dom'
 import { bomToCsv, computeAssemblyTable, type Bom } from '../lib/bom'
 import { chunkSegmentsForPrint, segmentsPerIsoPage } from '../lib/isoPagination'
 import { PrintIsometric } from './PrintIsometric'
+import { OrderDocModal } from './OrderDocModal'
+import type { OrderDocKind, PipeProcurementDefaults } from '../lib/orderDoc'
 import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
@@ -21,6 +23,10 @@ interface Props {
   assemblyNumberById: Record<string, number>
   /** 相番の手動上書き（undefinedで自動採番に戻す） */
   onRenumber: (id: string, num: number | undefined) => void
+  /** 直管の調達属性(色・ねじ加工・定尺長)の既定値。発注書の品目分けに使う。 */
+  procurementDefaults?: PipeProcurementDefaults
+  /** 発注書・見積依頼書の「現場名」の初期値(この図面が入っているフォルダ名)。 */
+  siteName?: string
   onClose: () => void
 }
 
@@ -36,6 +42,8 @@ export function BomModal({
   showThroughDim = false,
   assemblyNumberById,
   onRenumber,
+  procurementDefaults,
+  siteName = '',
   onClose,
 }: Props) {
   const empty =
@@ -69,6 +77,9 @@ export function BomModal({
   // 開くのではなく、まず画面プレビューを表示する。実際の印刷/PDF化は
   // プレビュー内のボタンから改めて行う。
   const [previewOpen, setPreviewOpen] = useState(false)
+  // 材料屋へ渡す帳票(発注書/見積もり依頼書)の作成ダイアログ。開いている間は
+  // この集計結果をそのまま流し込む(集計ロジック側は一切変えない)。
+  const [orderDocKind, setOrderDocKind] = useState<OrderDocKind | null>(null)
 
   // アプリ全体はキャンバス独自のピンチズームと競合しないよう viewport で
   // ピンチズームを禁止している(user-scalable=no)が、PDFプレビュー中は
@@ -338,6 +349,12 @@ export function BomModal({
           <button className="bom-csv" onClick={downloadCsv} disabled={empty}>
             CSVダウンロード
           </button>
+          <button className="bom-csv" onClick={() => setOrderDocKind('order')} disabled={empty}>
+            発注書PDF作成
+          </button>
+          <button className="bom-csv" onClick={() => setOrderDocKind('quote')} disabled={empty}>
+            見積もり依頼書PDF作成
+          </button>
           <button className="disclaimer-close" onClick={onClose}>
             完了
           </button>
@@ -565,6 +582,19 @@ export function BomModal({
         </div>
       </div>,
       document.body,
+    )}
+
+    {orderDocKind && (
+      <OrderDocModal
+        kind={orderDocKind}
+        bom={bom}
+        segments={segments}
+        effectiveById={effectiveById}
+        cutById={cutById}
+        procurementDefaults={procurementDefaults ?? {}}
+        defaultSiteName={siteName}
+        onClose={() => setOrderDocKind(null)}
+      />
     )}
     </>
   )
