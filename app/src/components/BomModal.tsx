@@ -27,10 +27,34 @@ interface Props {
   procurementDefaults?: PipeProcurementDefaults
   /** 発注書・見積依頼書の「現場名」の初期値(この図面が入っているフォルダ名)。 */
   siteName?: string
+  /**
+   * フランジの引きしろ(mm)。切り寸法の計算で既にフランジ端から控除されている
+   * 値をそのまま受け取り、印刷物に条件として明記するためだけに使う
+   * （ここで計算はしない）。
+   */
+  flangeAllow?: number
+  /** パッキン(ガスケット)厚(mm)。加味しない設定のときは0が渡る。用途は上と同じ。 */
+  gasketMm?: number
   onClose: () => void
 }
 
 const round1 = (x: number) => Math.round(x * 10) / 10
+
+/**
+ * フランジ端の控除条件の説明文。加工側が「この切り寸法は何を見込んだ値か」を
+ * 図面/PDFだけで判断できるようにするための注記で、計算には一切関与しない。
+ * フランジが1か所も無い図面では null を返す(不要な行を出さない)。
+ */
+function flangeConditionNote(
+  segments: Segment[],
+  flangeAllow: number,
+  gasketMm: number,
+): string | null {
+  const hasFlange = segments.some((s) => s.startFlange || s.endFlange)
+  if (!hasFlange) return null
+  const gasket = gasketMm > 0 ? `パッキン厚 ${round1(gasketMm)}mm` : 'パッキン厚 見込まない'
+  return `フランジ条件: 引きしろ ${round1(flangeAllow)}mm ・ ${gasket}（フランジ端1か所につき切り寸法から控除済み）`
+}
 
 export function BomModal({
   bom,
@@ -44,6 +68,8 @@ export function BomModal({
   onRenumber,
   procurementDefaults,
   siteName = '',
+  flangeAllow = 0,
+  gasketMm = 0,
   onClose,
 }: Props) {
   const empty =
@@ -52,6 +78,8 @@ export function BomModal({
     bom.flanges.length === 0
 
   const assemblyTable = computeAssemblyTable(segments, effectiveById, cutById, assemblyNumberById)
+  // フランジの引きしろ・パッキン厚の注記(この図面にフランジがあるときだけ)
+  const flangeNote = flangeConditionNote(segments, flangeAllow, gasketMm)
 
   // PDF/印刷レイアウト: 詳細(複数ページ, パイプ1本ごとの明細つき) か
   // 1ページ集約(アイソメ図を縮小・パイプ明細は小計のみ、改ページなし) かを選べる。
@@ -211,6 +239,7 @@ export function BomModal({
                   ))}
                 </tbody>
               </table>
+              {flangeNote && <p className="panel-hint">{flangeNote}</p>}
             </>
           )}
 
@@ -381,6 +410,9 @@ export function BomModal({
         <div className="preview-page">
         <h1>配管アイソメ図 材料集計表</h1>
         <p className="print-meta">作成日: {dateStr}</p>
+        {/* フランジの引きしろ・パッキン厚は切り寸法に織り込み済みなので、
+            加工側が条件を確認できるよう印刷物にも必ず残す。 */}
+        {flangeNote && <p className="print-meta">{flangeNote}</p>}
 
         {(() => {
           // アイソメ図・各明細表のJSXは、通常レイアウト(縦積み・複数ページ)と

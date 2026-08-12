@@ -1635,6 +1635,10 @@ export default function App() {
               return folder?.name ?? meta?.name ?? ''
             })()
           }
+          // フランジの引きしろ・パッキン厚は切り寸法に織り込み済みなので、
+          // 印刷物にも条件として残す（表示用に渡すだけで計算はしない）。
+          flangeAllow={defaults.flangeAllow ?? 0}
+          gasketMm={defaults.gasketOn ? (defaults.gasketMm ?? 0) : 0}
           onClose={() => setShowBom(false)}
         />
       )}
