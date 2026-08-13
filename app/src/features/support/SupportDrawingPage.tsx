@@ -6,6 +6,7 @@
 
 import { useState } from 'react'
 import SupportFigure, { type EditTarget } from './SupportFigure'
+import { SupportPrintSheet, type SupportPerPage } from './SupportPrintSheet'
 import {
   HangerDesign,
   HoleSpec,
@@ -51,6 +52,11 @@ interface Props {
 export function SupportDrawingPage({ onClose }: Props) {
   const [d, setD] = useState<HangerDesign>(() => createHangerDesign())
   const [editing, setEditing] = useState<Editing>(null)
+  // 印刷/PDF用に貯めた架台。1現場で何台も作ることが多いため、1台ずつ
+  // 印刷するのではなくシートにまとめてから出力する。
+  const [sheet, setSheet] = useState<HangerDesign[]>([])
+  const [perPage, setPerPage] = useState<SupportPerPage>(4)
+  const [printOpen, setPrintOpen] = useState(false)
   const patch = (p: Partial<HangerDesign>) => setD((cur) => ({ ...cur, ...p }))
 
   const openNum = (title: string, value: number, apply: (v: number) => HangerDesign) =>
@@ -106,6 +112,8 @@ export function SupportDrawingPage({ onClose }: Props) {
   const miss = missing(d)
   const r = miss.length === 0 ? compute(d) : null
   const overflow = r ? hangerOverflow(d, r) : false
+  // 印刷対象。シートに貯めてあればそれを、無ければ今表示中の1台を出す。
+  const printDesigns = sheet.length > 0 ? sheet : miss.length === 0 ? [d] : []
 
   return (
     <div className="qc-screen">
@@ -212,6 +220,57 @@ export function SupportDrawingPage({ onClose }: Props) {
             <b>{fmtMm(r.totalLength)} mm</b>
           </div>
         )}
+
+        {/* 印刷/PDF。何台か作ってからまとめて出すことが多いので、
+            「シートに追加」で貯めてから出力する。1台だけならそのまま
+            「PDFで見る」で今表示中の架台が出る。 */}
+        <div className="field">
+          <span className="field-label">
+            PDF・印刷
+            {sheet.length > 0 && <span className="field-note">シートに{sheet.length}台</span>}
+          </span>
+          <div className="support-sheet-row">
+            <button
+              type="button"
+              className="support-btn"
+              disabled={miss.length > 0}
+              onClick={() => setSheet((cur) => [...cur, JSON.parse(JSON.stringify(d)) as HangerDesign])}
+            >
+              シートに追加
+            </button>
+            {sheet.length > 0 && (
+              <button type="button" className="support-btn" onClick={() => setSheet([])}>
+                シートを空にする
+              </button>
+            )}
+            <button
+              type="button"
+              className="support-btn-primary"
+              disabled={printDesigns.length === 0}
+              onClick={() => setPrintOpen(true)}
+            >
+              PDFで見る
+            </button>
+          </div>
+        </div>
+
+        <div className="field">
+          <span className="field-label">1ページの台数</span>
+          <Seg
+            value={perPage}
+            options={[
+              [1, '1台'],
+              [2, '2台'],
+              [4, '4台'],
+            ]}
+            onChange={(v) => setPerPage(v as SupportPerPage)}
+          />
+        </div>
+        <div className="field-note">
+          {sheet.length > 0
+            ? `シートの${sheet.length}台をA4縦に${perPage}台ずつ並べて出力します`
+            : '今表示している1台をA4縦で出力します（「シートに追加」で複数台をまとめられます）'}
+        </div>
       </div>
 
       {editing?.type === 'num' && (
@@ -230,6 +289,13 @@ export function SupportDrawingPage({ onClose }: Props) {
       )}
       {editing?.type === 'holeSettings' && (
         <HoleSettingsModal d={d} onClose={() => setEditing(null)} onChange={(next) => setD(next)} />
+      )}
+      {printOpen && printDesigns.length > 0 && (
+        <SupportPrintSheet
+          designs={printDesigns}
+          perPage={perPage}
+          onClose={() => setPrintOpen(false)}
+        />
       )}
     </div>
   )

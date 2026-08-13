@@ -3902,3 +3902,161 @@ fieldset.panel-grid:disabled {
     page-break-inside: avoid;
   }
 }
+
+/* ============================================================
+   サポート架台図面の印刷／PDFシート
+   材料集計・発注書と同じ仕組み（印刷専用DOMをbody直下へportalし、
+   @media print で表示を切り替えて window.print()）。A4縦に1/2/4台を並べる。
+   ============================================================ */
+.support-print-sheet {
+  display: none;
+  background: #fff;
+  color: #111;
+}
+.support-print-page {
+  /* 用紙1枚に入れる高さ。A4縦(297mm)から実際に使えるのは実測で約249mm
+     （@pageのmarginを指定してもiOS Safari等は更に狭い領域しか使わない。
+     材料集計側の詳しい実測メモを参照）。ここは更に余裕を持たせておく。 */
+  height: 236mm;
+  display: grid;
+  gap: 4mm;
+  box-sizing: border-box;
+}
+/* 図(SupportFigure)は縦540に対して横が総長で決まるため、短い架台ほど
+   縦長になる。4台を縦1列に積むと1台が極端に平たい枠に入って小さくなるので、
+   4台のときだけ2列×2行に並べる（枠の縦横比が図に近くなり大きく出る）。 */
+.support-print-sheet.per-1 .support-print-page {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr;
+}
+.support-print-sheet.per-2 .support-print-page {
+  grid-template-columns: 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.support-print-sheet.per-4 .support-print-page {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.support-print-box {
+  position: relative;
+  border: 1px solid #999;
+  padding: 2mm;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  /* 枠が余ってもグリッドの1マスを超えて伸びないようにする */
+  min-width: 0;
+  min-height: 0;
+}
+/* 通し番号。図の見出し(材料・基準)が枠の左上に来るので、重ならないよう
+   右上に置き、下地を白で塗って寸法線と被っても読めるようにする。 */
+.support-print-no {
+  position: absolute;
+  top: 1.5mm;
+  right: 2mm;
+  z-index: 1;
+  padding: 0 3px;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+}
+/* SVGは viewBox + preserveAspectRatio(既定=meet) なので、枠に合わせて
+   縦横比を保ったまま収まる。枠からはみ出さないことを優先する。 */
+.support-print-figure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* 画面プレビュー（「PDFで見る」）。材料集計・発注書のプレビューと同じ扱い。 */
+.support-print-sheet.preview {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow-y: auto;
+  background: #0b1220;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.support-print-sheet.preview .preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto 12px;
+}
+.support-print-sheet.preview .support-print-page {
+  max-width: 800px;
+  margin: 0 auto 16px;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  /* 画面では mm 指定ではなくA4縦の比率で見せる（実際の紙の見え方に近づける） */
+  height: auto;
+  aspect-ratio: 210 / 297;
+}
+
+@media print {
+  /* 架台シート専用の用紙設定。材料集計・発注書側の@page設定は変更せず、
+     名前付きページとして独立させる。 */
+  @page support-sheet {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+  .support-print-sheet {
+    display: block;
+    page: support-sheet;
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    overflow: visible !important;
+  }
+  /* プレビューから印刷したときに画面用の暗い背景・余白・影が用紙へ乗らない
+     ように打ち消す（材料集計の印刷で実機に黒い枠が出た件と同じ対策）。 */
+  .support-print-sheet.preview {
+    background: #fff;
+    padding: 0;
+  }
+  .support-print-sheet.preview .support-print-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    height: 236mm;
+    aspect-ratio: auto;
+  }
+  .support-print-sheet .preview-toolbar {
+    display: none !important;
+  }
+  .support-print-page {
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .support-print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  .support-print-box {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+/* サポート架台図面のシート操作ボタン列 */
+.support-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
