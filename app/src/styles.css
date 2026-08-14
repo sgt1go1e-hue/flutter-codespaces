@@ -3215,9 +3215,16 @@ fieldset.panel-grid:disabled {
   gap: 4px 12px;
 }
 
+/* 穴の色は白い図面の上で見る前提のパレット（黒を含む）なので、そのまま
+   暗いテーマの画面に置くと文字が背景に沈んで読めない。白地のピルを敷いて
+   どの色でも読めるようにする。 */
 .support-hole-summary-item {
   font-size: 13.5px;
   font-weight: 700;
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
 }
 
 /* 穴の設定モーダル：3分/4分/吊りの各穴種をまとめて編集する区画。 */
@@ -4051,4 +4058,85 @@ fieldset.panel-grid:disabled {
   align-items: center;
   gap: 8px;
   flex-wrap: wrap;
+}
+
+/* サポート架台図面: 配管がまだ1本も無いときの空状態 */
+.support-empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 22px 16px;
+  text-align: center;
+  background: var(--panel);
+}
+.support-empty-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.support-empty-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* 「この架台を保存して次を作る」。1現場で何台も作るときの主役の操作なので、
+   他のボタンより目立たせて、押す場所が迷わないようにする。 */
+.support-next-btn {
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #04222e;
+  font-size: 15px;
+  font-weight: 700;
+}
+.support-next-btn:disabled {
+  background: var(--border);
+  color: var(--muted);
+}
+
+/* 保存した架台の一覧。今何台たまっているかが一目で分かるようにする。 */
+.support-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.support-saved-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.support-saved-no {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.support-saved-desc {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text);
+}
+.support-saved-cut {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* シート操作の行のボタンは現場で手袋のまま押すので、他の操作と同じ
+   タップ領域(44px以上)を確保する。 */
+.support-sheet-row button {
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 14.5px;
+  font-weight: 700;
 }

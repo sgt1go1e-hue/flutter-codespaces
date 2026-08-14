@@ -12,8 +12,6 @@ import {
   HoleSpec,
   createHangerDesign,
   compute,
-  addPipe,
-  removePipe,
   missing,
   legendSpecs,
   holeColor,
@@ -42,6 +40,7 @@ function hangerOverflow(d: HangerDesign, r: HangerCalcResult): boolean {
 type Editing =
   | { type: 'num'; title: string; value: number; apply: (v: number) => HangerDesign }
   | { type: 'pipe'; index: number }
+  | { type: 'addPipe' }
   | { type: 'holeSettings' }
   | null
 
@@ -49,8 +48,47 @@ interface Props {
   onClose: () => void
 }
 
+/**
+ * 配管を1本足す。hangerDesign の addPipe は必ずサイズ100Aと芯々200を付けるが、
+ * ここでは「最初は空・サイズは必ずユーザーが選ぶ」ようにしたいので、この画面
+ * 専用のヘルパーを置く（hangerDesign.ts はFlutter版と共有のためそのまま）。
+ * 1本目のときは芯々(spans)を増やさない（spansの本数は配管数-1）。
+ */
+function appendPipe(d: HangerDesign, size: string): HangerDesign {
+  return {
+    ...d,
+    pipeSizes: [...d.pipeSizes, size],
+    sleepers: [...d.sleepers, 0],
+    spans: d.pipeSizes.length === 0 ? [] : [...d.spans, 200],
+  }
+}
+
+/**
+ * 配管を1本削除。hangerDesign の removePipe は最後の1本を残す作りだが、
+ * この画面は「配管0本＝これから入力する状態」を正しく扱えるので全部消せる。
+ */
+function dropPipe(d: HangerDesign, i: number): HangerDesign {
+  const spans = [...d.spans]
+  if (spans.length > 0) spans.splice(i === 0 ? 0 : i - 1, 1)
+  return {
+    ...d,
+    pipeSizes: d.pipeSizes.filter((_, k) => k !== i),
+    sleepers: d.sleepers.filter((_, k) => k !== i),
+    spans,
+  }
+}
+
+/** 配管だけを空にした「次の架台」。材料・基準・ゲージ・端あき等は引き継ぐ。 */
+function nextDesign(d: HangerDesign): HangerDesign {
+  return { ...d, pipeSizes: [], sleepers: [], spans: [] }
+}
+
 export function SupportDrawingPage({ onClose }: Props) {
-  const [d, setD] = useState<HangerDesign>(() => createHangerDesign())
+  // 配管は最初から入れない。既定値が入っていると「今どこまで入力したのか」が
+  // 分からなくなるため、必ずユーザーがサイズを選んで足していく形にする。
+  const [d, setD] = useState<HangerDesign>(() =>
+    createHangerDesign({ pipeSizes: [], sleepers: [], spans: [] }),
+  )
   const [editing, setEditing] = useState<Editing>(null)
   // 印刷/PDF用に貯めた架台。1現場で何台も作ることが多いため、1台ずつ
   // 印刷するのではなくシートにまとめてから出力する。
@@ -109,11 +147,15 @@ export function SupportDrawingPage({ onClose }: Props) {
     }
   }
 
-  const miss = missing(d)
-  const r = miss.length === 0 ? compute(d) : null
+  // 配管0本のときは計算しない(計算側は配管が1本以上ある前提のため)。
+  const hasPipes = d.pipeSizes.length > 0
+  const miss = hasPipes ? missing(d) : []
+  const ready = hasPipes && miss.length === 0
+  const r = ready ? compute(d) : null
   const overflow = r ? hangerOverflow(d, r) : false
-  // 印刷対象。シートに貯めてあればそれを、無ければ今表示中の1台を出す。
-  const printDesigns = sheet.length > 0 ? sheet : miss.length === 0 ? [d] : []
+  // 印刷対象＝保存済みの架台＋（入力中のものがあれば）それも含める。
+  // 保存し忘れた1台が黙って抜け落ちる方が現場では困るため。
+  const printDesigns = ready ? [...sheet, d] : sheet
   // 何ページになるかを事前に知らせる(実際の分割も印刷シート側で同じ関数を使う)。
   const printPageCount = printDesigns.length > 0 ? paginateDesigns(printDesigns, printMode).length : 0
 
@@ -193,7 +235,19 @@ export function SupportDrawingPage({ onClose }: Props) {
           </div>
         </div>
 
-        {miss.length > 0 ? (
+        {!hasPipes ? (
+          // 配管がまだ1本も無い状態。何をすればいいかが一目で分かるように、
+          // 図の代わりに空状態のカードを出す。
+          <div className="support-empty">
+            <div className="support-empty-title">
+              {sheet.length > 0 ? `${sheet.length + 1}台目の架台` : 'まだ配管がありません'}
+            </div>
+            <p className="support-empty-body">
+              「配管を追加」から、この架台に乗せる配管のサイズを選んでください。
+              {sheet.length > 0 && '（材料・基準・ゲージ・端あきは前の架台から引き継いでいます）'}
+            </p>
+          </div>
+        ) : miss.length > 0 ? (
           <div className="n2-total-row">穴々が未登録です：{miss.join(', ')}</div>
         ) : (
           <>
@@ -212,7 +266,7 @@ export function SupportDrawingPage({ onClose }: Props) {
           </>
         )}
 
-        <button type="button" className="n2-add-row" onClick={() => setD((cur) => addPipe(cur))}>
+        <button type="button" className="n2-add-row" onClick={() => setEditing({ type: 'addPipe' })}>
           ＋ 配管を追加
         </button>
 
@@ -223,28 +277,53 @@ export function SupportDrawingPage({ onClose }: Props) {
           </div>
         )}
 
-        {/* 印刷/PDF。何台か作ってからまとめて出すことが多いので、
-            「シートに追加」で貯めてから出力する。1台だけならそのまま
-            「PDFで見る」で今表示中の架台が出る。 */}
+        {/* 1現場で何台も作るので、「今の1台を保存して次へ」を主役の操作にする。
+            保存すると配管だけが空になり、空状態のカードが出るので「今は次の
+            架台を入力中」だと分かる（材料・基準・ゲージ・端あきは引き継ぐ）。 */}
+        <button
+          type="button"
+          className="support-next-btn"
+          disabled={!ready}
+          onClick={() => {
+            setSheet((cur) => [...cur, JSON.parse(JSON.stringify(d)) as HangerDesign])
+            setD((cur) => nextDesign(cur))
+          }}
+        >
+          この架台を保存して次を作る
+        </button>
+
+        {sheet.length > 0 && (
+          <div className="field">
+            <span className="field-label">保存した架台（{sheet.length}台）</span>
+            <div className="support-saved-list">
+              {sheet.map((sd, i) => (
+                <div className="support-saved-item" key={i}>
+                  <span className="support-saved-no">No.{i + 1}</span>
+                  <span className="support-saved-desc">
+                    {sd.pipeSizes.join('・')}
+                    <span className="support-saved-cut">切り寸 {fmtMm(compute(sd).totalLength)}</span>
+                  </span>
+                  <button
+                    type="button"
+                    className="support-btn-danger"
+                    onClick={() => setSheet((cur) => cur.filter((_, k) => k !== i))}
+                  >
+                    削除
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="field">
           <span className="field-label">
             PDF・印刷
-            {sheet.length > 0 && <span className="field-note">シートに{sheet.length}台</span>}
+            <span className="field-note">
+              {printDesigns.length > 0 ? `${printDesigns.length}台` : '対象なし'}
+            </span>
           </span>
           <div className="support-sheet-row">
-            <button
-              type="button"
-              className="support-btn"
-              disabled={miss.length > 0}
-              onClick={() => setSheet((cur) => [...cur, JSON.parse(JSON.stringify(d)) as HangerDesign])}
-            >
-              シートに追加
-            </button>
-            {sheet.length > 0 && (
-              <button type="button" className="support-btn" onClick={() => setSheet([])}>
-                シートを空にする
-              </button>
-            )}
             <button
               type="button"
               className="support-btn-primary"
@@ -253,6 +332,9 @@ export function SupportDrawingPage({ onClose }: Props) {
             >
               PDFで見る
             </button>
+            {ready && sheet.length > 0 && (
+              <span className="field-note">入力中の1台も含めて出力します</span>
+            )}
           </div>
         </div>
 
@@ -289,6 +371,16 @@ export function SupportDrawingPage({ onClose }: Props) {
       )}
       {editing?.type === 'pipe' && (
         <PipeModal d={d} index={editing.index} onClose={() => setEditing(null)} onChange={(next) => setD(next)} />
+      )}
+      {editing?.type === 'addPipe' && (
+        <AddPipeModal
+          index={d.pipeSizes.length}
+          onClose={() => setEditing(null)}
+          onPick={(size) => {
+            setD((cur) => appendPipe(cur, size))
+            setEditing(null)
+          }}
+        />
       )}
       {editing?.type === 'holeSettings' && (
         <HoleSettingsModal d={d} onClose={() => setEditing(null)} onChange={(next) => setD(next)} />
@@ -508,6 +600,42 @@ function HoleSettingsModal({
   )
 }
 
+/**
+ * 「＋ 配管を追加」で最初に出す、配管サイズを選ぶだけのモーダル。
+ * サイズを選んで初めて図に配管が足される（既定値で勝手に入っていると
+ * 「自分が入れた値」と「最初から入っていた値」の区別が付かないため）。
+ * 保温厚などの細かい設定は、追加後に図の配管をタップして変更する。
+ */
+function AddPipeModal({
+  index,
+  onPick,
+  onClose,
+}: {
+  index: number
+  onPick: (size: string) => void
+  onClose: () => void
+}) {
+  return (
+    <Overlay title={`配管 ${index + 1} のサイズ`} onClose={onClose}>
+      <p className="field-note" style={{ marginTop: 0 }}>
+        サイズを選ぶと図に追加されます。保温厚は追加後に図の配管をタップして変更できます。
+      </p>
+      <div className="support-chip-row">
+        {PIPE_SIZES.map((s) => (
+          <button key={s} type="button" className="support-chip" onClick={() => onPick(s)}>
+            {s}
+          </button>
+        ))}
+      </div>
+      <div className="disclaimer-actions">
+        <button type="button" className="support-btn" onClick={onClose}>
+          キャンセル
+        </button>
+      </div>
+    </Overlay>
+  )
+}
+
 function PipeModal({
   d,
   index,
@@ -521,20 +649,18 @@ function PipeModal({
 }) {
   return (
     <Overlay title={`配管 ${index + 1}`} onClose={onClose}>
-      {d.pipeSizes.length > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
-          <button
-            type="button"
-            className="support-btn-danger"
-            onClick={() => {
-              onChange(removePipe(d, index))
-              onClose()
-            }}
-          >
-            この配管を削除
-          </button>
-        </div>
-      )}
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 8 }}>
+        <button
+          type="button"
+          className="support-btn-danger"
+          onClick={() => {
+            onChange(dropPipe(d, index))
+            onClose()
+          }}
+        >
+          この配管を削除
+        </button>
+      </div>
       <div className="field-label">配管サイズ</div>
       <div className="support-chip-row" style={{ marginBottom: 14 }}>
         {PIPE_SIZES.map((s) => (
