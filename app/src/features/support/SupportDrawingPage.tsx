@@ -6,7 +6,7 @@
 
 import { useState } from 'react'
 import SupportFigure, { type EditTarget } from './SupportFigure'
-import { SupportPrintSheet, type SupportPerPage } from './SupportPrintSheet'
+import { SupportPrintSheet, paginateDesigns, type SupportPrintMode } from './SupportPrintSheet'
 import {
   HangerDesign,
   HoleSpec,
@@ -55,7 +55,7 @@ export function SupportDrawingPage({ onClose }: Props) {
   // 印刷/PDF用に貯めた架台。1現場で何台も作ることが多いため、1台ずつ
   // 印刷するのではなくシートにまとめてから出力する。
   const [sheet, setSheet] = useState<HangerDesign[]>([])
-  const [perPage, setPerPage] = useState<SupportPerPage>(4)
+  const [printMode, setPrintMode] = useState<SupportPrintMode>('pack')
   const [printOpen, setPrintOpen] = useState(false)
   const patch = (p: Partial<HangerDesign>) => setD((cur) => ({ ...cur, ...p }))
 
@@ -114,6 +114,8 @@ export function SupportDrawingPage({ onClose }: Props) {
   const overflow = r ? hangerOverflow(d, r) : false
   // 印刷対象。シートに貯めてあればそれを、無ければ今表示中の1台を出す。
   const printDesigns = sheet.length > 0 ? sheet : miss.length === 0 ? [d] : []
+  // 何ページになるかを事前に知らせる(実際の分割も印刷シート側で同じ関数を使う)。
+  const printPageCount = printDesigns.length > 0 ? paginateDesigns(printDesigns, printMode).length : 0
 
   return (
     <div className="qc-screen">
@@ -255,21 +257,22 @@ export function SupportDrawingPage({ onClose }: Props) {
         </div>
 
         <div className="field">
-          <span className="field-label">1ページの台数</span>
+          <span className="field-label">並べ方</span>
           <Seg
-            value={perPage}
+            value={printMode}
             options={[
-              [1, '1台'],
-              [2, '2台'],
-              [4, '4台'],
+              ['pack', '詰めて印刷'],
+              ['one', '1台ずつ'],
             ]}
-            onChange={(v) => setPerPage(v as SupportPerPage)}
+            onChange={(v) => setPrintMode(v as SupportPrintMode)}
           />
         </div>
         <div className="field-note">
-          {sheet.length > 0
-            ? `シートの${sheet.length}台をA4縦に${perPage}台ずつ並べて出力します`
-            : '今表示している1台をA4縦で出力します（「シートに追加」で複数台をまとめられます）'}
+          {printDesigns.length === 0
+            ? '穴々を入力すると出力できます'
+            : printMode === 'pack'
+              ? `A4縦${printPageCount}ページ（1台ずつ用紙の幅いっぱいに描き、入るだけ1枚に詰めます）`
+              : `A4縦${printPageCount}ページ（1台で1枚を使うので、いちばん大きく出ます）`}
         </div>
       </div>
 
@@ -293,7 +296,7 @@ export function SupportDrawingPage({ onClose }: Props) {
       {printOpen && printDesigns.length > 0 && (
         <SupportPrintSheet
           designs={printDesigns}
-          perPage={perPage}
+          mode={printMode}
           onClose={() => setPrintOpen(false)}
         />
       )}

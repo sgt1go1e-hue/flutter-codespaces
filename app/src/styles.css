@@ -3916,27 +3916,17 @@ fieldset.panel-grid:disabled {
 .support-print-page {
   /* 用紙1枚に入れる高さ。A4縦(297mm)から実際に使えるのは実測で約249mm
      （@pageのmarginを指定してもiOS Safari等は更に狭い領域しか使わない。
-     材料集計側の詳しい実測メモを参照）。ここは更に余裕を持たせておく。 */
+     材料集計側の詳しい実測メモを参照）。ここは更に余裕を持たせておく。
+     この値は SupportPrintSheet.tsx の PAGE_H_MM と必ず揃える。 */
   height: 236mm;
-  display: grid;
+  display: flex;
+  flex-direction: column;
   gap: 4mm;
   box-sizing: border-box;
 }
-/* 図(SupportFigure)は縦540に対して横が総長で決まるため、短い架台ほど
-   縦長になる。4台を縦1列に積むと1台が極端に平たい枠に入って小さくなるので、
-   4台のときだけ2列×2行に並べる（枠の縦横比が図に近くなり大きく出る）。 */
-.support-print-sheet.per-1 .support-print-page {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr;
-}
-.support-print-sheet.per-2 .support-print-page {
-  grid-template-columns: 1fr;
-  grid-template-rows: 1fr 1fr;
-}
-.support-print-sheet.per-4 .support-print-page {
-  grid-template-columns: 1fr 1fr;
-  grid-template-rows: 1fr 1fr;
-}
+/* 1台ぶんの枠。必ず用紙の横幅いっぱいを使い、高さだけ図の縦横比に応じて
+   変える(高さは SupportPrintSheet 側で1台ずつ指定する)。等分した枠に
+   押し込むと、長い架台ほど左右に余白が残って小さく印刷されてしまうため。 */
 .support-print-box {
   position: relative;
   border: 1px solid #999;
@@ -3947,7 +3937,9 @@ fieldset.panel-grid:disabled {
   align-items: center;
   justify-content: center;
   background: #fff;
-  /* 枠が余ってもグリッドの1マスを超えて伸びないようにする */
+  width: 100%;
+  /* 指定した高さより縮まないようにする(flexの既定の縮小を止める) */
+  flex: 0 0 auto;
   min-width: 0;
   min-height: 0;
 }

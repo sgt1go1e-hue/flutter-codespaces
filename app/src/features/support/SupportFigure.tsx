@@ -113,6 +113,18 @@ interface Chip {
   thin?: boolean;
 }
 
+/**
+ * 図の縦横比(幅/高さ)。描画そのものと同じ式で求める。
+ * 印刷シート側で「用紙の横幅いっぱいに描いたとき縦が何mmになるか」を
+ * 決めるために使う（枠の縦横比が図と合っていないと、余白ばかりになって
+ * 図が小さく印刷されてしまうため）。
+ */
+export function figureAspect(design: HangerDesign): number {
+  const total = compute(design).totalLength;
+  if (total <= 0) return MIN_W / H;
+  return Math.max(MIN_W, PAD_L + PAD_R + total * PX_PER_MM) / H;
+}
+
 export interface SupportFigureProps {
   design: HangerDesign;
   onEdit?: (t: EditTarget) => void;
