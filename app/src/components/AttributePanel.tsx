@@ -189,6 +189,7 @@ const OFFSET_45_FACTOR = 1.414
 // 90°側寄り(まっすぐ受ける側)を分けて判定する。
 const isFortyFiveFitting = (id?: string) =>
   id === 'elbow45_long' ||
+  id === 'elbow45_short' ||
   id === 'elbow45_socket' ||
   id === 'elbow45_thread' ||
   id === 'elbow45_vp_dv' ||

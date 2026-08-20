@@ -16,6 +16,7 @@ const OFFSET_45_FACTOR = 1.414
 function isFortyFiveFitting(id?: string): boolean {
   return (
     id === 'elbow45_long' ||
+    id === 'elbow45_short' ||
     id === 'elbow45_socket' ||
     id === 'elbow45_thread' ||
     id === 'elbow45_vp_dv' ||
@@ -96,6 +97,7 @@ const isElbowId = (id?: string) =>
   id === 'elbow90_short' ||
   id === 'elbow90_long' ||
   id === 'elbow45_long' ||
+  id === 'elbow45_short' ||
   id === 'elbow90_socket' ||
   id === 'elbow45_socket' ||
   id === 'elbow90_thread' ||
@@ -677,7 +679,11 @@ export function computeEnds(
   // 含まない(斜めではない)短い連結区間は、実長がそのまま軸方向の進みと
   // 一致するため、従来通り実長をそのまま畳み込む。
   for (const s of segments) {
-    if (s.fitting !== 'elbow45_long') continue
+    // elbow45_long と同じ扱い方(45°の直角二等辺三角形オフセット)をする
+    // elbow45_short も対象に含める(それ以外の45°系=差込/ねじ込み/塩ビは
+    // 従来どおり対象外のまま。ここで広く isFortyFiveFitting を使うと
+    // 既存の挙動まで変えてしまうため、id を明示的に2つとも書く)。
+    if (s.fitting !== 'elbow45_long' && s.fitting !== 'elbow45_short') continue
     for (const end of ['start', 'end'] as const) {
       const result = out[s.id][end]
       if (result.role !== 'elbow') continue
