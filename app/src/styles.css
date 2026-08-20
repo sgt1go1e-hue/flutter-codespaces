@@ -4140,3 +4140,23 @@ fieldset.panel-grid:disabled {
   font-size: 14.5px;
   font-weight: 700;
 }
+
+/* 作図中の画面から常に押せる「ホーム」ボタン。右上に浮かせて常設する
+   （作図設定＝左上、ズーム＝右下、パン＝左下、と重ならない位置）。
+   下段メニューは項目数によって横スクロールが必要になることがあるため、
+   探さず押せる場所をもう1つ用意する。 */
+.home-float-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 15;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px var(--shadow);
+}

@@ -605,8 +605,12 @@ export default function App() {
     setNotes((prev) => [...prev, note])
   }
 
-  function goToLauncher() {
+  // ホームへ戻る。単に画面をlauncherに切り替えるだけだと、直前に見ていた
+  // フォルダの中(homeView)へ戻ってしまうことがあるため、常に本来のホーム
+  // (フォルダ棚)へリセットする。
+  function goHome() {
     setEraserMode(false)
+    setHomeView('shelf')
     setScreen('launcher')
   }
 
@@ -1283,14 +1287,9 @@ export default function App() {
         新規作成
       </button>
     ),
-    openLauncher: (
-      <button key="openLauncher" onClick={goToLauncher}>
-        過去の図面
-      </button>
-    ),
-    quickCalc: (
-      <button key="quickCalc" onClick={openQuickCalc}>
-        クイック計算
+    home: (
+      <button key="home" className="primary" onClick={goHome}>
+        ホーム
       </button>
     ),
     undo: (
@@ -1370,18 +1369,6 @@ export default function App() {
         }}
       >
         免責
-      </button>
-    ),
-    theme: (
-      <button
-        key="theme"
-        onClick={() => {
-          setEraserMode(false)
-          setTheme((t) => (t === 'dark' ? 'light' : 'dark'))
-        }}
-        title="屋外の明るい場所では「明るい画面」が見やすくなります"
-      >
-        {theme === 'dark' ? '明るい画面' : '暗い画面'}
       </button>
     ),
   }
@@ -1523,6 +1510,13 @@ export default function App() {
           disabled={!canEditStructure}
           colorLabels={colorLabels}
         />
+
+        {/* ホームへ戻る（右上に浮かせて常設）。下段メニューのバーは項目が
+            多いと横スクロールが必要になるため、探さずに常に押せる場所を
+            もう1つ用意する（下段の「ホーム」と合わせて2箇所）。 */}
+        <button type="button" className="home-float-btn" onClick={goHome}>
+          ホーム
+        </button>
       </main>
 
       {/* 寸法・属性の編集パネル（線を選択したときだけ表示。作図設定とは独立）。
@@ -1593,11 +1587,13 @@ export default function App() {
         />
       )}
 
-      {/* メニュー(元に戻す・消しゴム・全消去・集計拾い出し・クイック計算・
-          新規作成・過去の図面・免責・テーマ切替)は画面下部(親指の届きやすい
-          位置)に配置。特に「元に戻す・消しゴム・全消去」は使用頻度が高いため
-          左寄せの既定順にしている。表示順は menuOrder(並び替え設定で変更・
-          端末に保存)に従う。ボタン自体の機能・見た目は並び替えの対象外。 */}
+      {/* メニュー(元に戻す・消しゴム・全消去・集計拾い出し・共有・通り寸法・
+          新規作成・ホーム・免責)は画面下部(親指の届きやすい位置)に配置。
+          特に「元に戻す・消しゴム・全消去」は使用頻度が高いため左寄せの
+          既定順にしている。表示順は menuOrder(並び替え設定で変更・端末に
+          保存)に従う。ボタン自体の機能・見た目は並び替えの対象外。
+          クイック計算・過去の図面・テーマ切替はホーム画面側にあるので
+          ここには出さない(作図中の選択肢を絞るため)。 */}
       <header className="topbar">
         <div className={`tools-wrap${toolsOverflow ? ' has-more' : ''}`}>
           <div className="tools" ref={toolsRef}>

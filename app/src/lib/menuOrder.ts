@@ -6,28 +6,28 @@ export type MenuItemId =
   | 'clearAll'
   | 'bom'
   | 'share'
-  | 'quickCalc'
   | 'throughDim'
   | 'newDrawing'
-  | 'openLauncher'
+  | 'home'
   | 'disclaimer'
-  | 'theme'
 
 // 既定の並び順（現場で使用頻度の高い「元に戻す・消しゴム・全消去」を
 // 左側＝親指の届きやすい位置にまとめる）。並び替え設定の「初期順序に戻す」
 // もこの並びに戻す。
+//
+// クイック計算・過去の図面・テーマ切替はここから外した（ホーム画面から
+// 行ける・触るため、作図中の画面には出さない）。代わりに「ホーム」を
+// 増やし、常にホームへ戻れるようにしている。
 export const DEFAULT_MENU_ORDER: MenuItemId[] = [
   'undo',
   'eraser',
   'clearAll',
   'bom',
   'share',
-  'quickCalc',
   'throughDim',
   'newDrawing',
-  'openLauncher',
+  'home',
   'disclaimer',
-  'theme',
 ]
 
 // 並び替え設定画面に表示する項目名（実際のボタンの見た目・機能はApp.tsx側）
@@ -37,12 +37,10 @@ export const MENU_ITEM_LABELS: Record<MenuItemId, string> = {
   clearAll: '全消去',
   bom: '集計・拾い出し',
   share: '共有',
-  quickCalc: 'クイック計算',
   throughDim: '通り寸法（曲がるまでの全体の芯々）',
   newDrawing: '新規作成',
-  openLauncher: '過去の図面',
+  home: 'ホーム',
   disclaimer: '免責',
-  theme: 'テーマ切替（明るい/暗い画面）',
 }
 
 /**
