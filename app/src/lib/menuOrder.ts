@@ -37,7 +37,7 @@ export const MENU_ITEM_LABELS: Record<MenuItemId, string> = {
   clearAll: '全消去',
   bom: '集計・拾い出し',
   share: '共有',
-  throughDim: '通り寸法（曲がるまでの全体の芯々）',
+  throughDim: '全長寸法（曲がるまでの全体の芯々）',
   newDrawing: '新規作成',
   home: 'ホーム',
   disclaimer: '免責',

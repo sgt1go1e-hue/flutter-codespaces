@@ -1355,9 +1355,9 @@ export default function App() {
           setEraserMode(false)
           setShowThroughDim((v) => !v)
         }}
-        title="T・フランジで分かれた区間をまたいだ、曲がるまでの全体の芯々を表示します"
+        title="T・フランジで分かれた区間をまたいだ、曲がるまでの全長を表示します"
       >
-        {showThroughDim ? '通り寸法 中' : '通り寸法'}
+        {showThroughDim ? '全長寸法 中' : '全長寸法'}
       </button>
     ),
     disclaimer: (

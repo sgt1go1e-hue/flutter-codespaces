@@ -46,26 +46,27 @@ interface Props {
 
 const CROSS_GAP = 9
 
-// アイソメ図上に実際に表示される「45°」マークの位置を全て求める
-// （描画条件と同じ: 継手が elbow45_long のセグメント自身のエルボ端）。
-// この位置は、そのマークを描いているセグメント自身だけでなく、ノードを
-// 共有する隣接セグメント（キック区間など）の寸法ラベルからも見えるため、
-// 寸法ラベル側は「自分がその継手を持っているか」ではなく「近くにマークが
-// 実在するか」で反対側へ避ける必要がある。
+// アイソメ図上に実際に表示される「L45°」「S45°」マーク（45°エルボの
+// ロング/ショートを使用している端）の位置を全て求める。90°ショートエルボの
+// 「ショート」マークと同じく、セグメント自身のfitting値ではなく、実際の
+// 計算に使われた継手id(cutById[...].start/endFittingId、始点/終点の
+// 個別上書きも反映済み)で判定する。この位置は、そのマークを描いている
+// セグメント自身だけでなく、ノードを共有する隣接セグメント（キック区間など）
+// の寸法ラベルからも見えるため、寸法ラベル側は「自分がその継手を持って
+// いるか」ではなく「近くにマークが実在するか」で反対側へ避ける必要がある。
 function allElbow45MarkPositions(
   segments: Segment[],
-  effectiveById: Record<string, Effective>,
   cutById: Record<string, CutResult>,
 ): Point[] {
   const marks: Point[] = []
   for (const s of segments) {
-    const eff = effectiveById[s.id]
-    if (eff?.fitting !== 'elbow45_long') continue
     const c = cutById[s.id]
     if (!c) continue
     for (const at of ['start', 'end'] as const) {
       const role = at === 'start' ? c.startRole : c.endRole
       if (role !== 'elbow' && role !== 'elbow-reducer') continue
+      const fittingId = at === 'start' ? c.startFittingId : c.endFittingId
+      if (fittingId !== 'elbow45_long' && fittingId !== 'elbow45_short') continue
       const pt = at === 'start' ? s.start : s.end
       const other = at === 'start' ? s.end : s.start
       const len = distance(pt, other) || 1
@@ -147,10 +148,10 @@ export function PrintIsometric({
   // 値を参照する）。
   const elbow45Marks = useMemo(
     () => [
-      ...allElbow45MarkPositions(segments, effectiveById, cutById),
+      ...allElbow45MarkPositions(segments, cutById),
       ...allElbowShortMarkPositions(segments, cutById),
     ],
-    [segments, effectiveById, cutById],
+    [segments, cutById],
   )
 
   const resolvedLabels = useMemo(() => {
@@ -288,16 +289,17 @@ export function PrintIsometric({
         })
       }
     }
-    // 45°エルボの「45°」マークも、寸法ラベルが重なって文字が読めなくならないよう
-    // 固定の回避領域として扱う（特に短いキック区間ではマークと寸法が近接しがち）。
+    // 45°エルボ(L45°/S45°)の「45°」マークも、寸法ラベルが重なって文字が
+    // 読めなくならないよう固定の回避領域として扱う（特に短いキック区間では
+    // マークと寸法が近接しがち）。
     const elbow45Obstacles: LabelBox[] = []
     for (const s of segments) {
-      const eff = effectiveById[s.id]
-      if (eff?.fitting !== 'elbow45_long') continue
       const c = cutById[s.id]
       for (const at of ['start', 'end'] as const) {
         const role = at === 'start' ? c?.startRole : c?.endRole
         if (role !== 'elbow' && role !== 'elbow-reducer') continue
+        const fittingId = at === 'start' ? c?.startFittingId : c?.endFittingId
+        if (fittingId !== 'elbow45_long' && fittingId !== 'elbow45_short') continue
         const pt = at === 'start' ? s.start : s.end
         const other = at === 'start' ? s.end : s.start
         const len = distance(pt, other) || 1
@@ -452,8 +454,10 @@ export function PrintIsometric({
     )
   }
 
-  // 45°エルボを使用した端に「45°」マークを表示（90°エルボとの区別を現場ですぐ判別できるように）
-  function elbow45Mark(s: Segment, at: 'start' | 'end') {
+  // 45°エルボを使用した端に「L45°」（ロング）／「S45°」（ショート）マークを
+  // 表示（90°エルボとの区別、およびロング/ショートの区別を現場ですぐ判別
+  // できるように）。
+  function elbow45Mark(s: Segment, at: 'start' | 'end', label: 'L45°' | 'S45°') {
     const pt = at === 'start' ? s.start : s.end
     const other = at === 'start' ? s.end : s.start
     const len = distance(pt, other) || 1
@@ -467,7 +471,7 @@ export function PrintIsometric({
     const cy = pt.y + dy * gap + ny * off
     return (
       <text className="elbow45-mark" x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-        45°
+        {label}
       </text>
     )
   }
@@ -591,12 +595,20 @@ export function PrintIsometric({
               reducerAtEnd(s, 'end')}
             {(cutById[s.id]?.startRole === 'elbow' ||
               cutById[s.id]?.startRole === 'elbow-reducer') &&
-              eff?.fitting === 'elbow45_long' &&
-              elbow45Mark(s, 'start')}
+              cutById[s.id]?.startFittingId === 'elbow45_long' &&
+              elbow45Mark(s, 'start', 'L45°')}
             {(cutById[s.id]?.endRole === 'elbow' ||
               cutById[s.id]?.endRole === 'elbow-reducer') &&
-              eff?.fitting === 'elbow45_long' &&
-              elbow45Mark(s, 'end')}
+              cutById[s.id]?.endFittingId === 'elbow45_long' &&
+              elbow45Mark(s, 'end', 'L45°')}
+            {(cutById[s.id]?.startRole === 'elbow' ||
+              cutById[s.id]?.startRole === 'elbow-reducer') &&
+              cutById[s.id]?.startFittingId === 'elbow45_short' &&
+              elbow45Mark(s, 'start', 'S45°')}
+            {(cutById[s.id]?.endRole === 'elbow' ||
+              cutById[s.id]?.endRole === 'elbow-reducer') &&
+              cutById[s.id]?.endFittingId === 'elbow45_short' &&
+              elbow45Mark(s, 'end', 'S45°')}
             {(cutById[s.id]?.startRole === 'elbow' ||
               cutById[s.id]?.startRole === 'elbow-reducer') &&
               cutById[s.id]?.startFittingId === 'elbow90_short' &&
@@ -828,7 +840,7 @@ export function PrintIsometric({
               textAnchor="middle"
               transform={`rotate(${g.textRotateDeg} ${g.text1X} ${g.text1Y})`}
             >
-              通し {run.total}
+              全長 {run.total}
             </text>
           </g>
         )
