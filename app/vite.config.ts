@@ -7,11 +7,17 @@ export default defineConfig(({ command, mode }) => ({
   // 本番ビルドだけ base を合わせる。開発サーバー(dev)は '/' のまま。
   // ベータ版(mode=beta)は同じPagesサイトの /beta/ サブパスに置くため base を変える
   // （新しいリポジトリを作らず、既存のPages出力先のサブパスとして公開するため）。
+  // Capacitor版(mode=capacitor)はサーバー配下ではなくアプリ内(capacitor://localhost/
+  // 等)にバンドルされるため、絶対パス(/flutter-codespaces/...)ではアセットが
+  // 解決できない。相対パス('./')にして、index.htmlからの相対でJS/CSSを
+  // 読めるようにする。
   base:
     command === 'build'
-      ? mode === 'beta'
-        ? '/flutter-codespaces/beta/'
-        : '/flutter-codespaces/'
+      ? mode === 'capacitor'
+        ? './'
+        : mode === 'beta'
+          ? '/flutter-codespaces/beta/'
+          : '/flutter-codespaces/'
       : '/',
   plugins: [react()],
   server: {
