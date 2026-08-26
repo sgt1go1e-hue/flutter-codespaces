@@ -3,15 +3,6 @@ import { createRoot } from 'react-dom/client'
 import { BetaGate } from './components/BetaGate'
 import './styles.css'
 
-// 実機で「今動いているのが本当に最新ビルドか」を目視確認するための一時的な帯。
-// 動作確認できたら削除する。
-const buildBanner = document.createElement('div')
-buildBanner.textContent = 'BUILD MARKER 2026-08-26-2214'
-buildBanner.style.cssText =
-  'position:fixed;top:0;left:0;right:0;z-index:999999;background:#e11d48;color:#fff;' +
-  'font-size:12px;line-height:1.4;padding:4px 8px;text-align:center;'
-document.body.prepend(buildBanner)
-
 function showFatalError(err: unknown) {
   const el = document.getElementById('root')
   if (!el) return
