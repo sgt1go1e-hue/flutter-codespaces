@@ -3136,6 +3136,12 @@ fieldset.panel-grid:disabled {
   gap: 6px;
 }
 
+.support-missing-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
 .support-chip {
   background: var(--field-bg);
   color: var(--text);

@@ -253,7 +253,23 @@ export function SupportDrawingPage({ onClose }: Props) {
             </p>
           </div>
         ) : miss.length > 0 ? (
-          <div className="n2-total-row">穴々が未登録です：{miss.join(', ')}</div>
+          <div className="support-missing-block">
+            <div className="n2-total-row">穴々が未登録です：{miss.join(', ')}</div>
+            <div className="support-chip-row">
+              {d.pipeSizes.map((size, i) => (
+                <button
+                  key={i}
+                  type="button"
+                  className="support-chip"
+                  onClick={() => setEditing({ type: 'pipe', index: i })}
+                >
+                  配管{i + 1}：{size}
+                  {d.sleepers[i] ? `（保温T${d.sleepers[i]}）` : ''}
+                </button>
+              ))}
+            </div>
+            <div className="field-note">タップしてサイズや保温厚を変更するか、配管を削除してください</div>
+          </div>
         ) : (
           <>
             {overflow && (
