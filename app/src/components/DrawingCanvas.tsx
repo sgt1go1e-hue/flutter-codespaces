@@ -12,6 +12,12 @@ import {
   snapToLattice,
 } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
+import {
+  ELBOW_MARK_LABELS,
+  elbowMarkEndKey,
+  elbowMarkEnds,
+  elbowMarkKindByEnd,
+} from '../lib/elbowMarks'
 import type { Effective } from '../lib/inheritance'
 import type { CutResult } from '../lib/cutlength'
 import { effectiveSlopeDenom } from '../lib/slope'
@@ -97,6 +103,12 @@ interface Props {
    * 表示専用で、寸法・切り寸法の計算結果には一切関与しない。
    */
   throughRuns?: ThroughRun[]
+  /**
+   * 90°ショートエルボの「ショート」マークを表示するか。ショートを既定と
+   * している会社では毎回全ての角に出てしまい図が読みにくいため、切れるように
+   * している（表示専用。切り寸法の計算には影響しない）。
+   */
+  showShortMark?: boolean
   /** 現場溶接マークの三角をタップしたとき、90°回す（表示専用）。 */
   onRotateFieldWeldMark?: (segId: string, markId: string) => void
   /** 消しゴム中に現場溶接マークの三角をタップしたとき、そのマークだけ消す。 */
@@ -155,71 +167,6 @@ const MAX_SCALE = 3
 // ズームボタン1回あたりの変化幅（ピンチより小刻みに調整したい場面向け）。
 const ZOOM_BUTTON_STEP = 0.05
 
-// アイソメ図上に実際に表示される「L45°」「S45°」マーク（45°エルボの
-// ロング/ショートを使用している端）の位置を全て求める。90°ショートエルボの
-// 「ショート」マークと同じく、セグメント自身のfitting値ではなく、実際の
-// 計算に使われた継手id(cutById[...].start/endFittingId、始点/終点の
-// 個別上書きも反映済み)で判定する。この位置は、そのマークを描いている
-// セグメント自身だけでなく、ノードを共有する隣接セグメント（キック区間など）
-// の寸法ラベルからも見えるため、寸法ラベル側は「自分がその継手を持って
-// いるか」ではなく「近くにマークが実在するか」で反対側へ避ける必要がある。
-function allElbow45MarkPositions(
-  segments: Segment[],
-  cutById: Record<string, CutResult>,
-): Point[] {
-  const marks: Point[] = []
-  for (const s of segments) {
-    const c = cutById[s.id]
-    if (!c) continue
-    for (const at of ['start', 'end'] as const) {
-      const role = at === 'start' ? c.startRole : c.endRole
-      if (role !== 'elbow' && role !== 'elbow-reducer') continue
-      const fittingId = at === 'start' ? c.startFittingId : c.endFittingId
-      if (fittingId !== 'elbow45_long' && fittingId !== 'elbow45_short') continue
-      const pt = at === 'start' ? s.start : s.end
-      const other = at === 'start' ? s.end : s.start
-      const len = distance(pt, other) || 1
-      const dx = (other.x - pt.x) / len
-      const dy = (other.y - pt.y) / len
-      const nx = -dy
-      const ny = dx
-      marks.push({ x: pt.x + dx * 20 + nx * 11, y: pt.y + dy * 20 + ny * 11 })
-    }
-  }
-  return marks
-}
-
-// アイソメ図上に実際に表示される「ショート」マーク（90°ショートエルボを
-// 使用している端）の位置を全て求める。45°マークと違い、セグメント自身の
-// fitting値ではなく、実際の計算に使われた継手id(cutById[...].start/endFittingId、
-// 始点/終点の個別上書きも反映済み)で判定する。ロングが既定のため、ショートを
-// 使っている箇所だけ現場で見落とさないよう明示する。
-function allElbowShortMarkPositions(
-  segments: Segment[],
-  cutById: Record<string, CutResult>,
-): Point[] {
-  const marks: Point[] = []
-  for (const s of segments) {
-    const c = cutById[s.id]
-    if (!c) continue
-    for (const at of ['start', 'end'] as const) {
-      const role = at === 'start' ? c.startRole : c.endRole
-      if (role !== 'elbow' && role !== 'elbow-reducer') continue
-      const fittingId = at === 'start' ? c.startFittingId : c.endFittingId
-      if (fittingId !== 'elbow90_short') continue
-      const pt = at === 'start' ? s.start : s.end
-      const other = at === 'start' ? s.end : s.start
-      const len = distance(pt, other) || 1
-      const dx = (other.x - pt.x) / len
-      const dy = (other.y - pt.y) / len
-      const nx = -dy
-      const ny = dx
-      marks.push({ x: pt.x + dx * 20 + nx * 11, y: pt.y + dy * 20 + ny * 11 })
-    }
-  }
-  return marks
-}
-
 // 指定座標に最も近い45°マーク（一定距離内にあるものだけ）。無ければnull。
 function nearestElbow45Mark(marks: Point[], x: number, y: number): Point | null {
   let best: Point | null = null
@@ -256,6 +203,7 @@ export function DrawingCanvas({
   assemblyNumberActive = false,
   assemblyNumberById = {},
   throughRuns = [],
+  showShortMark = true,
   onRotateFieldWeldMark,
   onDeleteFieldWeldMark,
   onToggleFieldFitFlip,
@@ -594,16 +542,15 @@ export function DrawingCanvas({
     setPreview(null)
   }
 
-  // 実際に描かれる45°/ショートマークの位置（寸法線を出す側の判定に使う。マークを
-  // 持つセグメント自身だけでなく、ノードを共有する隣接セグメント側からも
-  // 近さで判定するため、レンダー側(寸法線の実描画)でも同じ値を参照する）。
-  const elbow45Marks = useMemo(
-    () => [
-      ...allElbow45MarkPositions(segments, cutById),
-      ...allElbowShortMarkPositions(segments, cutById),
-    ],
-    [segments, cutById],
+  // 実際に描かれる45°/ショートマークの一覧（描画とレイアウトで同じものを使う）。
+  // マークを持つセグメント自身だけでなく、ノードを共有する隣接セグメント側からも
+  // 近さで判定するため、レンダー側(寸法線の実描画)でも同じ値を参照する。
+  const markEnds = useMemo(
+    () => elbowMarkEnds(segments, cutById, showShortMark),
+    [segments, cutById, showShortMark],
   )
+  const markKindByEnd = useMemo(() => elbowMarkKindByEnd(markEnds), [markEnds])
+  const elbow45Marks = useMemo(() => markEnds.map((e) => e.pos), [markEnds])
 
   // 末端の呼び径ラベル・寸法(外側/内側レーン)の基準位置(重なり回避の押し出し前)を
   // 全セグメント分まとめて求め、重なりを解消した最終位置を得る。
@@ -806,38 +753,15 @@ export function DrawingCanvas({
         })
       }
     }
-    // 45°エルボ(L45°/S45°)の「45°」マークも、寸法ラベルが重なって文字が
+    // 45°(L45°/S45°)・ショートのエルボマークも、寸法ラベルが重なって文字が
     // 読めなくならないよう固定の回避領域として扱う（特に短いキック区間では
-    // マークと寸法が近接しがち）。
-    const elbow45Obstacles: LabelBox[] = []
-    for (const s of segments) {
-      const c = cutById[s.id]
-      for (const at of ['start', 'end'] as const) {
-        const role = at === 'start' ? c?.startRole : c?.endRole
-        if (role !== 'elbow' && role !== 'elbow-reducer') continue
-        const fittingId = at === 'start' ? c?.startFittingId : c?.endFittingId
-        if (fittingId !== 'elbow45_long' && fittingId !== 'elbow45_short') continue
-        const pt = at === 'start' ? s.start : s.end
-        const other = at === 'start' ? s.end : s.start
-        const len = distance(pt, other) || 1
-        const dx = (other.x - pt.x) / len
-        const dy = (other.y - pt.y) / len
-        const nx = -dy
-        const ny = dx
-        const gap = 20 * uiScale
-        const off = 11 * uiScale
-        elbow45Obstacles.push({
-          cx: pt.x + dx * gap + nx * off,
-          cy: pt.y + dy * gap + ny * off,
-          w: 34 * uiScale,
-          h: 22 * uiScale,
-        })
-      }
-    }
-    // ショートエルボの「ショート」マークも同様に回避領域として扱う。
-    for (const pos of allElbowShortMarkPositions(segments, cutById)) {
-      elbow45Obstacles.push({ cx: pos.x, cy: pos.y, w: 34 * uiScale, h: 22 * uiScale })
-    }
+    // マークと寸法が近接しがち）。実際に描くマークと同じ位置を使う。
+    const elbow45Obstacles: LabelBox[] = markEnds.map((e) => ({
+      cx: e.pos.x,
+      cy: e.pos.y,
+      w: 34 * uiScale,
+      h: 22 * uiScale,
+    }))
     return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles, ...dimArrowObstacles])
   }, [
     segments,
@@ -849,6 +773,7 @@ export function DrawingCanvas({
     baseSlopeDenom,
     assemblyNumberActive,
     assemblyNumberById,
+    markEnds,
   ])
 
   // フランジ記号を端点に描く。
@@ -866,7 +791,9 @@ export function DrawingCanvas({
     const uy = (other.y - pt.y) / len
     const nx = -uy
     const ny = ux
-    const half = 10
+    // 端点の●や寸法線に埋もれて見落とされやすいため、線をやや長めに取る
+    // （太さは .flange-mark 側で調整）。
+    const half = 15
     const bar = (cx: number, cy: number, key: number) => (
       <line
         key={key}
@@ -884,7 +811,8 @@ export function DrawingCanvas({
     // 両フランジ: 接続点を挟んで前後に1本ずつ（合計2本のペア表現）。
     // 分割した A.endFlange と B.startFlange は同じ2位置を描くため、重なって
     // ちょうど2本に見える（ペアのボルト締結を表す一般的な記号）。
-    const off = 4
+    // 線を太くした分、間隔も広げないと2本が1本に潰れて見える。
+    const off = 6
     return (
       <>
         {bar(pt.x - ux * off, pt.y - uy * off, 0)}
@@ -1139,10 +1067,13 @@ export function DrawingCanvas({
     )
   }
 
-  // 45°エルボを使用した端に「L45°」（ロング）／「S45°」（ショート）マークを
-  // 表示（90°エルボとの区別、およびロング/ショートの区別を現場ですぐ判別
-  // できるように）。
-  function elbow45Mark(s: Segment, at: 'start' | 'end', label: 'L45°' | 'S45°') {
+  // 45°(L45°/S45°)・90°ショート(ショート)のエルボマークを端に表示する。
+  // ロングが既定のため、それ以外を使っている箇所を現場で見落とさないようにする。
+  // どの端に何を描くかは markKindByEnd（エルボの角ごとに1つだけ選ばれている）で
+  // 決まり、位置は markEnds と同じ計算を使う。
+  function elbowMark(s: Segment, at: 'start' | 'end') {
+    const kind = markKindByEnd.get(elbowMarkEndKey(s.id, at))
+    if (!kind) return null
     const pt = at === 'start' ? s.start : s.end
     const other = at === 'start' ? s.end : s.start
     const len = distance(pt, other) || 1
@@ -1155,29 +1086,14 @@ export function DrawingCanvas({
     const cx = pt.x + dx * gap + nx * off
     const cy = pt.y + dy * gap + ny * off
     return (
-      <text className="elbow45-mark" x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-        {label}
-      </text>
-    )
-  }
-
-  // 90°ショートエルボを使用した端に「ショート」マークを表示（ロングが既定のため、
-  // 加工時にどこがショートエルボか現場で見落とさないよう明示する）。
-  function elbowShortMark(s: Segment, at: 'start' | 'end') {
-    const pt = at === 'start' ? s.start : s.end
-    const other = at === 'start' ? s.end : s.start
-    const len = distance(pt, other) || 1
-    const dx = (other.x - pt.x) / len
-    const dy = (other.y - pt.y) / len
-    const nx = -dy
-    const ny = dx
-    const gap = 20
-    const off = 11
-    const cx = pt.x + dx * gap + nx * off
-    const cy = pt.y + dy * gap + ny * off
-    return (
-      <text className="elbow-short-mark" x={cx} y={cy} textAnchor="middle" dominantBaseline="middle">
-        ショート
+      <text
+        className={kind === 'short' ? 'elbow-short-mark' : 'elbow45-mark'}
+        x={cx}
+        y={cy}
+        textAnchor="middle"
+        dominantBaseline="middle"
+      >
+        {ELBOW_MARK_LABELS[kind]}
       </text>
     )
   }
@@ -1361,30 +1277,10 @@ export function DrawingCanvas({
               cutById[s.id]?.endRole === 'wye-run-reducer' ||
               cutById[s.id]?.endRole === 'elbow-reducer') &&
               reducerAtEnd(s, 'end')}
-            {(cutById[s.id]?.startRole === 'elbow' ||
-              cutById[s.id]?.startRole === 'elbow-reducer') &&
-              cutById[s.id]?.startFittingId === 'elbow45_long' &&
-              elbow45Mark(s, 'start', 'L45°')}
-            {(cutById[s.id]?.endRole === 'elbow' ||
-              cutById[s.id]?.endRole === 'elbow-reducer') &&
-              cutById[s.id]?.endFittingId === 'elbow45_long' &&
-              elbow45Mark(s, 'end', 'L45°')}
-            {(cutById[s.id]?.startRole === 'elbow' ||
-              cutById[s.id]?.startRole === 'elbow-reducer') &&
-              cutById[s.id]?.startFittingId === 'elbow45_short' &&
-              elbow45Mark(s, 'start', 'S45°')}
-            {(cutById[s.id]?.endRole === 'elbow' ||
-              cutById[s.id]?.endRole === 'elbow-reducer') &&
-              cutById[s.id]?.endFittingId === 'elbow45_short' &&
-              elbow45Mark(s, 'end', 'S45°')}
-            {(cutById[s.id]?.startRole === 'elbow' ||
-              cutById[s.id]?.startRole === 'elbow-reducer') &&
-              cutById[s.id]?.startFittingId === 'elbow90_short' &&
-              elbowShortMark(s, 'start')}
-            {(cutById[s.id]?.endRole === 'elbow' ||
-              cutById[s.id]?.endRole === 'elbow-reducer') &&
-              cutById[s.id]?.endFittingId === 'elbow90_short' &&
-              elbowShortMark(s, 'end')}
+            {/* 45°(L45°/S45°)・ショートのマーク。エルボの角は隣り合う2本の線が
+                共有するため、角ごとに片方の線だけが描く（markKindByEnd で選択済み）。 */}
+            {elbowMark(s, 'start')}
+            {elbowMark(s, 'end')}
             {/* 排水勾配を設定した区間には「勾配1/N」を線の中点に表示する
                 （個別上書きが無ければ配管設定のベース値を継承して表示） */}
             {effectiveSlopeDenom(s, baseSlopeDenom) != null &&

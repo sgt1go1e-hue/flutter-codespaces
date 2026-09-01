@@ -7,6 +7,7 @@ export type MenuItemId =
   | 'bom'
   | 'share'
   | 'throughDim'
+  | 'shortMark'
   | 'newDrawing'
   | 'home'
   | 'disclaimer'
@@ -25,6 +26,7 @@ export const DEFAULT_MENU_ORDER: MenuItemId[] = [
   'bom',
   'share',
   'throughDim',
+  'shortMark',
   'newDrawing',
   'home',
   'disclaimer',
@@ -38,6 +40,7 @@ export const MENU_ITEM_LABELS: Record<MenuItemId, string> = {
   bom: '集計・拾い出し',
   share: '共有',
   throughDim: '全長寸法（曲がるまでの全体の芯々）',
+  shortMark: 'ショート表示（90°ショートエルボの印）',
   newDrawing: '新規作成',
   home: 'ホーム',
   disclaimer: '免責',

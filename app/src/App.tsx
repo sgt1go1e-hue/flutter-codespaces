@@ -323,6 +323,13 @@ export default function App() {
     'piping-iso:throughDim',
     true,
   )
+  // 90°ショートエルボの「ショート」マークを図に出すか。ショートを既定と
+  // している会社では全ての角に出てしまい図が読みにくいため、切れるようにする
+  // （表示だけの切り替えで、切り寸法の計算には影響しない）。
+  const [showShortMark, setShowShortMark] = useLocalStorage<boolean>(
+    'piping-iso:shortMark',
+    true,
+  )
   // 表示テーマ（暗い/明るい）。屋外の日差しの下では暗い画面が見づらいため、
   // 端末ごとに好みを覚えておいて切り替えられるようにする。
   const [theme, setTheme] = useLocalStorage<'dark' | 'light'>(
@@ -653,6 +660,37 @@ export default function App() {
     const name = input.trim()
     setDrawingIndex((prev) => {
       const next = prev.map((m) => (m.id === id ? { ...m, name: name || undefined } : m))
+      saveIndex(next)
+      return next
+    })
+  }
+
+  /**
+   * 作図画面のヘッダーから、開いている図面の名前を付け替える。
+   * まだ一度も線を引いていない図面は一覧に登録されていない（一覧を汚さない
+   * ため）が、名前を付けた時点で「意図して作った図面」なので登録する。
+   */
+  function renameCurrentDrawing(name: string) {
+    if (!drawingId) return
+    const trimmed = name.trim()
+    setDrawingIndex((prev) => {
+      const existing = prev.find((m) => m.id === drawingId)
+      if (!existing && !trimmed) return prev
+      const now = Date.now()
+      const next = existing
+        ? prev.map((m) => (m.id === drawingId ? { ...m, name: trimmed || undefined } : m))
+        : [
+            ...prev,
+            {
+              id: drawingId,
+              name: trimmed,
+              createdAt: now,
+              updatedAt: now,
+              segCount: segments.length,
+              folderId: null,
+              statusColor: 'white' as const,
+            },
+          ]
       saveIndex(next)
       return next
     })
@@ -1360,6 +1398,19 @@ export default function App() {
         {showThroughDim ? '全長寸法 中' : '全長寸法'}
       </button>
     ),
+    shortMark: (
+      <button
+        key="shortMark"
+        className={showShortMark ? 'active' : ''}
+        onClick={() => {
+          setEraserMode(false)
+          setShowShortMark((v) => !v)
+        }}
+        title="90°ショートエルボを使っている角に「ショート」の印を出します（ショートが既定の会社では切っておけます）"
+      >
+        {showShortMark ? 'ショート表示 中' : 'ショート表示'}
+      </button>
+    ),
     disclaimer: (
       <button
         key="disclaimer"
@@ -1457,6 +1508,8 @@ export default function App() {
           }}
           open={partsOpen}
           onToggle={() => setPartsOpen((v) => !v)}
+          drawingName={drawingIndex.find((d) => d.id === drawingId)?.name}
+          onRenameDrawing={renameCurrentDrawing}
         />
       )}
 
@@ -1483,6 +1536,7 @@ export default function App() {
           assemblyNumberActive={assemblyNumberActive}
           assemblyNumberById={assemblyNumberById}
           throughRuns={throughRuns}
+          showShortMark={showShortMark}
           onRotateFieldWeldMark={canEditStructure ? rotateFieldWeldMark : undefined}
           onDeleteFieldWeldMark={canEditStructure ? deleteFieldWeldMark : undefined}
           onToggleFieldFitFlip={canEditStructure ? toggleFieldFitFlip : undefined}
@@ -1615,6 +1669,7 @@ export default function App() {
           cutById={cutById}
           baseSlopeDenom={defaults.slopeDenom}
           showThroughDim={showThroughDim}
+          showShortMark={showShortMark}
           assemblyNumberById={assemblyNumberById}
           onRenumber={canEditStructure ? setAssemblyNumberOverride : () => {}}
           procurementDefaults={{

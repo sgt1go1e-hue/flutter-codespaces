@@ -1,4 +1,4 @@
-import { useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { partsPalette, getPart } from '../data/parts'
 
 interface Props {
@@ -14,6 +14,10 @@ interface Props {
   open: boolean
   /** ヘッダーをタップして開閉を切り替える */
   onToggle: () => void
+  /** 開いている図面の名前（未設定なら undefined）。ヘッダーの入力欄に出す。 */
+  drawingName?: string
+  /** 図面名が変わったとき。未入力(空)なら未設定に戻す。 */
+  onRenameDrawing?: (name: string) => void
 }
 
 // 動きが「横スクロール」か「上へドラッグ」かを判定するまでの移動量(px)
@@ -26,7 +30,33 @@ const GESTURE_THRESHOLD = 10
  * シビアなレジューサー等でも、タップは指でドラッグ中の対象を隠さないぶん
  * 狙った場所に置きやすい。定義は data/parts.ts の partsPalette 配列。
  */
-export function PartsPalette({ onDragStart, draggingId, selectedId, onSelect, open, onToggle }: Props) {
+export function PartsPalette({
+  onDragStart,
+  draggingId,
+  selectedId,
+  onSelect,
+  open,
+  onToggle,
+  drawingName,
+  onRenameDrawing,
+}: Props) {
+  // 図面名は入力のたびに保存すると日本語変換の途中で確定してしまうため、
+  // 入力中は手元だけで持ち、指を離した時(blur)・改行時にまとめて保存する。
+  const [nameDraft, setNameDraft] = useState(drawingName ?? '')
+  const [editingName, setEditingName] = useState(false)
+  useEffect(() => {
+    // 別の図面を開いた等、外側で名前が変わったときは入力欄も追従させる
+    // （入力中は上書きしない）。
+    if (!editingName) setNameDraft(drawingName ?? '')
+  }, [drawingName, editingName])
+
+  function commitName() {
+    setEditingName(false)
+    const next = nameDraft.trim()
+    if (next === (drawingName ?? '')) return
+    onRenameDrawing?.(next)
+  }
+
   // 押した瞬間はまだ「タップ選択」か「ドラッグ配置」か「横スクロールで他の候補を
   // 見る」か分からないため、動きを見てから判定する（横に動けばスクロールに任せ、
   // 上下に動けばドラッグ開始、動かさずに離せばタップ選択）。
@@ -87,13 +117,29 @@ export function PartsPalette({ onDragStart, draggingId, selectedId, onSelect, op
 
   return (
     <div className={`palette${open ? ' open' : ''}`}>
-      <button className="panel-header" onClick={onToggle}>
-        <span className="panel-caret">{open ? '▼' : '▲'}</span>
-        <span className="panel-summary">
+      <div className="panel-header palette-header">
+        <button className="palette-header-toggle" onClick={onToggle}>
+          <span className="panel-caret">{open ? '▼' : '▲'}</span>
           <span className="sum-mode">パーツ</span>
           {!open && selectedId && <span className="sum-none">選択中: {getPart(selectedId)?.name}</span>}
-        </span>
-      </button>
+        </button>
+        {/* 図面名。ヘッダーの空きに置いて、作図中でも「どの図面か」が常に
+            見えるようにする（保存先の名前もこれと同じものになる）。 */}
+        <input
+          className="palette-title-input"
+          type="text"
+          value={nameDraft}
+          placeholder="図面名を入力"
+          aria-label="図面名"
+          maxLength={40}
+          onChange={(e) => setNameDraft(e.target.value)}
+          onFocus={() => setEditingName(true)}
+          onBlur={commitName}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+        />
+      </div>
       {open && (
         <div className="palette-items">
           {partsPalette.map((p) => (

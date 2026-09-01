@@ -1112,10 +1112,11 @@ body {
   stroke-width: calc(3px * var(--ui-scale, 1));
 }
 
-/* フランジ記号（配管に直交する2本線） */
+/* フランジ記号（配管に直交する2本線）。端点の●・寸法線・継手マークが
+   集まる場所に描かれるため、細いと見落とされる。太く長くして目立たせる。 */
 .flange-mark {
   stroke: var(--text);
-  stroke-width: calc(2.5px * var(--ui-scale, 1));
+  stroke-width: calc(4px * var(--ui-scale, 1));
   stroke-linecap: round;
 }
 
@@ -1857,6 +1858,41 @@ fieldset.panel-grid:disabled {
   /* 画面最上部に来たため、ノッチ等のセーフエリア分を上端に確保する
      （メニューバーが元々ここで行っていたのと同じ考慮）。 */
   padding-top: max(10px, env(safe-area-inset-top));
+}
+
+/* ヘッダーは「開閉ボタン＋図面名の入力欄」の2つを並べる行。
+   ボタンの中に入力欄を入れると開閉と入力が競合するため、行だけをdivにして
+   その中にボタンと入力欄を並べている。 */
+.palette-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  padding: 0;
+  min-height: 32px;
+  text-align: left;
+}
+
+/* 図面名。作図中も「どの図面か」が常に見えるようにヘッダーの空きに置く。 */
+.palette-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-height: 32px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.palette-title-input::placeholder {
+  color: var(--hint-2);
+  font-weight: 400;
 }
 
 .palette-items {
