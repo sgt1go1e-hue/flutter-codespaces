@@ -1,0 +1,4204 @@
+:root {
+  --bg: #0f172a;
+  --panel: #1e293b;
+  --panel-2: #263346;
+  --field-bg: #0b1220;
+  --border: #334155;
+  --border-soft: #1f2b3d;
+  --text: #e2e8f0;
+  --hint: #94a3b8;
+  --hint-2: #64748b;
+  --accent: #38bdf8;
+  --accent-strong: #0ea5e9;
+  --accent-on: #04222e;
+  --overlay: rgba(2, 6, 23, 0.82);
+  --shadow: rgba(0, 0, 0, 0.5);
+  --shadow-strong: rgba(0, 0, 0, 0.6);
+  --grid-line: rgba(148, 163, 184, 0.14);
+  --scrollbar-thumb: rgba(226, 232, 240, 0.75);
+  --danger: #f87171;
+
+  /* キャンバス上の配管線・端点マーカー色（屋外の直射日光下でも見分けられるよう
+     ライトテーマでは彩度を保ったまま濃くする） */
+  --seg-selected: #f59e0b;
+  --seg-resolved: #38bdf8;
+  --seg-unresolved: #64748b;
+  --seg-dot: #94a3b8;
+  --seg-preview: #22c55e;
+  --reducer-fill: rgba(56, 189, 248, 0.25);
+
+  /* 寸法・呼び径ラベル色。キャンバス(SVG)と常設パネルの「切り寸」表示の両方で使う。 */
+  --label-outline: var(--bg);
+  --label-main: #cbd5e1;
+  --label-muted: #64748b;
+  --label-sub: #94a3b8;
+  --label-cut: #34d399;
+  --label-zero: #fbbf24;
+  --label-over: #f87171;
+  --label-tight: #fb923c;
+  --label-terminus: #fbbf24;
+  --label-elbow45: #f472b6;
+  --label-elbow-short: #2dd4bf;
+  --label-through: #c084fc;
+}
+
+/* 屋外の明るい場所でも見やすいライトテーマ。トップバーの切替ボタンで選べる。 */
+:root[data-theme='light'] {
+  --bg: #ffffff;
+  --panel: #e2e8f0;
+  --panel-2: #cbd5e1;
+  --field-bg: #ffffff;
+  --border: #cbd5e1;
+  --border-soft: #e2e8f0;
+  --text: #0f172a;
+  --hint: #64748b;
+  --hint-2: #475569;
+  --accent: #0284c7;
+  --overlay: rgba(15, 23, 42, 0.35);
+  --shadow: rgba(15, 23, 42, 0.16);
+  --shadow-strong: rgba(15, 23, 42, 0.22);
+  --grid-line: rgba(51, 65, 85, 0.2);
+  --scrollbar-thumb: rgba(51, 65, 85, 0.45);
+  --danger: #dc2626;
+
+  --seg-selected: #d97706;
+  --seg-resolved: #0369a1;
+  --seg-unresolved: #475569;
+  --seg-dot: #475569;
+  --seg-preview: #16a34a;
+  --reducer-fill: rgba(2, 132, 199, 0.18);
+
+  --label-main: #1e293b;
+  --label-muted: #475569;
+  --label-sub: #475569;
+  --label-cut: #059669;
+  --label-zero: #b45309;
+  --label-over: #dc2626;
+  --label-tight: #c2410c;
+  --label-terminus: #b45309;
+  --label-elbow45: #be185d;
+  --label-elbow-short: #0f766e;
+  --label-through: #7e22ce;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  margin: 0;
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+}
+
+body {
+  font-family:
+    system-ui, -apple-system, 'Hiragino Kaku Gothic ProN', 'Noto Sans JP',
+    sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  /* タッチ操作でのスクロール／ズームを無効化（描画優先） */
+  touch-action: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+/* ================= ホーム画面（図面一覧／フォルダ一覧）=================
+   このブロックはホーム画面専用。作図画面・PDF出力・各計算タブとは
+   独立させるため、色は --home-* という専用トークンに閉じてある。
+   （このアプリの --bg / --accent 等はキャンバスやPDFを含む全画面共通の
+   変数なので、そこへホーム画面用の色を上書きすると作図画面やPDFまで
+   巻き添えで変わってしまう。名前を分けているのはそれを防ぐため。）
+
+   既定は暗い画面。トップの設定(⚙)から切り替えると
+   :root[data-theme='light'] 側の明るい配色になる。 */
+.home {
+  /* 面 */
+  --home-bg: #0f1722;
+  --home-surface: #1b2534;
+  --home-surface-sub: #26313f;
+  --home-header: #16304f;
+  --home-header-field: #22436b;
+  /* 文字 */
+  --home-ink: #e8edf3;
+  --home-ink-2: #a9b7c6;
+  --home-ink-3: #7a8798;
+  --home-on-header: #ffffff;
+  --home-on-header-sub: #8fa6c2;
+  /* アクセント */
+  --home-accent: #12a05a;
+  --home-accent-ink: #c9f0dc;
+  --home-tool-1: #3d7be8;
+  --home-tool-2: #9b6bf0;
+  --home-tool-3: #d98324;
+  /* 図面ステータス色（意味はユーザー定義） */
+  --home-status-white: #5b6878;
+  --home-status-red: #d64534;
+  --home-status-green: #12a05a;
+  --home-status-blue: #2e77db;
+  /* 形 */
+  --home-r-lg: 16px;
+  --home-r-md: 15px;
+  --home-r-sm: 13px;
+  --home-r-pill: 999px;
+  --home-gap: 12px;
+  --home-pad-x: 20px;
+  --home-shadow-accent: 0 8px 18px rgba(18, 160, 90, 0.3);
+
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  background: var(--home-bg);
+  color: var(--home-ink);
+}
+
+/* 明るい画面（指示書の配色そのまま） */
+:root[data-theme='light'] .home {
+  --home-bg: #edf0f4;
+  --home-surface: #ffffff;
+  --home-surface-sub: #e1e6ed;
+  --home-ink: #16202e;
+  --home-ink-2: #48576a;
+  --home-ink-3: #8593a5;
+  --home-status-white: #c3cad4;
+}
+
+/* --- ヘッダーブロック --- */
+.home-header {
+  position: relative;
+  background: var(--home-header);
+  border-radius: 0 0 26px 26px;
+  padding: 34px var(--home-pad-x) 22px;
+  padding-top: max(34px, calc(env(safe-area-inset-top) + 14px));
+  flex-shrink: 0;
+}
+
+.home-header-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.home-brand-block {
+  min-width: 0;
+}
+
+.home-brand {
+  margin: 0;
+  font-size: 25px;
+  font-weight: 900;
+  letter-spacing: -0.02em;
+  color: var(--home-on-header);
+}
+
+.home-brand-folder {
+  font-size: 22px;
+  margin-top: 10px;
+}
+
+.home-brand-sub {
+  margin: 3px 0 0;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--home-on-header-sub);
+}
+
+.home-gear,
+.home-back {
+  background: var(--home-header-field);
+  color: var(--home-on-header);
+  border: none;
+  border-radius: var(--home-r-pill);
+  flex-shrink: 0;
+  /* 手袋のままでも押せるよう最小48px を確保する */
+  min-width: 48px;
+  min-height: 48px;
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-back {
+  border-radius: var(--home-r-sm);
+  padding: 0 16px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-search {
+  margin-top: 16px;
+  width: 100%;
+  background: var(--home-header-field);
+  color: var(--home-on-header);
+  border: none;
+  border-radius: 12px;
+  padding: 12px 15px;
+  font-size: 14px;
+  font-weight: 500;
+  min-height: 48px;
+  appearance: none;
+}
+
+.home-search::placeholder {
+  color: var(--home-on-header-sub);
+}
+
+/* --- 本体 --- */
+.home-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--home-gap);
+  padding: 18px var(--home-pad-x);
+  padding-bottom: max(24px, env(safe-area-inset-bottom));
+}
+
+/* --- 新規作成 CTA --- */
+.home-cta {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  background: var(--home-accent);
+  color: #ffffff;
+  border: none;
+  border-radius: var(--home-r-lg);
+  padding: 20px;
+  box-shadow: var(--home-shadow-accent);
+  text-align: left;
+}
+
+.home-cta-badge {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 13px;
+  background: rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.home-cta-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.home-cta-title {
+  font-size: 21px;
+  font-weight: 900;
+  letter-spacing: -0.01em;
+}
+
+.home-cta-sub {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--home-accent-ink);
+}
+
+/* --- ツール 2カラム --- */
+.home-tools {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--home-gap);
+}
+
+.home-tool {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  background: var(--home-surface);
+  border: none;
+  border-radius: var(--home-r-md);
+  padding: 15px;
+  min-height: 96px;
+  text-align: left;
+  color: var(--home-ink);
+}
+
+/* 絵文字は機種依存で潰れるため、単色の角丸ブロックで表す */
+.home-tool-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  margin-bottom: 6px;
+}
+
+.home-tool-icon-1 {
+  background: var(--home-tool-1);
+}
+.home-tool-icon-2 {
+  background: var(--home-tool-2);
+}
+.home-tool-icon-3 {
+  background: var(--home-tool-3);
+}
+
+.home-tool-title {
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.home-tool-sub {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--home-ink-3);
+}
+
+/* --- 共有ファイルを開く（主要導線ではないので重みを落とす） --- */
+.home-import {
+  background: var(--home-surface-sub);
+  color: var(--home-ink-2);
+  border: none;
+  border-radius: var(--home-r-sm);
+  padding: 14px;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 500;
+}
+
+/* --- フォルダセクション --- */
+.home-section-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.home-section-title {
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: var(--home-ink-2);
+}
+
+.home-folder-add {
+  background: var(--home-surface);
+  color: var(--home-ink-2);
+  border: none;
+  border-radius: var(--home-r-pill);
+  padding: 0 16px;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.home-folder-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--home-gap);
+}
+
+.home-folder-card {
+  position: relative;
+  background: var(--home-surface);
+  border-radius: var(--home-r-md);
+  /* overflow:hidden は付けない。付けると ⋯ メニューがカードの外へ出られず
+     「削除」が見切れてしまう(実機で報告)。色帯は自分で角を丸める。 */
+}
+
+/* カード上端の色帯。フォルダ自体の識別色はまだデータに無いため中立色。 */
+.home-folder-band {
+  display: block;
+  height: 5px;
+  background: var(--home-status-white);
+  border-radius: var(--home-r-md) var(--home-r-md) 0 0;
+}
+
+.home-folder-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  width: 100%;
+  background: transparent;
+  border: none;
+  padding: 14px 46px 14px 14px;
+  min-height: 76px;
+  text-align: left;
+  color: var(--home-ink);
+}
+
+.home-folder-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.home-folder-date {
+  font-size: 10px;
+  font-weight: 400;
+  color: var(--home-ink-3);
+}
+
+/* 削除は不可逆なので、カード脇に出しっぱなしにせずメニューの中に入れる */
+.home-folder-menu-btn {
+  position: absolute;
+  top: 5px;
+  right: 0;
+  width: 48px;
+  height: 48px;
+  background: transparent;
+  border: none;
+  color: var(--home-ink-3);
+  font-size: 20px;
+  line-height: 1;
+}
+
+.home-menu-backdrop {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  border: none;
+  padding: 0;
+  z-index: 40;
+}
+
+.home-menu {
+  position: absolute;
+  top: 48px;
+  right: 8px;
+  z-index: 41;
+  display: flex;
+  flex-direction: column;
+  min-width: 148px;
+  background: var(--home-surface);
+  border-radius: var(--home-r-sm);
+  overflow: hidden;
+  box-shadow: 0 10px 26px rgba(0, 0, 0, 0.35);
+}
+
+.home-menu-settings {
+  top: auto;
+  right: var(--home-pad-x);
+  margin-top: 6px;
+}
+
+.home-menu button {
+  background: transparent;
+  border: none;
+  color: var(--home-ink);
+  padding: 0 16px;
+  min-height: 48px;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+}
+
+.home-menu button.danger {
+  color: var(--home-status-red);
+}
+
+.home-empty {
+  margin: 4px 0;
+  font-size: 14px;
+  color: var(--home-ink-2);
+}
+
+/* --- 図面カード（フォルダを開いた先の一覧） --- */
+.home-drawing-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--home-gap);
+}
+
+.home-drawing-card {
+  position: relative;
+  display: flex;
+  background: var(--home-surface);
+  border-radius: var(--home-r-md);
+  /* overflow:hidden は付けない(上の .home-folder-card と同じ理由) */
+}
+
+/* ステータス色は左端の縦帯で表す（色の意味は定義しない＝ユーザー任せ） */
+.home-drawing-band {
+  flex-shrink: 0;
+  width: 4px;
+  background: var(--home-status-white);
+  border-radius: var(--home-r-md) 0 0 var(--home-r-md);
+}
+
+.home-drawing-card.status-red .home-drawing-band {
+  background: var(--home-status-red);
+}
+.home-drawing-card.status-green .home-drawing-band {
+  background: var(--home-status-green);
+}
+.home-drawing-card.status-blue .home-drawing-band {
+  background: var(--home-status-blue);
+}
+
+.home-drawing-body {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 4px 46px 10px 0;
+}
+
+.home-drawing-main {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 3px;
+  background: transparent;
+  border: none;
+  padding: 12px 14px 8px;
+  min-height: 48px;
+  text-align: left;
+  color: var(--home-ink);
+}
+
+.home-drawing-name {
+  font-size: 15px;
+  font-weight: 700;
+  overflow-wrap: anywhere;
+}
+
+.home-drawing-meta {
+  font-size: 11px;
+  font-weight: 400;
+  color: var(--home-ink-3);
+}
+
+.home-drawing-sub {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 0 14px;
+}
+
+.status-dot-row {
+  display: flex;
+  gap: 8px;
+}
+
+.status-dot {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+.status-dot.active {
+  border-color: var(--home-ink);
+}
+
+.status-dot-white {
+  background: var(--home-status-white);
+}
+.status-dot-red {
+  background: var(--home-status-red);
+}
+.status-dot-green {
+  background: var(--home-status-green);
+}
+.status-dot-blue {
+  background: var(--home-status-blue);
+}
+
+.home-move-select {
+  background: var(--home-surface-sub);
+  color: var(--home-ink-2);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  padding: 8px 10px;
+  min-height: 40px;
+  max-width: 52%;
+  appearance: none;
+}
+
+/* --- タブレット幅ではカードが間延びしないよう列を増やす --- */
+@media (min-width: 700px) {
+  .home-folder-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .home-tools {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (min-width: 980px) {
+  .home-folder-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}
+
+/* --- 操作可能であることを色で示す（フラットデザインを維持） --- */
+.home-tool:hover,
+.home-import:hover,
+.home-folder-add:hover,
+.home-folder-main:hover,
+.home-drawing-main:hover,
+.home-menu button:hover {
+  background: var(--home-surface-sub);
+}
+
+.home-cta:hover {
+  background: #0d8b4d;
+}
+
+.home-cta:focus-visible,
+.home-tool:focus-visible,
+.home-import:focus-visible,
+.home-folder-add:focus-visible,
+.home-folder-main:focus-visible,
+.home-drawing-main:focus-visible,
+.home-folder-menu-btn:focus-visible,
+.home-gear:focus-visible,
+.home-back:focus-visible,
+.home-search:focus-visible,
+.status-dot:focus-visible,
+.home-move-select:focus-visible {
+  outline: 2px solid var(--home-tool-1);
+  outline-offset: 2px;
+}
+
+.topbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 10px 14px;
+  /* 画面下部(パーツパレットと入れ替え済み)に配置している、画面最下段の
+     バーなので、ノッチ等のセーフエリアはここで吸収する(以前はこの下に
+     あったfooter(statusbar)が担っていたが、セグメント数表示ごと廃止した)。 */
+  padding-bottom: max(10px, env(safe-area-inset-bottom));
+  background: var(--panel);
+  gap: 12px;
+}
+
+.title {
+  font-weight: 700;
+  font-size: 16px;
+  flex-shrink: 0;
+}
+
+/* ツールバーの横スクロール領域＋「まだ続きがある」ヒント表示用の外枠 */
+.tools-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  display: flex;
+}
+
+.tools {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  /* スクロールバーを見やすく（Firefox / Android Chrome等） */
+  scrollbar-width: thin;
+  scrollbar-color: var(--scrollbar-thumb) transparent;
+}
+
+.tools::-webkit-scrollbar {
+  height: 5px;
+}
+
+.tools::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.tools::-webkit-scrollbar-thumb {
+  background: var(--scrollbar-thumb);
+  border-radius: 4px;
+}
+
+.tools button {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
+  min-height: 44px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* 右端がスクロールで隠れているとき、フェードと矢印で「まだ続きがある」と示す。
+   iOS等スクロールバー自体を装飾できない環境でも確実に気づけるようにするため。 */
+.tools-wrap::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 30px;
+  background: linear-gradient(to right, transparent, var(--panel) 75%);
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tools-wrap.has-more::after {
+  opacity: 1;
+}
+
+.tools-scroll-hint {
+  position: absolute;
+  right: 2px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: rgba(241, 245, 249, 0.92);
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 900;
+  line-height: 1;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+
+.tools-wrap.has-more .tools-scroll-hint {
+  opacity: 1;
+}
+
+.tools button:disabled {
+  opacity: 0.4;
+}
+
+.tools button:active:not(:disabled) {
+  background: var(--accent);
+  color: #04222e;
+}
+
+/* 消しゴムモード中は、誤って線を消し続けないよう一目で分かる色にする
+   （削除系の色＝パネルの削除ボタンと同系色）。 */
+.tools button.eraser-toggle.active {
+  background: #3a1720;
+  color: #f87171;
+  border: 1px solid #5b2230;
+  font-weight: 800;
+}
+
+/* 主要アクション（集計/BOM）は色分けして目立たせる */
+.tools button.primary {
+  background: #10b981;
+  color: #04231a;
+  font-weight: 800;
+  padding: 10px 18px;
+}
+
+.tools button.primary:active:not(:disabled) {
+  background: #059669;
+}
+
+.stage {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+}
+
+.canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
+  background: var(--bg);
+  touch-action: none;
+}
+
+/* 消しゴムモード中は、線をタップすると即削除であることが伝わるよう
+   カーソル自体も変える（マウス操作時のヒント。タッチでは見た目に影響しない）。 */
+.canvas.eraser-active {
+  cursor: crosshair;
+}
+
+/* アイソメグリッド線（薄いグレーで常時表示のガイド）。--ui-scale は
+   DrawingCanvas のルート<svg>で画面幅に応じて設定される表示スケール
+   係数（iPhone幅で1、iPad等の広い画面ほど大きくなる）。PDF出力側
+   (PrintIsometric)はこの変数を持たないため既定値1のまま影響を受けない。 */
+.iso-grid line {
+  stroke: var(--grid-line);
+  stroke-width: calc(1px * var(--ui-scale, 1));
+}
+
+
+/* 属性入力フォーム（常設パネル内で使用） */
+.field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 8px 4px;
+}
+
+.field-label {
+  color: var(--hint);
+  font-size: 13px;
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+
+.field-note {
+  color: var(--hint-2);
+  font-size: 12px;
+}
+
+.field select {
+  appearance: none;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
+  min-height: 48px;
+  width: 100%;
+}
+
+.num-input {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px 14px;
+  font-size: 15px;
+  min-height: 48px;
+  width: 100%;
+}
+
+/* セグメント上のサイズ表示ラベル。フォント・縁取りとも --ui-scale
+   （DrawingCanvasのルート<svg>で画面幅に応じて設定。iPhone幅=1、iPad等の
+   広い画面ほど大きい）に比例させ、iPadでグリッド・線に対して文字が
+   相対的に小さく見えないようにする。PDF出力(PrintIsometric)は
+   --ui-scale を持たないため既定値1のまま(=表示スケーリングの対象外)。 */
+.seg-label {
+  fill: var(--label-main);
+  font-size: calc(12px * var(--ui-scale, 1));
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3px * var(--ui-scale, 1));
+}
+
+/* 継承（仮適用）中のサイズラベルは控えめに表示 */
+.seg-label.inherited {
+  fill: var(--label-muted);
+  font-weight: 500;
+}
+
+/* 末端（フリー端）の呼び径ラベル。配管サイズを端に明示（手書き流） */
+.seg-label.terminus {
+  fill: var(--label-terminus);
+  font-size: calc(13px * var(--ui-scale, 1));
+  font-weight: 800;
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
+}
+
+/* 寸法表記(ISOGEN流): パイプから離した外側/内側レーンの専用寸法線上に表示する。
+   芯々/芯先(外側レーン、.dim-center)は控えめな色、切り寸法(内側レーン、
+   .dim-cut)は現場で実際に使う数値のため強調色にする。括弧書きにすることで
+   「参照寸法(計算後の値)」であることを示す製図慣習に合わせ、以前使っていた
+   下線は廃止した。 */
+.dim-center {
+  fill: var(--label-sub); /* 外側レーン: 芯々寸法（控えめ） */
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  font-weight: 600;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3px * var(--ui-scale, 1));
+}
+
+/* 下線を廃止したことで、以前は下線との併用を避けるために分けていた
+   「縁取り専用レイヤー」がstroke+underlineの競合なく直接指定できるように
+   なった(.dim-cut-outlineは廃止し、paint-orderで縁取りを直接かける)。 */
+.dim-cut {
+  fill: var(--label-cut); /* 寸法線の2行目: 切り寸（強調・現場で使う数値・括弧書き） */
+  font-size: calc(12.5px * var(--ui-scale, 1));
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
+}
+
+.dim-cut.zero {
+  fill: var(--label-zero);
+  font-size: calc(10.5px * var(--ui-scale, 1));
+  text-decoration: none;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
+}
+
+.dim-cut.over {
+  fill: var(--label-over);
+  font-size: calc(11px * var(--ui-scale, 1));
+  text-decoration: none;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
+}
+
+.dim-cut.tight {
+  fill: var(--label-tight);
+}
+
+/* 通り寸法(曲がるまでの全体の芯々)。チーズ・フランジで区間が分かれていても
+   通しの寸法が知りたい、という現場の要望で追加した。個別の寸法線より外側の
+   レーンに出す。個別の芯々(.dim-center)や切り寸(.dim-cut)と取り違えないよう、
+   「通し」の接頭辞に加えて色も分ける。 */
+.dim-through {
+  fill: var(--label-through);
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 700;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3.2px * var(--ui-scale, 1));
+}
+
+/* 現合(現物合わせ)区間の注記表示。通常の芯々/切り寸法(.dim-center/.dim-cut)
+   の代わりに1行だけ出す。色(既存の警告色--label-zeroを流用)に加えて
+   イタリック体にもすることで、色を判別しづらい環境でも「確定値ではない」
+   と分かるよう二重に見た目を変える(誤って確定寸法として使われないため)。 */
+.dim-gengou {
+  fill: var(--label-zero);
+  font-size: calc(12px * var(--ui-scale, 1));
+  font-weight: 800;
+  font-style: italic;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3.5px * var(--ui-scale, 1));
+}
+
+/* 現合区間の補足メモ(印刷専用)。画面上はタップして確認するアイコンで
+   済むが、印刷は操作できないため2行目(通常は切り寸法が入る、現合では
+   未使用のレーン)にそのまま文字で出す。確定寸法の.dim-cutと混同され
+   ないよう、控えめな色・細め・イタリックにする。 */
+.dim-gengou-note {
+  fill: var(--label-sub);
+  font-size: calc(9.5px * var(--ui-scale, 1));
+  font-weight: 500;
+  font-style: italic;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3px * var(--ui-scale, 1));
+}
+
+/* 現合区間の補足メモアイコン。既存の相番バッジ(assembly-badge)と同じ
+   「円+文字」の構成を流用し、視覚言語を増やしすぎないようにする。 */
+.gengou-note-icon circle {
+  fill: var(--label-zero);
+  stroke: var(--label-outline);
+  stroke-width: calc(1.5px * var(--ui-scale, 1));
+}
+.gengou-note-icon text {
+  fill: #04222e;
+  font-size: calc(12px * var(--ui-scale, 1));
+  font-weight: 800;
+}
+
+/* 寸法補助線(パイプ端点から寸法線まで伸ばす短い線)。目立たせすぎない
+   よう細く控えめな色にする。 */
+.dim-ext-line {
+  stroke: var(--label-sub);
+  stroke-width: calc(0.8px * var(--ui-scale, 1));
+  opacity: 0.55;
+}
+
+/* 寸法線・矢羽根(1本にまとめたもの)。以前は芯々/芯先用(外側)と切り寸法用
+   (内側)の2本を別々に引いていたが、近接して重なって見づらいという
+   フィードバックにより1本へ統合した。.dim-centerと同系色(控えめ)にし、
+   その上に乗る1行目(芯々/芯先)・2行目(切り寸法、強調色)の2行のテキストは
+   従来どおり区別できるようにする。 */
+.dim-line {
+  stroke: var(--label-sub);
+  stroke-width: calc(1px * var(--ui-scale, 1));
+  opacity: 0.75;
+}
+.dim-arrow {
+  fill: var(--label-sub);
+  opacity: 0.75;
+}
+
+/* 引き出し線: 近接するラベルとの重なりを避けるため文字を押し出したとき、
+   本来の寸法線上の位置と実際の文字位置をつなぎ、どちらの配管の数字か
+   分かるようにする（重ならないときは表示しない）。 */
+.dim-leader-line {
+  stroke: var(--label-sub);
+  stroke-width: calc(0.8px * var(--ui-scale, 1));
+  stroke-dasharray: 2 2;
+  opacity: 0.6;
+}
+
+/* 相番(合番)バッジ。密集した図面では芯々/切り寸法を直書きせず番号だけを
+   表示し、詳しい寸法はBOMの対応表で確認する運用（現場の相番方式）。
+   老眼等でも読み取れるよう、円・文字サイズは通常のラベルよりかなり
+   大きめにしている（従来比 約1.6倍）。円の半径自体はJS側(uiScale)で
+   拡大済みのため、ここでは文字・縁取りだけ --ui-scale に合わせる。 */
+.assembly-badge circle {
+  fill: var(--accent);
+  stroke: var(--label-outline);
+  stroke-width: calc(2.5px * var(--ui-scale, 1));
+}
+
+.assembly-badge text {
+  fill: var(--accent-on);
+  font-size: calc(19px * var(--ui-scale, 1));
+  font-weight: 800;
+}
+
+/* レジューサー記号（三角形） */
+.reducer-mark {
+  fill: var(--reducer-fill);
+  stroke: var(--text);
+  stroke-width: calc(2px * var(--ui-scale, 1));
+  stroke-linejoin: round;
+}
+
+/* 45°エルボ使用箇所のマーク（90°エルボと区別できるよう明示） */
+.elbow45-mark {
+  fill: var(--label-elbow45);
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3px * var(--ui-scale, 1));
+}
+
+/* 90°ショートエルボ使用箇所のマーク（ロングが既定のため、加工時に見落とさないよう明示） */
+.elbow-short-mark {
+  fill: var(--label-elbow-short);
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3px * var(--ui-scale, 1));
+}
+
+/* 排水勾配(1/N)を設定した区間のマーク */
+.slope-mark {
+  fill: var(--label-elbow45);
+  font-size: calc(11px * var(--ui-scale, 1));
+  font-weight: 800;
+  paint-order: stroke;
+  stroke: var(--label-outline);
+  stroke-width: calc(3px * var(--ui-scale, 1));
+}
+
+/* フランジ記号（配管に直交する2本線）。端点の●・寸法線・継手マークが
+   集まる場所に描かれるため、細いと見落とされる。太く長くして目立たせる。 */
+.flange-mark {
+  stroke: var(--text);
+  stroke-width: calc(4px * var(--ui-scale, 1));
+  stroke-linecap: round;
+}
+
+/* 現場溶接マーク（工場加工の分割点。正三角形・輪郭のみ・赤系で目立たせる。
+   既存のエラー/警告色(--label-over)を流用し、新しい色を増やさない）。 */
+.field-weld-mark {
+  fill: none;
+  stroke: var(--label-over);
+  stroke-width: calc(1.6px * var(--ui-scale, 1));
+  stroke-linejoin: round;
+}
+
+/* ドラッグで移動中は、塗りを薄く入れて掴んでいることが分かるようにする。 */
+.field-weld-mark.dragging {
+  fill: var(--label-over);
+  fill-opacity: 0.25;
+}
+
+/* 現場合わせ区間（遊びを持たせて加工している区間）の二重線・端点マーク。
+   選択中セグメントと同系色(橙)にして、通常の配管線・現場溶接マーク(赤)
+   のどちらとも見分けやすくする。 */
+.field-fit-line {
+  stroke: var(--seg-selected);
+  stroke-width: calc(1.4px * var(--ui-scale, 1));
+  stroke-linecap: round;
+  opacity: 0.85;
+}
+.field-fit-mark {
+  fill: none;
+  stroke: var(--seg-selected);
+  stroke-width: calc(1.6px * var(--ui-scale, 1));
+  stroke-linejoin: round;
+}
+
+/* --- 常設 属性パネル（画面下部） --- */
+.attr-panel {
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+}
+
+.panel-header {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  padding: 10px 14px;
+  min-height: 46px;
+  text-align: left;
+}
+
+.panel-header.static {
+  cursor: default;
+}
+
+/* 作図設定は画面下部のバーではなく、キャンバス左上に浮かせて常設する
+   （下部はパーツパレット等で手狭なため、親指で届きやすい左上に配置）。 */
+.attr-panel.settings {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 15;
+  width: auto;
+  max-width: calc(100% - 20px);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 8px 24px var(--shadow);
+  overflow: hidden;
+}
+
+.attr-panel.settings .panel-header {
+  min-height: 40px;
+  padding: 8px 12px;
+}
+
+.attr-panel.settings .panel-body {
+  width: min(84vw, 340px);
+  max-height: min(60vh, 420px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.panel-caret {
+  color: var(--hint);
+  font-size: 11px;
+}
+
+/* ズームボタン(－/＋)。キャンバス右下に浮かせて常設する（作図設定＝左上、
+   選択時の詳細パネル＝下、と重ならない位置）。ピンチ操作の保険として、
+   密集した図面を少しずつ縮小・拡大したい場面向けの細かい調整用。 */
+.zoom-controls {
+  position: absolute;
+  right: 10px;
+  bottom: 10px;
+  z-index: 15;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  box-shadow: 0 8px 24px var(--shadow);
+  padding: 4px;
+}
+
+.zoom-controls button {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: var(--border);
+  color: var(--text);
+  font-size: 18px;
+  font-weight: 800;
+  line-height: 1;
+}
+
+.zoom-controls button:disabled {
+  opacity: 0.35;
+}
+
+.zoom-controls button:active:not(:disabled) {
+  background: var(--accent);
+  color: #04222e;
+}
+
+/* パン(移動)ジョイスティック。二本指ドラッグでのパンは既存のまま残しつつ、
+   スマホゲームの移動スティックのように片手の親指で連続的に画面を動かせる
+   保険のコントローラー。既定は左下(ズームボタンは右下のため衝突しない)。
+   タップ・ドラッグ判定を全て自前で行うため、ブラウザ標準のスクロール/
+   ダブルタップズーム等に横取りされないようtouch-action: noneにする。 */
+.pan-joystick {
+  position: absolute;
+  z-index: 15;
+  border-radius: 50%;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  box-shadow: 0 8px 24px var(--shadow);
+  touch-action: none;
+  opacity: 0.9;
+}
+
+.pan-joystick.repositioning {
+  box-shadow: 0 0 0 3px var(--accent), 0 8px 24px var(--shadow);
+  opacity: 1;
+}
+
+.pan-joystick-knob {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  border-radius: 50%;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+}
+
+.pan-joystick.repositioning .pan-joystick-knob {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+/* 「持ち上げ」中(ダブルタップ後)、次の1タップで置き場所を選べるように
+   画面全体を覆う透明なタップ受け皿。既存の作図・選択操作には一切影響
+   させず、この間だけ最前面でタップを横取りする。 */
+.pan-joystick-place-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 20;
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  touch-action: none;
+}
+
+.pan-joystick-place-hint {
+  margin-top: max(16px, env(safe-area-inset-top));
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--accent);
+  border-radius: 999px;
+  padding: 8px 16px;
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px var(--shadow);
+}
+
+.zoom-percent {
+  min-width: 42px;
+  text-align: center;
+  font-size: 12px;
+  color: var(--hint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* 芯々寸法欄は連続入力の主役なので少し強調 */
+.dim-field .num-input {
+  border-color: #0ea5e9;
+}
+
+/* 寸法入力欄(DimCalcInput)は、見た目・操作感はこれまでの数字入力欄の
+   まま（.num-inputを共有）に、タップした時だけクイック計算(芯引き)の
+   「全体寸法」欄と全く同じテンキー(CalcKeypad)をポップアップ表示する。
+   .num-inputは本来<input>向けのスタイルだが<button>にもそのまま
+   流用できる（テキスト整列・見た目リセットだけここで補う）。 */
+.dim-calc-trigger {
+  appearance: none;
+  text-align: left;
+  font-family: inherit;
+  cursor: pointer;
+}
+.dim-calc-placeholder {
+  color: var(--hint);
+}
+
+.dim-calc-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding: 0 12px max(12px, env(safe-area-inset-bottom));
+}
+.dim-calc-popup {
+  width: 100%;
+  max-width: 360px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px 16px 12px 12px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  box-shadow: 0 -8px 30px rgba(0, 0, 0, 0.4);
+}
+.dim-calc-popup-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--hint);
+}
+.dim-calc-close {
+  background: var(--panel-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+}
+
+/* 寸法入力欄で「180+20」のような式を電卓ロジック(calcExpr.ts)で確定
+   できなかったとき(5桁超過・不正な文字等)だけ表示するエラー表示。
+   クイック計算の.qc-calc-errorと同じ色を使う。通常時は表示されないため
+   見た目は変わらない。 */
+.dim-calc-error {
+  color: var(--label-over);
+}
+
+.panel-summary {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  overflow: hidden;
+  white-space: nowrap;
+}
+
+.panel-summary b {
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-weight: 700;
+}
+
+.sum-fit {
+  color: var(--hint);
+}
+
+.sum-mode {
+  background: #0ea5e9;
+  color: #04222e;
+  border-radius: 6px;
+  padding: 3px 8px;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.sum-none {
+  color: var(--hint);
+}
+
+.panel-delete {
+  background: #3a1720;
+  color: #f87171;
+  border: 1px solid #5b2230;
+  border-radius: 8px;
+  padding: 8px 12px;
+  font-size: 13px;
+  min-height: 40px;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+/* パネルを閉じる固定ボタン。ヘッダーは常に画面上部に表示されるため、
+   キーボード表示中でも狙いやすい大きな当たり判定を確保する。 */
+.panel-close {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  min-height: 40px;
+  flex-shrink: 0;
+  font-size: 16px;
+  font-weight: 700;
+  margin-left: 8px;
+}
+
+.panel-close:active {
+  background: var(--accent);
+  color: #04222e;
+}
+
+.panel-body {
+  max-height: 46vh;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 4px 14px 12px;
+  border-top: 1px solid var(--border-soft);
+}
+
+.panel-hint {
+  color: var(--hint);
+  font-size: 13px;
+  margin: 10px 2px;
+}
+
+.panel-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px 12px;
+}
+
+/* panel-grid を <fieldset> として使う箇所（図面共有の「寸法のみ編集可」で
+   継手・管種等の構成項目をまとめて編集不可にするため）。ブラウザ既定の
+   fieldset の枠線・余白をリセットし、通常の div と同じ見た目にする。 */
+fieldset.panel-grid {
+  border: 0;
+  margin: 0;
+  padding: 0;
+  min-width: 0;
+}
+
+fieldset.panel-grid:disabled {
+  opacity: 0.55;
+}
+
+/* パネル内の field は上下の余白を詰める */
+.panel-body .field {
+  padding: 4px 0;
+}
+
+/* 切り寸法の丸め切替（パネル内・全幅） */
+.round-field {
+  grid-column: 1 / -1;
+}
+
+.offset-field {
+  grid-column: 1 / -1;
+}
+
+.round-toggle {
+  display: flex;
+  gap: 8px;
+}
+
+.round-toggle button {
+  flex: 1;
+  background: var(--field-bg);
+  color: var(--hint);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.round-toggle button.active {
+  background: var(--accent);
+  color: #04222e;
+  border-color: var(--accent);
+}
+
+/* パッキン加味チェック＋厚み */
+.gasket-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--text);
+  min-height: 44px;
+}
+
+.gasket-check input {
+  width: 22px;
+  height: 22px;
+}
+
+.gasket-thick {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+
+.gasket-thick .num-input {
+  width: 100px;
+}
+
+/* 配管ライン色分け(系統)。色スウォッチの並びは、老眼配慮で他のタップ領域
+   (ズームボタン等)と同じ44px前後の当たり判定を確保する。色自体には
+   系統の意味を持たせない(ラベルはユーザー任意設定、data/lineColors.ts)。 */
+.color-swatch-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.color-swatch {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  border: 2px solid var(--border);
+  padding: 0;
+}
+
+.color-swatch.selected {
+  border-color: var(--text);
+  box-shadow: 0 0 0 2px var(--accent);
+}
+
+.color-swatch-none {
+  width: auto;
+  min-width: 44px;
+  height: 36px;
+  border-radius: 18px;
+  padding: 0 10px;
+  background: var(--field-bg);
+  color: var(--hint);
+  font-size: 12px;
+}
+
+.color-swatch-static {
+  cursor: default;
+}
+
+/* 作図設定バーのヘッダー要約(panel-summary)に出す、系統色の小さい丸
+   (既存のbバッジの中に添える。バッジ自体の背景色は変えず、色は点で示す)。 */
+.color-swatch-dot {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  margin-right: 4px;
+  vertical-align: middle;
+}
+
+.color-edit-all {
+  background: var(--panel-2);
+  color: var(--accent);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  min-height: 36px;
+}
+
+.color-label-field {
+  grid-column: 1 / -1;
+  margin-top: 8px;
+}
+
+/* 現合(現物合わせ)の概算寸法・修飾語・補足メモの入力欄。ONにしたときだけ
+   展開される(round-toggleの直下に縦に積む)。 */
+.gengou-fields {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+/* 色↔系統名をまとめて編集する画面(ColorLabelsModal)。既存のモーダル
+   (disclaimer-overlay/card)の見た目をそのまま流用する。 */
+.color-labels-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  list-style: none;
+  padding: 0;
+  margin: 10px 0 0;
+}
+
+.color-labels-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.color-labels-row .num-input {
+  flex: 1;
+}
+
+.cut-field .cut-value {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  padding: 0 4px;
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--label-cut);
+}
+
+.cut-field .cut-value.zero {
+  color: var(--label-zero);
+  font-size: 14px;
+}
+
+.cut-field .cut-value.over {
+  color: var(--label-over);
+  font-size: 14px;
+}
+
+.cut-field .cut-value.tight {
+  color: var(--label-tight);
+}
+
+.cut-warn.danger {
+  color: var(--label-over);
+  font-weight: 700;
+}
+
+/* 管種・サイズ: 分岐や口径変更があるときだけ重要なため、既定(継承のまま)は
+   控えめな枠、この区間で個別に上書きしているときだけオレンジ枠＋バッジで強調する。 */
+.pipe-size-group {
+  position: relative;
+  border: 1px solid var(--border-soft);
+  border-radius: 10px;
+  padding: 8px 10px 2px;
+  margin-top: 4px;
+}
+
+.pipe-size-group.overridden {
+  border-color: var(--label-tight);
+}
+
+.pipe-size-badge {
+  grid-column: 1 / -1;
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--label-tight);
+  border: 1px solid var(--label-tight);
+  border-radius: 999px;
+  padding: 2px 8px;
+  margin-bottom: 4px;
+}
+
+.end-breakdown {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.end-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.end-row span:last-child {
+  color: var(--text);
+}
+
+.cut-warn {
+  color: var(--label-zero);
+  font-size: 13px;
+  margin: 8px 2px 0;
+  line-height: 1.6;
+}
+
+/* エルボtoエルボの間隔不足時、45°×2 / 90°+45° への振り分け提案 */
+.elbow-clash-suggest {
+  grid-column: 1 / -1;
+  margin: 8px 2px 0;
+  padding: 10px 12px;
+  background: #1e1b0f;
+  border: 1px solid #78350f;
+  border-radius: 10px;
+}
+
+.elbow-clash-suggest p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #fbbf24;
+  line-height: 1.6;
+}
+
+.elbow-clash-apply {
+  width: 100%;
+  padding: 10px;
+  border-radius: 8px;
+  border: none;
+  background: #f59e0b;
+  color: #1e1b0f;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+/* 差込溶接の溶接代不足警告 */
+.socket-gap-warn {
+  grid-column: 1 / -1;
+  margin: 8px 2px 0;
+  padding: 10px 12px;
+  background: #1e1509;
+  border: 1px solid #9a3412;
+  border-radius: 10px;
+}
+
+/* 相番(合番)の手動入力欄。パネル上部で目立たせて、自動採番の値をすぐ
+   上書き・確認できるようにする。 */
+.assembly-number-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 2px 12px;
+}
+
+.assembly-number-row .field-label {
+  flex-shrink: 0;
+}
+
+.assembly-number-row .num-input {
+  width: 84px;
+  flex-shrink: 0;
+  text-align: center;
+  font-weight: 800;
+  border-color: var(--accent);
+}
+
+.assembly-number-reset {
+  background: transparent;
+  color: var(--hint);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.socket-gap-warn p {
+  margin: 0;
+  font-size: 13px;
+  color: #fb923c;
+  line-height: 1.6;
+}
+
+.ecc-box {
+  margin-top: 10px;
+  padding: 10px 12px;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.ecc-line {
+  font-size: 15px;
+  color: var(--text);
+}
+
+.ecc-line b {
+  color: var(--accent);
+  font-size: 17px;
+}
+
+.ecc-note {
+  margin: 6px 0 0;
+  color: var(--hint);
+  font-size: 12px;
+  line-height: 1.7;
+}
+
+.panel-more {
+  margin-top: 8px;
+}
+
+.panel-more > summary {
+  cursor: pointer;
+  color: var(--hint);
+  font-size: 13px;
+  padding: 8px 2px;
+  list-style: none;
+}
+
+.panel-more > summary::before {
+  content: '▸ ';
+}
+
+.panel-more[open] > summary::before {
+  content: '▾ ';
+}
+
+/* --- パーツパレット（画面上部。メニューバーと入れ替え済み） ---
+   キャンバスを広く保つため、既定は閉（ヘッダー1行のみ）の格納式。
+   「配管設定」パネルと同じ折りたたみパターン(panel-header/panel-caret/
+   panel-summary/sum-mode)を再利用し、操作感・見た目のトーンを揃える。 */
+.palette {
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border-top: 1px solid var(--border-soft);
+}
+
+.palette .panel-header {
+  /* 画面最上部に来たため、ノッチ等のセーフエリア分を上端に確保する
+     （メニューバーが元々ここで行っていたのと同じ考慮）。 */
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+/* ヘッダーは「開閉ボタン＋図面名の入力欄」の2つを並べる行。
+   ボタンの中に入力欄を入れると開閉と入力が競合するため、行だけをdivにして
+   その中にボタンと入力欄を並べている。 */
+.palette-header-toggle {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex: 0 0 auto;
+  background: transparent;
+  color: var(--text);
+  border: none;
+  padding: 0;
+  min-height: 32px;
+  text-align: left;
+}
+
+/* 図面名。作図中も「どの図面か」が常に見えるようにヘッダーの空きに置く。 */
+.palette-title-input {
+  flex: 1 1 auto;
+  min-width: 0;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 10px;
+  min-height: 32px;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.palette-title-input::placeholder {
+  color: var(--hint-2);
+  font-weight: 400;
+}
+
+.palette-items {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  overflow-x: auto;
+  padding: 0 12px 10px;
+}
+
+.palette-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--panel);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 12px;
+  min-height: 44px;
+  font-size: 14px;
+  /* 横スクロール(パン)はブラウザに許可し、縦方向の動きだけ配管へのドラッグ開始として
+     JS側で判定する（pan-x以外は無効にし、判定が確定するまでは既定動作を妨げない）。 */
+  touch-action: pan-x;
+  white-space: nowrap;
+}
+
+.palette-chip.dragging {
+  opacity: 0.4;
+}
+
+/* 選択→タップ配置で選択中のパーツ。配管をタップするまで維持されるため、
+   ドラッグ中(一時的・薄く)とは違い、はっきり分かる強調にする。 */
+.palette-chip.selected {
+  border-color: #0ea5e9;
+  background: #0ea5e9;
+  color: #04222e;
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.35);
+}
+
+.chip-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 34px;
+  height: 24px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: #0ea5e9;
+  color: #04222e;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.palette-hint {
+  color: var(--hint-2);
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* --- 免責事項モーダル --- */
+.disclaimer-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  background: var(--overlay);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.disclaimer-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px var(--shadow-strong);
+}
+
+.disclaimer-header {
+  flex-shrink: 0;
+  padding: 16px;
+  font-size: 17px;
+  font-weight: 700;
+  border-bottom: 1px solid var(--border);
+}
+
+.disclaimer-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 16px;
+  font-size: 14px;
+  line-height: 1.8;
+  color: var(--text);
+}
+
+.disclaimer-body p {
+  margin: 0 0 14px;
+}
+
+.disclaimer-agreed {
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.disclaimer-actions {
+  flex-shrink: 0;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.disclaimer-agree,
+.disclaimer-close {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  min-height: 52px;
+}
+
+.disclaimer-agree {
+  background: #0ea5e9;
+  color: #04222e;
+}
+
+.disclaimer-agree:active {
+  background: #0284c7;
+}
+
+.disclaimer-close {
+  background: var(--border);
+  color: var(--text);
+}
+
+/* 日替わり挨拶メッセージ(disclaimer-*と同じ枠組みを流用) */
+.daily-greeting-body {
+  text-align: center;
+  font-size: 17px;
+  font-weight: 700;
+  padding-top: 28px;
+}
+
+.daily-greeting-body p {
+  margin: 0 0 6px;
+}
+
+/* --- メニューの並び替え設定 --- */
+.menu-order-list {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.menu-order-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--panel-2);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.menu-order-label {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.menu-order-buttons {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.menu-order-buttons button {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 8px;
+  width: 40px;
+  height: 40px;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.menu-order-buttons button:disabled {
+  opacity: 0.35;
+}
+
+.menu-order-buttons button:active:not(:disabled) {
+  background: var(--accent);
+  color: #04222e;
+}
+
+.menu-order-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.menu-order-actions button {
+  flex: 1;
+  min-width: 100px;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 50px;
+}
+
+.menu-order-reset {
+  background: var(--border);
+  color: var(--text);
+}
+
+.menu-order-actions .disclaimer-close {
+  width: auto;
+}
+
+/* 配管設定パネル内の「メニューの並び替え」入り口ボタン */
+.menu-order-open {
+  width: 100%;
+  margin-top: 4px;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 46px;
+}
+
+/* --- 材料集計(BOM)モーダル --- */
+.bom-card {
+  width: 100%;
+  max-width: 560px;
+  max-height: 100%;
+  display: flex;
+  flex-direction: column;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  overflow: hidden;
+  box-shadow: 0 20px 50px var(--shadow-strong);
+}
+
+.bom-body {
+  flex: 1;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  padding: 12px 16px;
+}
+
+.bom-section {
+  margin: 16px 0 6px;
+  font-size: 14px;
+  color: var(--accent);
+}
+
+.bom-section:first-child {
+  margin-top: 4px;
+}
+
+/* パイプ切り寸法（サイズ別グループ） */
+.pipe-group {
+  margin: 8px 0 12px;
+  padding: 10px 12px;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.pipe-group-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+
+.pipe-size {
+  font-size: 16px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.pipe-sub {
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.pipe-cuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cut-chip {
+  background: #064e3b;
+  color: #6ee7b7;
+  border: 1px solid #10b981;
+  border-radius: 8px;
+  padding: 6px 10px;
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.bom-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.bom-table th,
+.bom-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+}
+
+.bom-table th {
+  color: var(--hint);
+  font-weight: 600;
+  font-size: 12px;
+}
+
+.bom-table .num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.bom-table tbody td {
+  color: var(--text);
+}
+
+/* 相番対応表の番号セル。ここで数値を変えると手動上書き（現場の組み立て
+   やすい順への最終調整）になる。 */
+.assembly-number-cell {
+  width: 56px;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  padding: 4px 6px;
+  font-size: 14px;
+  font-weight: 700;
+  text-align: right;
+}
+
+.bom-actions {
+  flex-shrink: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  padding: 14px 16px;
+  border-top: 1px solid var(--border);
+}
+
+.bom-actions button {
+  flex: 1;
+  min-width: 100px;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  min-height: 50px;
+}
+
+.bom-csv {
+  background: #0ea5e9;
+  color: #04222e;
+}
+
+.bom-pdf {
+  background: #a78bfa;
+  color: #1e1b3a;
+}
+
+.bom-csv:disabled,
+.bom-pdf:disabled {
+  opacity: 0.4;
+}
+
+/* PDFのページ構成切替（詳細＝複数ページ／1ページ集約） */
+.pdf-mode-row {
+  display: flex;
+  gap: 8px;
+  padding: 0 16px 4px;
+}
+
+.pdf-mode-btn {
+  flex: 1;
+  border: 1px solid var(--border);
+  background: var(--field-bg);
+  color: var(--hint);
+  border-radius: 8px;
+  padding: 8px;
+  font-size: 12.5px;
+  font-weight: 600;
+  min-height: 36px;
+}
+
+.pdf-mode-btn.active {
+  background: #a78bfa;
+  border-color: #a78bfa;
+  color: #1e1b3a;
+}
+
+/* PDFの用紙サイズ・向き選択。A3横+1ページ集約のときだけ、左2/3アイソメ図・
+   右1/3明細の専用レイアウト(.a3-landscape)が使われる。 */
+.pdf-paper-row {
+  display: flex;
+  gap: 14px;
+  padding: 8px 16px 4px;
+  flex-wrap: wrap;
+}
+
+.pdf-paper-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.pdf-paper-label {
+  color: var(--hint);
+  font-size: 12px;
+  flex-shrink: 0;
+}
+
+.pdf-paper-group .pdf-mode-btn {
+  flex: none;
+  min-width: 44px;
+}
+
+.pdf-a3-hint {
+  padding: 0 16px 4px;
+  color: var(--hint);
+  font-size: 12px;
+}
+
+/* 印刷専用レイアウト。画面表示では隠しておき、「PDFで見る」の画面プレビュー
+   または実際の印刷/PDF化のときだけ表示する。内容のスタイル(見出し・表など)は
+   プレビューと印刷で共通のため、@media print の外（常時有効）で定義し、
+   @media print 側は用紙サイズ・表示切り替え・改ページなど印刷固有の設定のみ扱う。 */
+.bom-print-only {
+  display: none;
+  background: #fff;
+  color: #111;
+  font-family: sans-serif;
+}
+.bom-print-only h1 {
+  font-size: 18px;
+  margin: 0 0 4px;
+}
+.bom-print-only h2 {
+  font-size: 14px;
+  margin: 18px 0 6px;
+  border-bottom: 1px solid #999;
+  padding-bottom: 2px;
+  break-after: avoid;
+  page-break-after: avoid;
+}
+.bom-print-only .print-meta {
+  font-size: 11px;
+  color: #555;
+  margin: 0 0 10px;
+}
+.bom-print-only table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 8px;
+}
+.bom-print-only thead {
+  display: table-header-group;
+}
+.bom-print-only tr {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+/* パイプはサイズ別に1グループ(切り寸法一覧+小計行)をtbodyでまとめ、
+   ページの都合でどうしても分割が必要なとき以外は同じページに収める。
+   継手・フランジは通常件数が少ないため、見出し(h2)ごとブロックとして
+   まとめて別ページへ孤立させない。相番対応表(assemblyBlock)は区間数
+   ぶんの行数になり得るため、これまで通りtr単位の分割のみ許可する。 */
+.bom-print-only .print-pipe-group,
+.bom-print-only .bom-section-block {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.bom-print-only th,
+.bom-print-only td {
+  border: 1px solid #888;
+  padding: 4px 8px;
+  font-size: 12px;
+  text-align: left;
+}
+.bom-print-only tr.print-subtotal td {
+  font-weight: 700;
+  background: #f0f0f0;
+}
+.bom-print-only .print-iso-wrap {
+  page-break-after: always;
+  break-after: page;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+.print-iso-svg {
+  width: 100%;
+  height: 620px;
+  border: 1px solid #999;
+  background: #fff;
+}
+
+/* 1ページ集約モード: アイソメ図を縮小して改ページせずに続け、パイプ明細は
+   1本ごとの切り寸法行を省き小計行のみにし、余白・文字サイズを詰める。 */
+.bom-print-only.compact {
+  padding: 10px;
+}
+.bom-print-only.compact h1 {
+  font-size: 14px;
+  margin: 0 0 2px;
+}
+.bom-print-only.compact h2 {
+  font-size: 11px;
+  margin: 8px 0 3px;
+  padding-bottom: 1px;
+}
+.bom-print-only.compact .print-meta {
+  font-size: 9px;
+  margin: 0 0 6px;
+}
+.bom-print-only.compact th,
+.bom-print-only.compact td {
+  padding: 2px 5px;
+  font-size: 9.5px;
+}
+.bom-print-only.compact table {
+  margin-bottom: 4px;
+}
+.bom-print-only.compact .print-iso-wrap {
+  page-break-after: auto;
+  break-after: auto;
+  margin-bottom: 6px;
+}
+.bom-print-only.compact .print-iso-svg {
+  height: 240px;
+}
+
+/* A3横1ページレイアウト（左2/3アイソメ図・右1/3明細）。A3横向き＋
+   「1ページに集約」のときだけ使う専用レイアウトで、アイソメ図・明細表
+   それぞれの中身(データ・計算)は通常レイアウトと完全に共通。ここでは
+   配置とサイズだけを変える。左右比率(2:1)はプレビュー(画面上の縮小表示)
+   でも実際の印刷でも同じflexで保たれるため、アイソメ図はSVGのviewBox
+   拡大縮小(preserveAspectRatio)により文字が潰れず自動で大きく表示される。 */
+.a3-sheet-body {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.a3-iso-col {
+  flex: 2;
+  min-width: 0;
+}
+
+.a3-detail-col {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 右側は幅が狭いため、通常の1ページ集約(.compact)よりさらに詰めた
+   文字サイズにして、明細ができるだけ1枚に収まるようにする。収まりきら
+   ない分は自然に次ページへ続く(既存の複数ページ機能へのフォールバック)。 */
+.a3-detail-col h2 {
+  font-size: 10px;
+  margin: 10px 0 3px;
+}
+
+.a3-detail-col th,
+.a3-detail-col td {
+  padding: 2px 4px;
+  font-size: 8.5px;
+}
+
+.a3-iso-col .print-iso-wrap {
+  page-break-after: auto;
+  break-after: auto;
+}
+
+.a3-iso-col .print-iso-svg {
+  height: 480px;
+}
+
+/* 画面プレビュー（「PDFで見る」）。印刷ダイアログを介さずまず内容を確認できる
+   ようにし、確認後に上部の「印刷/PDFで保存」ボタンで初めて window.print() を
+   呼ぶ（現場では即印刷できず、まず見る→LINE等で加工場へ送る、の順のため）。 */
+.bom-print-only.preview {
+  display: block;
+  position: fixed;
+  inset: 0;
+  /* 材料集計(BOM)モーダル本体(.disclaimer-overlay, z-index:100)より
+     必ず手前に出す必要があるため、それより高い値にする。 */
+  z-index: 200;
+  overflow-y: auto;
+  background: #0b1220;
+  /* iPhoneの横向き表示ではノッチ/ホームインジケータが画面の左右・下に
+     食い込むため、閉じる等のボタンがそこに重なって押せなくなっていた。
+     safe-area分を必ず確保する。 */
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.preview-toolbar {
+  display: none;
+}
+.bom-print-only.preview .preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto 12px;
+}
+.preview-toolbar button {
+  padding: 10px 16px;
+  border-radius: 8px;
+  border: none;
+  font-weight: 700;
+  font-size: 14px;
+}
+.preview-print-btn {
+  background: #38bdf8;
+  color: #04222e;
+}
+.preview-close-btn {
+  background: #334155;
+  color: #e2e8f0;
+}
+.bom-print-only.preview .preview-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  color: #111;
+}
+
+@media print {
+  @page {
+    size: A4;
+    margin: 12mm;
+  }
+  /* A3横向き＋1ページ集約のときだけ使う名前付きページ(CSS Paged Media)。
+     対応ブラウザでは .a3-landscape 要素に `page` プロパティ経由でこの
+     用紙サイズ・向きが適用される（未対応環境では既定の@page(A4)や、
+     印刷ダイアログ側の用紙設定にフォールバックする＝A4設定と同じ限界）。 */
+  @page a3-landscape {
+    size: A3 landscape;
+    margin: 10mm;
+  }
+  .bom-print-only.a3-landscape {
+    page: a3-landscape;
+  }
+  /* A3横1ページ集約のアイソメ図の高さ。
+     A3横の紙の高さはA4縦と同じ297mmで、下記の実測どおり実際に使えるのは
+     約249mm。従来の230mmは「表題約10mm＋見出し約6mm＋図230mm ≒ 246mm」と
+     限界すれすれで、実機(iPhone)では数mm超えて2ページ目に落ちていた
+     （6区間の図面でも「1ページに集約」が2ページになる）。
+     余裕を持たせて1枚に収まる方を優先する。 */
+  .bom-print-only.a3-landscape .a3-iso-col .print-iso-svg {
+    height: 210mm;
+  }
+
+  /* 「詳細（複数ページ）」モード全般の用紙サイズ・向き選択。A3横1ページ
+     レイアウト(.a3-landscape、常にcompact)とは独立に、通常の複数ページ
+     出力(!compact)でも選んだ用紙サイズ・向きを実際の@pageに反映する
+     （反映しないと、A3を選んで1ページの目安本数を増やしても、実際の
+     用紙はA4のままで結局はみ出してしまうため）。 */
+  @page a4-landscape {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+  @page a3-portrait {
+    size: A3 portrait;
+    margin: 10mm;
+  }
+  .bom-print-only.paper-a4-landscape {
+    page: a4-landscape;
+  }
+  .bom-print-only.paper-a3-portrait {
+    page: a3-portrait;
+  }
+  .bom-print-only.paper-a3-landscape {
+    page: a3-landscape;
+  }
+
+  /* 詳細（複数ページ）モードのアイソメ図。
+     経緯: 元々は高さ固定(620px相当)の箱の下に無条件で改ページしていたため、
+     実際のページ高さとの差分が大きな空白として残る不具合があった。それを
+     「印刷可能領域の高さいっぱいに」近い値(A4縦で250mm/225mm等)まで
+     拡大したところ、今度は逆に一部の環境(実機のブラウザの印刷エンジン、
+     用紙サイズの丸め・実際の余白の差など)で見積もりを超えてあふれ、
+     空白ページの発生・材料明細ページの消失という、あふれ由来のより
+     深刻な不具合を引き起こしてしまった。
+     「余白が残るのは問題ない。あふれて壊れる方が絶対に避けるべき実害」
+     という原則に立ち返り、印刷可能領域に対してかなり余裕を持たせた
+     (実際に収まる保証を優先する)控えめな値に変更する。ページが完全には
+     埋まらず余白が残ることを許容するかわりに、どんな環境でも確実に
+     1ページに収まる方を優先する。 */
+  .bom-print-only:not(.compact) .print-iso-wrap .print-iso-svg {
+    width: 100%;
+    height: 180mm;
+  }
+  .bom-print-only:not(.compact) .print-iso-wrap:first-of-type .print-iso-svg {
+    height: 150mm;
+  }
+  .bom-print-only.paper-a4-landscape:not(.compact) .print-iso-wrap .print-iso-svg {
+    height: 110mm;
+  }
+  .bom-print-only.paper-a4-landscape:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-svg {
+    height: 85mm;
+  }
+  .bom-print-only.paper-a3-portrait:not(.compact) .print-iso-wrap .print-iso-svg {
+    height: 280mm;
+  }
+  .bom-print-only.paper-a3-portrait:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-svg {
+    height: 240mm;
+  }
+  .bom-print-only.paper-a3-landscape:not(.compact) .print-iso-wrap .print-iso-svg {
+    height: 180mm;
+  }
+  .bom-print-only.paper-a3-landscape:not(.compact)
+    .print-iso-wrap:first-of-type
+    .print-iso-svg {
+    height: 145mm;
+  }
+
+  /* 明細(BOM)の上下中央寄せ。
+     内容が箱より高いときに上へあふれてページ送りで切れることが無いよう、
+     flex(justify-content:center)ではなく table-cell + vertical-align:middle
+     を使う(heightが「最小値」扱いになり、内容が高いときは箱が伸びて上詰めに
+     戻るだけで済む)。
+
+     【箱の高さについて・重要】
+     「用紙の印刷可能領域」をCSSから正しく知る方法は無い。@pageのmarginを
+     指定しても、iOS Safari等は自前の余白＋ページ上下のURL/日付表示のために
+     更に狭い領域しか使わないため、A4縦=273mm のような理論値で箱を作ると
+     数mmあふれ、その数mmのためだけに実質白紙のページが1枚増える
+     (6区間の図面が4ページになる不具合として実機で発生)。
+
+     ▼iPhone(iOS Safari)が実際に出力したPDFの実測値 — A4縦(297mm):
+        内容の上端 14.1mm / 内容の下端 262.8mm → 使える高さ 248.7mm
+        (URL・日付のfooterは282mm付近＝余白の中に描かれる)
+      理論値273mmに対し 約25mm 狭い。紙の高さが同じA3横(297mm)も同様。
+      新しく高さを決めるときは 273mm ではなく この 248.7mm から引くこと。
+
+     そのうえで、更に理論値ではなく「この画面で実績のある高さ」を基準にする。
+     2枚目以降のアイソメ図は 見出し9mm + SVG180mm = 189mm で従来から
+     あふれたことが無いため、これを安全上限とみなす(A4縦の理論値273mmの
+     約69%)。他の用紙も同じ比率で決める。
+     箱が実際の印刷可能領域より低い分、真の中央より少し上寄りになるが、
+     あふれてページが増えるより優先する。
+
+     なお アイソメ図側は中央寄せしない。SVGの高さ(1枚目150mm/2枚目以降
+     180mm)だけで既に上記の安全上限をほぼ使い切っており、中央寄せのための
+     余地がそもそも無い(無理に箱を高くすると上記のあふれを起こす)。 */
+  .bom-print-only:not(.compact) .bom-detail-block {
+    display: table;
+    width: 100%;
+  }
+  .bom-print-only:not(.compact) .bom-detail-inner {
+    display: table-cell;
+    vertical-align: middle;
+    height: 189mm; /* A4縦 */
+  }
+  .bom-print-only.paper-a4-landscape:not(.compact) .bom-detail-inner {
+    height: 128mm;
+  }
+  .bom-print-only.paper-a3-portrait:not(.compact) .bom-detail-inner {
+    height: 276mm;
+  }
+  .bom-print-only.paper-a3-landscape:not(.compact) .bom-detail-inner {
+    height: 191mm;
+  }
+
+  /* アプリ本体(#root)は fixed/absolute配置と 100vh 固定+overflow:hidden の
+     1画面レイアウトなので、これを印刷対象に含めると1ページ分の高さで
+     切り取られてしまう。印刷時は#root自体を非表示にし、.bom-print-only は
+     body直下(portal)の通常フロー要素として実寸の高さで複数ページに正しく
+     分割されるようにする。 */
+  html,
+  body {
+    height: auto !important;
+    overflow: visible !important;
+    /* アプリ本体はダークテーマ(body背景が濃紺)。印刷用の .bom-print-only は
+       通常フローの要素なので、その下端より先(最終ページの余った部分など)は
+       body の背景がそのまま用紙に出てしまい、黒い帯として印刷される。
+       用紙は必ず白にする。 */
+    background: #fff !important;
+  }
+  #root {
+    display: none !important;
+  }
+  .bom-print-only {
+    display: block;
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    overflow: visible !important;
+    padding: 16px;
+  }
+  .preview-toolbar {
+    display: none !important;
+  }
+  /* 「PDFで見る」のプレビュー(.preview)から印刷すると、画面用オーバーレイの
+     暗い背景(#0b1220)とセーフエリア余白がそのまま用紙に乗り、黒い枠として
+     印刷されてしまう(実機のiPhoneで発生を確認)。
+     上の .bom-print-only のリセットは position/inset/overflow を !important で
+     打ち消しているが、background と padding には !important が無いため、
+     詳細度の高い .bom-print-only.preview (クラス2つ)側が勝って残っていた。
+     ここで同じ詳細度の指定として明示的に打ち消す(用紙は常に白・余白は
+     @page の margin だけに任せる)。 */
+  .bom-print-only.preview {
+    background: #fff;
+    padding: 0;
+  }
+  .bom-print-only.preview .preview-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+}
+
+/* ドラッグ中に指へ追従する ghost */
+.part-ghost {
+  position: fixed;
+  z-index: 30;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: #0ea5e9;
+  color: #04222e;
+  font-size: 12px;
+  font-weight: 700;
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.5);
+}
+
+/* スマホを横向きにしたとき（高さが低い画面）、寸法・属性パネルは通常の
+   縦積みレイアウトのまま画面下に置くと縦幅のほとんどを占めてしまい、
+   アイソメ図（作図エリア）が完全に隠れてしまう。横画面のときだけ、画面
+   下ではなく右側に固定した縦長パネルとして重ねて表示し、キャンバスの
+   高さを潰さないようにする（作図設定バーはもともとキャンバス上に浮かせて
+   あるので対象外）。 */
+@media (orientation: landscape) and (max-height: 500px) {
+  .attr-panel:not(.settings) {
+    position: fixed;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: auto;
+    width: min(340px, 46vw);
+    max-width: min(340px, 46vw);
+    height: 100%;
+    z-index: 25;
+    display: flex;
+    flex-direction: column;
+    border-top: none;
+    border-left: 1px solid var(--border);
+    box-shadow: -8px 0 24px var(--shadow);
+    padding-top: env(safe-area-inset-top);
+    padding-right: env(safe-area-inset-right);
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+
+  .attr-panel:not(.settings) .panel-body {
+    flex: 1;
+    max-height: none;
+  }
+
+  /* パーツパレットも、横向きの低い高さでは通常サイズのままだと画面下に
+     大きく張り出して図面を隠し、主役のように見えてしまっていた。
+     チップ自体は小さくしすぎるとタップしづらくなるため、タップ領域は
+     残しつつ、外側の余白・文字・アイコンを詰めて縦幅を抑える。 */
+  .palette .panel-header {
+    padding: 6px 8px;
+    padding-top: max(6px, env(safe-area-inset-top));
+    min-height: 34px;
+  }
+
+  .palette-items {
+    gap: 5px;
+    padding: 0 8px 6px;
+  }
+
+  .palette-chip {
+    padding: 4px 8px;
+    min-height: 34px;
+    gap: 5px;
+    font-size: 11.5px;
+  }
+
+  .chip-icon {
+    min-width: 26px;
+    height: 18px;
+    font-size: 9px;
+  }
+
+  .palette-hint {
+    font-size: 9px;
+  }
+}
+
+/* --- クイック計算（芯引き）画面 ---
+   以前は外側(.qc-screen)をoverflow:hiddenにし、内側(.qc-body)だけを
+   overflow-y:autoでスクロールさせる「入れ子スクロール」構成だったが、
+   一度この構成を「ヘッダーをposition:stickyにして.qc-screen側1箇所の
+   スクロールに統一する」形に変更したことがあった。しかしposition:sticky
+   は、数値入力欄が多いこの画面で端末のソフトウェアキーボードが
+   開閉してビューポート高さが変わるたびに、Safari等で古い位置の
+   ヘッダーが再描画されず残ってしまう（本文と重なって見える）不具合が
+   実機で再現したため撤回する。
+   代わりに、作図画面(.app/.stage)と同じ「ヘッダーは通常のフローに
+   固定表示(flex-shrink:0)、本文側だけをflex:1のスクロール領域にする」
+   構成にする。ヘッダーにposition:sticky/fixedを一切使わないため、
+   ビューポート変化時の再描画不整合そのものが起こり得ない。 */
+.qc-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.qc-screen .topbar {
+  flex-shrink: 0;
+  /* 共通の.topbarは「メイン画面では下部に配置しているためセーフエリアは
+     footer側が吸収する」前提で上端の余白を持たないが、この画面のヘッダーは
+     画面最上部に置くため、ノッチ/ステータスバー分の余白がここでは必要。
+     余白がないと、ノッチ付きiPhone等でタイトルや「作図に戻る」ボタンが
+     ステータスバーの裏に回り込み、表示が重なって見える・ボタンの一部が
+     タップできない、という不具合になる（実機で再現・報告されたもの）。 */
+  padding-top: max(10px, env(safe-area-inset-top));
+}
+
+.qc-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: 14px;
+  padding-bottom: max(14px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.qc-result {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 16px;
+  text-align: center;
+}
+
+.qc-result.over {
+  border-color: #7f1d1d;
+}
+
+.qc-result-label {
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.qc-result-value {
+  color: var(--label-cut);
+  font-size: 40px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.3;
+}
+
+.qc-result-value.zero {
+  color: var(--label-zero);
+  font-size: 22px;
+}
+
+.qc-result-error {
+  color: var(--label-over);
+  font-size: 18px;
+  font-weight: 700;
+  padding: 10px 0;
+}
+
+.qc-result-placeholder {
+  color: var(--hint);
+  font-size: 15px;
+  padding: 14px 0;
+}
+
+.qc-result-sub {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  margin-top: 8px;
+  color: var(--hint);
+  font-size: 12.5px;
+}
+
+.qc-config {
+  grid-template-columns: 1fr 1fr;
+}
+
+.qc-ends {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+
+.qc-end {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.qc-end select {
+  appearance: none;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  min-height: 44px;
+  width: 100%;
+}
+
+.qc-basis-toggle button {
+  font-size: 12px;
+  padding: 8px 4px;
+  min-height: 38px;
+}
+
+.qc-overall {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+}
+
+.qc-calc-error {
+  color: var(--label-over);
+  margin-left: 8px;
+}
+
+.qc-overall-display {
+  font-size: 26px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  min-height: 34px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.qc-keypad {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.qc-key {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  min-height: 56px;
+  font-size: 20px;
+  font-weight: 700;
+  /* キーパッドはスクロール可能な.qc-body内にあるため、touch-actionを
+     指定しないとブラウザが「タップかスクロール開始か」の判定に数百ms
+     かけてしまい、反応が遅く感じる原因になる。タップとして即確定させる。 */
+  touch-action: manipulation;
+}
+
+.qc-key:active {
+  background: var(--panel-2);
+}
+
+.qc-key-op {
+  background: var(--panel);
+  color: var(--accent);
+}
+
+.qc-key-clear {
+  background: var(--panel);
+  color: var(--label-over);
+  font-size: 15px;
+}
+
+.qc-key-equal {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  font-size: 24px;
+}
+
+.qc-history {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.qc-history-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.qc-history-row b {
+  color: var(--label-cut);
+  font-variant-numeric: tabular-nums;
+}
+
+/* --- 窒素計算(気密試験)画面 --- */
+.n2-rows {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.n2-row {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.n2-row-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.n2-row-remove {
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--label-over);
+  padding: 4px 10px;
+  font-size: 12px;
+  min-height: 30px;
+}
+
+.n2-row-volume {
+  font-size: 13px;
+  color: var(--hint);
+}
+
+.n2-row-volume b {
+  color: var(--text);
+  font-variant-numeric: tabular-nums;
+}
+
+.n2-add-row {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 10px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.n2-total-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px 14px;
+  font-size: 14px;
+}
+
+.n2-total-row b {
+  color: var(--label-cut);
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.n2-panel {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  /* .qc-bodyはflex-direction:columnのスクロール領域のため、overflow:hiddenを
+     持つ子は自動最小高さが0扱いになり(CSS Flexboxの仕様)、他の兄弟要素の
+     高さに押し潰されてしまう(実機で発生を確認)。押し潰されないよう固定する。 */
+  flex-shrink: 0;
+}
+
+.n2-panel .panel-header {
+  font-size: 14px;
+}
+
+.n2-panel .panel-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  max-height: none;
+}
+
+.n2-recommend {
+  margin: 6px 0 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--accent);
+}
+
+.n2-formula {
+  margin-top: 10px;
+  font-size: 11.5px;
+  color: var(--hint-2);
+  font-variant-numeric: tabular-nums;
+}
+
+.n2-disclaimer {
+  font-size: 11.5px;
+}
+
+/* サポート架台図面（app/src/features/support）専用のスタイル。
+   フォームの土台(.qc-*, .field, .round-toggle, .n2-row*)は既存の
+   クイック計算・窒素計算と共通のものをそのまま流用し、ここでは
+   このページ固有のもの(ゲージのプリセットチップ・図面用紙)だけを足す。 */
+.support-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.support-missing-block {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.support-chip {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 36px;
+}
+
+.support-chip.active {
+  background: var(--accent);
+  color: #04222e;
+  border-color: var(--accent);
+}
+
+/* モーダル(数値入力・ゲージ・配管編集)のボタン。.menu-order-actions(flex行)の
+   子として使う前提(flex:1はそちら側で付く)。 */
+.support-btn {
+  background: var(--border);
+  color: var(--text);
+  border: none;
+  border-radius: 10px;
+}
+
+.support-btn-primary {
+  background: var(--accent);
+  color: #04222e;
+  border: none;
+  border-radius: 10px;
+}
+
+.support-btn-danger {
+  background: transparent;
+  border: 1px solid #7f1d1d;
+  border-radius: 8px;
+  color: var(--danger);
+  padding: 4px 10px;
+  font-size: 12.5px;
+  min-height: 32px;
+}
+
+/* 図面はアイソメ図の印刷プレビュー等と同じく「用紙」として白背景のまま
+   見せる(黒線・寸法文字が用紙前提の色になっているため)。
+   .qc-bodyはflex-direction:columnのスクロール領域のため、overflow:hiddenを
+   持つ子は自動最小高さが0扱いになり(CSS Flexboxの仕様)、他の兄弟要素に
+   押し潰されてしまう(.n2-panelと同じ理由。実機で発生を確認)。
+   押し潰されないよう固定する。
+   図面(SupportFigure)は1mmあたり固定pxの実寸で描くため、配管が増えて
+   総長が伸びると画面幅を超えることがある。縮めて文字を読めなくするより
+   横スクロールで見てもらう方を優先する(短い構成は元々画面内に収まる)。 */
+.support-figure-card {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  flex-shrink: 0;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 「穴」欄：現在の穴仕様（色付きの記号+文字）を一覧し、「変更する」で
+   穴の設定モーダル(全種類まとめて編集)を開く。フォーム内では図面の
+   凡例と同じ配色で表示し、タップ編集(図側)との見た目の一貫性を保つ。 */
+.support-hole-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.support-hole-summary-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+
+/* 穴の色は白い図面の上で見る前提のパレット（黒を含む）なので、そのまま
+   暗いテーマの画面に置くと文字が背景に沈んで読めない。白地のピルを敷いて
+   どの色でも読めるようにする。 */
+.support-hole-summary-item {
+  font-size: 13.5px;
+  font-weight: 700;
+  background: #fff;
+  border-radius: 999px;
+  padding: 2px 9px;
+  white-space: nowrap;
+}
+
+/* 穴の設定モーダル：3分/4分/吊りの各穴種をまとめて編集する区画。 */
+.support-hole-editor {
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+
+.support-hole-editor:first-child {
+  border-top: none;
+  padding-top: 0;
+}
+
+.support-hole-editor-title {
+  font-size: 14px;
+  font-weight: 800;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+
+.support-hole-editor-preview {
+  color: var(--hint);
+  font-size: 12.5px;
+  margin-top: 4px;
+}
+
+/* 径の±ステッパー。数値を直接テキスト入力させないことで先頭0の
+   ちらつき（消して打ち直すと"0"から始まる見た目になる）を避ける。 */
+.support-stepper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.support-stepper-btn {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  width: 44px;
+  min-height: 44px;
+  font-size: 20px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+.support-stepper-value {
+  min-width: 56px;
+  text-align: center;
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.support-color-row {
+  display: flex;
+  gap: 10px;
+}
+
+.support-color-swatch {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  padding: 0;
+}
+
+.support-color-swatch.active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px var(--field-bg);
+}
+
+.n2-cascade .panel-body {
+  padding: 12px;
+  gap: 12px;
+}
+
+.n2-run-button {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 12px;
+  padding: 12px;
+  font-size: 15px;
+  font-weight: 800;
+  min-height: 48px;
+}
+
+.n2-run-button:disabled {
+  opacity: 0.45;
+}
+
+.n2-cascade-result {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.n2-cascade-table-wrap {
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.n2-cascade-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+.n2-cascade-table th,
+.n2-cascade-table td {
+  padding: 8px 10px;
+  text-align: center;
+  border-bottom: 1px solid var(--border-soft);
+}
+
+.n2-cascade-table thead th {
+  color: var(--hint);
+  font-weight: 700;
+  background: var(--panel-2);
+}
+
+.n2-cascade-table tr.reached td {
+  color: var(--label-cut);
+  font-weight: 700;
+}
+
+/* --- ベータ期間ロック（合言葉入力・期限切れ画面） --- */
+.beta-screen {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  padding-top: max(16px, env(safe-area-inset-top));
+  padding-bottom: max(16px, env(safe-area-inset-bottom));
+}
+
+.beta-card {
+  width: 100%;
+  max-width: 420px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 16px;
+  padding: 24px 20px;
+  box-shadow: 0 20px 50px var(--shadow-strong);
+}
+
+.beta-title {
+  font-size: 19px;
+  font-weight: 800;
+  text-align: center;
+}
+
+.beta-body {
+  color: var(--hint);
+  font-size: 14px;
+  line-height: 1.7;
+  margin: 0;
+  text-align: center;
+}
+
+.beta-input {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  text-align: center;
+}
+
+.beta-error {
+  color: var(--label-over);
+  font-size: 13px;
+  text-align: center;
+  margin: 0;
+}
+
+.beta-primary {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 16px;
+  font-weight: 700;
+  min-height: 52px;
+}
+
+.beta-primary:active {
+  filter: brightness(0.9);
+}
+
+@media (min-width: 700px) {
+  .qc-body {
+    max-width: 640px;
+    margin: 0 auto;
+    width: 100%;
+  }
+}
+
+/* ============================================================
+   図面共有機能（権限付きファイル共有）
+   ============================================================ */
+
+.note-panel-hint {
+  margin-top: 10px;
+}
+
+.note-panel-dim {
+  font-weight: 700;
+  color: var(--text);
+  margin: 4px 2px 12px;
+}
+
+.note-list {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-empty {
+  color: var(--hint);
+  font-size: 13px;
+  padding: 4px 2px;
+}
+
+.note-item {
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+}
+
+.note-item-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-size: 14px;
+  color: var(--text);
+}
+
+.note-item-date {
+  margin-top: 6px;
+  font-size: 12px;
+  color: var(--hint);
+}
+
+.note-add {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.note-input {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+  resize: vertical;
+  font-family: inherit;
+}
+
+.note-add-btn {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 44px;
+}
+
+.note-add-btn:disabled {
+  opacity: 0.5;
+}
+
+/* 共有(エクスポート)モーダル・権限選択 */
+.share-modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.55);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  z-index: 60;
+}
+
+@media (min-width: 700px) {
+  .share-modal-backdrop {
+    align-items: center;
+  }
+}
+
+.share-modal {
+  background: var(--panel);
+  color: var(--text);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
+  overflow-y: auto;
+  border-radius: 16px 16px 0 0;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (min-width: 700px) {
+  .share-modal {
+    border-radius: 16px;
+  }
+}
+
+.share-modal h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.share-modal-desc {
+  margin: 0;
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.share-permission-options {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.share-permission-option {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px;
+  cursor: pointer;
+}
+
+.share-permission-option.active {
+  border-color: var(--accent);
+  background: var(--field-bg);
+}
+
+.share-permission-option input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+
+.share-permission-option-title {
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.share-permission-option-desc {
+  font-size: 12px;
+  color: var(--hint);
+  margin-top: 2px;
+}
+
+.share-modal-actions {
+  display: flex;
+  gap: 10px;
+}
+
+.share-modal-actions button {
+  flex: 1;
+  min-height: 48px;
+  border-radius: 10px;
+  font-size: 15px;
+  font-weight: 700;
+}
+
+.share-modal-cancel {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+.share-modal-submit {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+}
+
+.share-modal-error {
+  color: var(--label-over);
+  font-size: 13px;
+  margin: 0;
+}
+
+/* ランチャーの共有ファイルを開くボタン */
+.launcher-import {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px;
+  font-size: 15px;
+  font-weight: 700;
+  margin-top: 10px;
+}
+
+/* 共有図面を開いているときの権限バナー（トップバー下・常設） */
+.share-permission-banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  font-size: 13px;
+  background: #1e1509;
+  border-bottom: 1px solid #9a3412;
+  color: var(--text);
+}
+
+.share-permission-banner b {
+  color: var(--accent);
+}
+
+.share-permission-banner button {
+  margin-left: auto;
+  background: transparent;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 12px;
+  color: var(--text);
+  font-size: 12px;
+}
+
+/* ============================================================
+   発注書 / 見積もり依頼書（帳票PDF）
+   材料集計(.bom-print-only)と同じ仕組み（印刷専用DOMをbody直下へportalし、
+   @media print で表示を切り替えて window.print()）で出力する。
+   金額・単価・メーカーの列は一切持たない数量書類。
+   ============================================================ */
+.order-doc-print {
+  display: none;
+  background: #fff;
+  color: #1a1a1a;
+  font-size: 11px;
+  line-height: 1.5;
+}
+.order-doc-print .doc-no {
+  text-align: right;
+  font-size: 9.5px;
+  color: #666;
+  margin-bottom: 2px;
+}
+.order-doc-print .issue-date {
+  text-align: right;
+  font-size: 11px;
+  margin-bottom: 10px;
+}
+.order-doc-print .doc-title {
+  text-align: center;
+  font-size: 26px;
+  font-weight: 700;
+  /* 字間を広げると最後の1文字ぶんだけ右に寄るため、同じ量を左に足して戻す */
+  letter-spacing: 14px;
+  padding-left: 14px;
+  margin: 0 0 4px;
+}
+.order-doc-print .title-rule {
+  border: none;
+  border-top: 2.5px solid #1a1a1a;
+  margin: 0 0 18px;
+}
+.order-doc-print .meta-top {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 10px;
+}
+.order-doc-print .meta-top > tbody > tr > td {
+  vertical-align: top;
+  padding: 0;
+  border: none;
+}
+.order-doc-print .meta-left {
+  width: 58%;
+}
+.order-doc-print .meta-right {
+  width: 42%;
+}
+.order-doc-print .dest-box {
+  font-size: 17px;
+  font-weight: 700;
+  border-bottom: 2px solid #1a1a1a;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  display: inline-block;
+  min-width: 78%;
+}
+.order-doc-print .dest-sub {
+  font-size: 10.5px;
+  color: #555;
+  margin-top: 6px;
+}
+.order-doc-print .issuer-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+}
+.order-doc-print .issuer-table td {
+  border: 1px solid #999;
+  padding: 4px 8px;
+}
+.order-doc-print .issuer-table .label {
+  background: #f0f0f0;
+  width: 34%;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.order-doc-print .site-table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 4px 0 14px;
+  font-size: 11px;
+}
+.order-doc-print .site-table td {
+  border: 1px solid #999;
+  padding: 6px 10px;
+}
+.order-doc-print .site-table .site-label {
+  background: #f0f0f0;
+  font-weight: 700;
+  width: 16%;
+  white-space: nowrap;
+}
+.order-doc-print table.items {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 10.5px;
+  margin-bottom: 4px;
+}
+.order-doc-print table.items th {
+  background: #333;
+  color: #fff;
+  border: 1px solid #333;
+  padding: 6px 4px;
+  font-weight: 700;
+}
+.order-doc-print table.items td {
+  border: 1px solid #999;
+  padding: 7px 6px;
+  height: 20px;
+}
+.order-doc-print .col-itemspec {
+  width: 48%;
+}
+.order-doc-print .col-size {
+  width: 16%;
+  text-align: center;
+}
+.order-doc-print .col-qty {
+  width: 14%;
+  text-align: right;
+}
+.order-doc-print .col-note {
+  width: 22%;
+}
+.order-doc-print table.items tbody tr:nth-child(even) {
+  background: #fafafa;
+}
+.order-doc-print .note-line {
+  font-size: 9.5px;
+  color: #555;
+  margin-top: 10px;
+}
+.order-doc-print .foot-area {
+  margin-top: 16px;
+  display: flex;
+  gap: 18px;
+}
+.order-doc-print .foot-box {
+  flex: 1;
+  border: 1px solid #999;
+  min-height: 56px;
+  padding: 6px 8px;
+}
+.order-doc-print .foot-box .foot-label {
+  font-weight: 700;
+  font-size: 10px;
+  color: #444;
+  margin-bottom: 4px;
+}
+.order-doc-print .foot-box .foot-value {
+  font-size: 11px;
+}
+
+/* 画面プレビュー（「PDFで見る」）。材料集計のプレビューと同じ扱い。 */
+.order-doc-print.preview {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow-y: auto;
+  background: #0b1220;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.order-doc-print.preview .preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto 12px;
+}
+.order-doc-print.preview .preview-page {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 24px;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  color: #1a1a1a;
+}
+
+@media print {
+  /* 帳票専用の用紙設定(A4縦・上16mm/左右14mm/下14mm)。既存の材料集計側の
+     @page 設定は変更せず、名前付きページとして独立させる。 */
+  @page order-doc {
+    size: A4;
+    margin: 16mm 14mm 14mm;
+  }
+  .order-doc-print {
+    page: order-doc;
+  }
+  /* 帳票を開いている間は、材料集計の印刷レイアウトが同時にDOM上に
+     残っていても印刷対象から外す（両方が1つのPDFに出てしまわないように）。 */
+  body.order-doc-open .bom-print-only {
+    display: none !important;
+  }
+  .order-doc-print {
+    display: block;
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    overflow: visible !important;
+  }
+  /* プレビューから印刷したときに画面用の暗い背景・余白が用紙へ乗らないよう
+     打ち消す（材料集計の印刷で実機に黒い枠が出た件と同じ対策）。 */
+  .order-doc-print.preview {
+    background: #fff;
+    padding: 0;
+  }
+  .order-doc-print.preview .preview-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+  }
+  .order-doc-print .preview-toolbar {
+    display: none !important;
+  }
+  /* 明細が長いときは行単位で改ページする（見出し行は各ページに繰り返す）。 */
+  .order-doc-print table.items thead {
+    display: table-header-group;
+  }
+  .order-doc-print table.items tr {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  /* 注記・フッターは明細表と切り離されないようにまとめる。 */
+  .order-doc-print .foot-area {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}
+
+/* ============================================================
+   サポート架台図面の印刷／PDFシート
+   材料集計・発注書と同じ仕組み（印刷専用DOMをbody直下へportalし、
+   @media print で表示を切り替えて window.print()）。A4縦に1/2/4台を並べる。
+   ============================================================ */
+.support-print-sheet {
+  display: none;
+  background: #fff;
+  color: #111;
+}
+.support-print-page {
+  /* 用紙1枚に入れる高さ。A4縦(297mm)から実際に使えるのは実測で約249mm
+     （@pageのmarginを指定してもiOS Safari等は更に狭い領域しか使わない。
+     材料集計側の詳しい実測メモを参照）。ここは更に余裕を持たせておく。
+     この値は SupportPrintSheet.tsx の PAGE_H_MM と必ず揃える。 */
+  height: 236mm;
+  display: flex;
+  flex-direction: column;
+  gap: 4mm;
+  box-sizing: border-box;
+}
+/* 1台ぶんの枠。必ず用紙の横幅いっぱいを使い、高さだけ図の縦横比に応じて
+   変える(高さは SupportPrintSheet 側で1台ずつ指定する)。等分した枠に
+   押し込むと、長い架台ほど左右に余白が残って小さく印刷されてしまうため。 */
+.support-print-box {
+  position: relative;
+  border: 1px solid #999;
+  padding: 2mm;
+  box-sizing: border-box;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #fff;
+  width: 100%;
+  /* 指定した高さより縮まないようにする(flexの既定の縮小を止める) */
+  flex: 0 0 auto;
+  min-width: 0;
+  min-height: 0;
+}
+/* 通し番号。図の見出し(材料・基準)が枠の左上に来るので、重ならないよう
+   右上に置き、下地を白で塗って寸法線と被っても読めるようにする。 */
+.support-print-no {
+  position: absolute;
+  top: 1.5mm;
+  right: 2mm;
+  z-index: 1;
+  padding: 0 3px;
+  background: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  color: #555;
+}
+/* SVGは viewBox + preserveAspectRatio(既定=meet) なので、枠に合わせて
+   縦横比を保ったまま収まる。枠からはみ出さないことを優先する。 */
+.support-print-figure {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  max-width: 100%;
+  max-height: 100%;
+}
+
+/* 画面プレビュー（「PDFで見る」）。材料集計・発注書のプレビューと同じ扱い。 */
+.support-print-sheet.preview {
+  display: block;
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  overflow-y: auto;
+  background: #0b1220;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right))
+    max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
+}
+.support-print-sheet.preview .preview-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  max-width: 800px;
+  margin: 0 auto 12px;
+}
+.support-print-sheet.preview .support-print-page {
+  max-width: 800px;
+  margin: 0 auto 16px;
+  padding: 16px;
+  border-radius: 8px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+  background: #fff;
+  /* 画面では mm 指定ではなくA4縦の比率で見せる（実際の紙の見え方に近づける） */
+  height: auto;
+  aspect-ratio: 210 / 297;
+}
+
+@media print {
+  /* 架台シート専用の用紙設定。材料集計・発注書側の@page設定は変更せず、
+     名前付きページとして独立させる。 */
+  @page support-sheet {
+    size: A4 portrait;
+    margin: 8mm;
+  }
+  .support-print-sheet {
+    display: block;
+    page: support-sheet;
+    position: static !important;
+    inset: auto !important;
+    z-index: auto !important;
+    overflow: visible !important;
+  }
+  /* プレビューから印刷したときに画面用の暗い背景・余白・影が用紙へ乗らない
+     ように打ち消す（材料集計の印刷で実機に黒い枠が出た件と同じ対策）。 */
+  .support-print-sheet.preview {
+    background: #fff;
+    padding: 0;
+  }
+  .support-print-sheet.preview .support-print-page {
+    max-width: none;
+    margin: 0;
+    padding: 0;
+    border-radius: 0;
+    box-shadow: none;
+    height: 236mm;
+    aspect-ratio: auto;
+  }
+  .support-print-sheet .preview-toolbar {
+    display: none !important;
+  }
+  .support-print-page {
+    page-break-after: always;
+    break-after: page;
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+  .support-print-page:last-child {
+    page-break-after: auto;
+    break-after: auto;
+  }
+  .support-print-box {
+    page-break-inside: avoid;
+    break-inside: avoid;
+  }
+}
+
+/* サポート架台図面のシート操作ボタン列 */
+.support-sheet-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* サポート架台図面: 配管がまだ1本も無いときの空状態 */
+.support-empty {
+  border: 1px dashed var(--border);
+  border-radius: 12px;
+  padding: 22px 16px;
+  text-align: center;
+  background: var(--panel);
+}
+.support-empty-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 6px;
+}
+.support-empty-body {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.6;
+  color: var(--muted);
+}
+
+/* 「この架台を保存して次を作る」。1現場で何台も作るときの主役の操作なので、
+   他のボタンより目立たせて、押す場所が迷わないようにする。 */
+.support-next-btn {
+  width: 100%;
+  min-height: 48px;
+  border: none;
+  border-radius: 12px;
+  background: var(--accent);
+  color: #04222e;
+  font-size: 15px;
+  font-weight: 700;
+}
+.support-next-btn:disabled {
+  background: var(--border);
+  color: var(--muted);
+}
+
+/* 保存した架台の一覧。今何台たまっているかが一目で分かるようにする。 */
+.support-saved-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.support-saved-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--panel);
+}
+.support-saved-no {
+  font-weight: 700;
+  font-size: 13px;
+  color: var(--muted);
+  white-space: nowrap;
+}
+.support-saved-desc {
+  flex: 1;
+  min-width: 0;
+  font-size: 13.5px;
+  color: var(--text);
+}
+.support-saved-cut {
+  margin-left: 8px;
+  color: var(--muted);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+
+/* シート操作の行のボタンは現場で手袋のまま押すので、他の操作と同じ
+   タップ領域(44px以上)を確保する。 */
+.support-sheet-row button {
+  min-height: 44px;
+  padding: 0 18px;
+  font-size: 14.5px;
+  font-weight: 700;
+}
+
+/* 作図中の画面から常に押せる「ホーム」ボタン。右上に浮かせて常設する
+   （作図設定＝左上、ズーム＝右下、パン＝左下、と重ならない位置）。
+   下段メニューは項目数によって横スクロールが必要になることがあるため、
+   探さず押せる場所をもう1つ用意する。 */
+.home-float-btn {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 15;
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: 0 8px 24px var(--shadow);
+}
