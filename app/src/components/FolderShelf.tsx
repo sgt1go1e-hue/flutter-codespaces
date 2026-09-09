@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react'
 import type { DrawingMeta, FolderMeta } from '../lib/drawingStore'
+import type { EnabledFeatures } from '../lib/featureToggles'
 
 interface Props {
   folders: FolderMeta[]
@@ -13,12 +14,16 @@ interface Props {
   onQuickCalc: () => void
   onNitrogenCalc: () => void
   onImportFile: (file: File) => void
+  /** どのツールカードをホームに出すか（設定画面の「仕様のオンオフ」で切り替える）。 */
+  enabledFeatures: EnabledFeatures
   /** 設定メニュー用（既存の機能をホーム画面からも触れるようにするだけ）。 */
   theme: 'dark' | 'light'
   onToggleTheme: () => void
   onOpenDisclaimer: () => void
   /** 自社情報(発注書・見積依頼書の差出人欄)の編集を開く。 */
   onOpenCompanyInfo: () => void
+  /** 「仕様のオンオフ」設定画面を開く。 */
+  onOpenSettings: () => void
 }
 
 function formatDate(ms: number): string {
@@ -46,10 +51,12 @@ export function FolderShelf({
   onQuickCalc,
   onNitrogenCalc,
   onImportFile,
+  enabledFeatures,
   theme,
   onToggleTheme,
   onOpenDisclaimer,
   onOpenCompanyInfo,
+  onOpenSettings,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   // 開いているフォルダカードのメニュー(名前を変更/削除)のid。
@@ -151,6 +158,16 @@ export function FolderShelf({
               >
                 免責事項を見る
               </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setSettingsOpen(false)
+                  onOpenSettings()
+                }}
+              >
+                仕様のオンオフ
+              </button>
             </div>
           </>
         )}
@@ -167,23 +184,31 @@ export function FolderShelf({
           </span>
         </button>
 
-        <div className="home-tools">
-          <button type="button" className="home-tool" onClick={onQuickCalc}>
-            <span className="home-tool-icon home-tool-icon-1" aria-hidden="true" />
-            <span className="home-tool-title">クイック計算</span>
-            <span className="home-tool-sub">芯引きをすぐ出す</span>
-          </button>
-          <button type="button" className="home-tool" onClick={onNitrogenCalc}>
-            <span className="home-tool-icon home-tool-icon-2" aria-hidden="true" />
-            <span className="home-tool-title">窒素計算</span>
-            <span className="home-tool-sub">気密試験の必要量</span>
-          </button>
-          <button type="button" className="home-tool" onClick={onSupportDrawing}>
-            <span className="home-tool-icon home-tool-icon-3" aria-hidden="true" />
-            <span className="home-tool-title">サポート架台図面</span>
-            <span className="home-tool-sub">吊り架台の図をつくる</span>
-          </button>
-        </div>
+        {(enabledFeatures.quickCalc || enabledFeatures.nitrogenCalc || enabledFeatures.supportDrawing) && (
+          <div className="home-tools">
+            {enabledFeatures.quickCalc && (
+              <button type="button" className="home-tool" onClick={onQuickCalc}>
+                <span className="home-tool-icon home-tool-icon-1" aria-hidden="true" />
+                <span className="home-tool-title">クイック計算</span>
+                <span className="home-tool-sub">芯引きをすぐ出す</span>
+              </button>
+            )}
+            {enabledFeatures.nitrogenCalc && (
+              <button type="button" className="home-tool" onClick={onNitrogenCalc}>
+                <span className="home-tool-icon home-tool-icon-2" aria-hidden="true" />
+                <span className="home-tool-title">窒素計算</span>
+                <span className="home-tool-sub">気密試験の必要量</span>
+              </button>
+            )}
+            {enabledFeatures.supportDrawing && (
+              <button type="button" className="home-tool" onClick={onSupportDrawing}>
+                <span className="home-tool-icon home-tool-icon-3" aria-hidden="true" />
+                <span className="home-tool-title">サポート架台図面</span>
+                <span className="home-tool-sub">吊り架台の図をつくる</span>
+              </button>
+            )}
+          </div>
+        )}
 
         <button
           type="button"

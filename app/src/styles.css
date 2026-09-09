@@ -1519,6 +1519,49 @@ fieldset.panel-grid:disabled {
   border-color: var(--accent);
 }
 
+/* 設定画面「仕様のオンオフ」の一覧。1項目=1カード(タイトル+説明+チェック)。 */
+.settings-feature-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin-top: 10px;
+}
+
+.settings-feature-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 12px 14px;
+  min-height: 44px;
+}
+
+.settings-feature-text {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.settings-feature-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.settings-feature-sub {
+  font-size: 12.5px;
+  color: var(--hint-2);
+}
+
+.settings-feature-row input[type='checkbox'] {
+  flex: none;
+  width: 24px;
+  height: 24px;
+}
+
 /* パッキン加味チェック＋厚み */
 .gasket-check {
   display: flex;

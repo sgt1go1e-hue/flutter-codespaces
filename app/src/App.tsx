@@ -42,6 +42,12 @@ import {
   saveDrawingColorLabels,
 } from './lib/drawingStore'
 import { FolderShelf } from './components/FolderShelf'
+import { SettingsPage } from './components/SettingsPage'
+import {
+  DEFAULT_ENABLED_FEATURES,
+  sanitizeEnabledFeatures,
+  type EnabledFeatures,
+} from './lib/featureToggles'
 import { ColorLabelsModal } from './components/ColorLabelsModal'
 import {
   distance,
@@ -283,9 +289,9 @@ function markSingleFlange(
 export default function App() {
   // 起動時は必ず「新規作成／過去の図面」を選ぶ画面から始める。
   // 図面は名前を付けず自動保存され、複数を切り替えて管理できる。
-  const [screen, setScreen] = useState<'launcher' | 'drawing' | 'quickcalc' | 'nitrogen' | 'support'>(
-    'launcher',
-  )
+  const [screen, setScreen] = useState<
+    'launcher' | 'drawing' | 'quickcalc' | 'nitrogen' | 'support' | 'settings'
+  >('launcher')
   const [drawingIndex, setDrawingIndex] = useState<DrawingMeta[]>(() =>
     migrateLegacyDrawing(),
   )
@@ -375,6 +381,16 @@ export default function App() {
   )
   const menuOrder = useMemo(() => sanitizeMenuOrder(menuOrderRaw), [menuOrderRaw])
   const [showMenuOrder, setShowMenuOrder] = useState(false)
+  // ホーム画面のツール(クイック計算・窒素計算・サポート架台図面)を出すかどうか。
+  // 設定画面の「仕様のオンオフ」で切り替える。表示専用で、機能自体は消えない。
+  const [enabledFeaturesRaw, setEnabledFeaturesRaw] = useLocalStorage<EnabledFeatures>(
+    'piping-iso:enabledFeatures',
+    DEFAULT_ENABLED_FEATURES,
+  )
+  const enabledFeatures = useMemo(
+    () => sanitizeEnabledFeatures(enabledFeaturesRaw),
+    [enabledFeaturesRaw],
+  )
   const needConsent = consent.version !== CONSENT_VERSION
   // 図面共有機能の権限フラグ。'full'(通常の自分の図面、または共有元がフル編集を
   // 許可した図面)のときだけ、作図・削除・全消去・部材配置・配管設定の変更ができる。
@@ -649,6 +665,16 @@ export default function App() {
   // サポート架台図面を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
   function closeSupportDrawing() {
     setScreen(drawingId ? 'drawing' : 'launcher')
+  }
+
+  function openSettings() {
+    setEraserMode(false)
+    setScreen('settings')
+  }
+
+  // 設定画面は今のところホーム画面からしか開かないため、閉じたら常にランチャーへ戻る。
+  function closeSettings() {
+    setScreen('launcher')
   }
 
   function renameDrawing(id: string, currentName: string) {
@@ -1440,10 +1466,12 @@ export default function App() {
             onNitrogenCalc={openNitrogenCalc}
             onSupportDrawing={openSupportDrawing}
             onImportFile={importShareFile}
+            enabledFeatures={enabledFeatures}
             theme={theme}
             onToggleTheme={() => setTheme((t) => (t === 'dark' ? 'light' : 'dark'))}
             onOpenDisclaimer={() => setReviewDisclaimer(true)}
             onOpenCompanyInfo={() => setShowCompanyInfo(true)}
+            onOpenSettings={openSettings}
           />
         ) : (
           <DrawingLauncher
@@ -1469,6 +1497,14 @@ export default function App() {
           labels={folders.find((f) => f.id === editFolderColorsId)?.colorLabels ?? {}}
           onChange={(colorId, label) => updateFolderColorLabel(editFolderColorsId, colorId, label)}
           onClose={() => setEditFolderColorsId(null)}
+        />
+      )}
+
+      {screen === 'settings' && (
+        <SettingsPage
+          enabled={enabledFeatures}
+          onChange={setEnabledFeaturesRaw}
+          onClose={closeSettings}
         />
       )}
 
