@@ -466,6 +466,14 @@ export default function App() {
   // 正しい順序で戻せるようにする（segments配列の末尾要素を消すだけの実装だと、
   // レジューサー等の分割で配列の途中に挿入された場合に無関係な要素が消えてしまう）。
   const [history, setHistory] = useState<Segment[][]>([])
+  // 寸法パネルでの1件ずつの編集(updateSelected)を、連続した操作としてまとめて
+  // 1つの「元に戻す」に積むための直近編集時刻。テキスト欄(現合メモ等)は
+  // 1文字ごとにonChangeが飛んでくるため、そのまま毎回履歴に積むと
+  // 「元に戻す」が1文字ずつしか戻らず、かつ履歴の上限(50件)をすぐ使い切って
+  // しまう。一定時間(PATCH_COALESCE_MS)内の連続編集は1つの履歴にまとめ、
+  // 間が空いたら次の編集として新しく履歴を積む。
+  const lastPatchRef = useRef<{ time: number; id: string | null }>({ time: 0, id: null })
+  const PATCH_COALESCE_MS = 800
   function mutateSegments(updater: (prev: Segment[]) => Segment[]) {
     // setSegments の更新関数の中で setHistory を呼ぶと、React 18 の
     // StrictMode(開発時)がその更新関数を2回呼ぶ影響で履歴が二重に積まれて
@@ -1069,7 +1077,20 @@ export default function App() {
   // レジューサー専用の特別なサイズ変更処理は不要（通常のパッチ適用のみでよい）。
   function updateSelected(patch: Partial<Segment>) {
     if (!selectedId) return
-    setSegments((prev) => prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s)))
+    const now = Date.now()
+    const last = lastPatchRef.current
+    // 直前の編集から間隔が空いている、または別の区間を編集し始めたときだけ
+    // 「元に戻す」に積む(＝この編集の直前の状態を1件として記録する)。
+    // 連続する短い間隔の編集(テキスト入力中など)はまとめて1件として扱う。
+    const isNewEdit = last.id !== selectedId || now - last.time > PATCH_COALESCE_MS
+    lastPatchRef.current = { time: now, id: selectedId }
+    const apply = (prev: Segment[]) =>
+      prev.map((s) => (s.id === selectedId ? { ...s, ...patch } : s))
+    if (isNewEdit) {
+      mutateSegments(apply)
+    } else {
+      setSegments(apply)
+    }
   }
 
   // 分岐(チーズ)の「メイン管サイズ／枝管サイズ」編集用。指定したセグメント群の
@@ -1182,6 +1203,9 @@ export default function App() {
     setSegments(prevState)
     setEraserMode(false)
     closeSelection()
+    // 次にどこかの寸法を編集したときは必ず新しい編集として履歴に積む
+    // （元に戻した直後の編集を、元に戻す前の編集と誤って1件にまとめない）。
+    lastPatchRef.current = { time: 0, id: null }
   }
 
   function clearAll() {
