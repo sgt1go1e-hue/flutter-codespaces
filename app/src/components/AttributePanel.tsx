@@ -50,11 +50,23 @@ const DimCalcInput = forwardRef<HTMLButtonElement, DimCalcInputProps>(function D
   ref,
 ) {
   const [open, setOpen] = useState(false)
+  // ポップアップを閉じた直後、指がまだ画面に触れている状態のまま(あるいは
+  // モバイルブラウザ側のクリック確定が遅れて)、閉じた位置の裏にあった
+  // ボタン(サイズ選択・集計など)にタップが突き抜けて誤操作してしまう
+  // ことがある。閉じてからごく短時間だけ透明な層を残してタップを吸収し、
+  // それを防ぐ。
+  const [guarding, setGuarding] = useState(false)
   const [calc, setCalc] = useState<CalcState>(initialCalcState)
 
   function openKeypad() {
     setCalc(value != null ? calcStateFromValue(value) : initialCalcState)
     setOpen(true)
+  }
+
+  function closeWithGuard() {
+    setOpen(false)
+    setGuarding(true)
+    window.setTimeout(() => setGuarding(false), 400)
   }
 
   // ポップアップを閉じる（＝キー・閉じるボタン・外側タップの共通処理）。
@@ -70,7 +82,7 @@ const DimCalcInput = forwardRef<HTMLButtonElement, DimCalcInputProps>(function D
         if (total != null && total !== value) onCommit(total)
       }
     }
-    setOpen(false)
+    closeWithGuard()
   }
 
   function pressEqual() {
@@ -80,7 +92,7 @@ const DimCalcInput = forwardRef<HTMLButtonElement, DimCalcInputProps>(function D
       return
     }
     if (v != null && v !== value) onCommit(v)
-    setOpen(false)
+    closeWithGuard()
   }
 
   return (
@@ -114,6 +126,18 @@ const DimCalcInput = forwardRef<HTMLButtonElement, DimCalcInputProps>(function D
               <CalcKeypad onChange={setCalc} onEqual={pressEqual} />
             </div>
           </div>,
+          document.body,
+        )}
+      {!open &&
+        guarding &&
+        createPortal(
+          <div
+            className="dim-calc-guard"
+            onClick={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+            }}
+          />,
           document.body,
         )}
     </>

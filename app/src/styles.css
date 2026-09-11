@@ -1343,6 +1343,15 @@ body {
   justify-content: center;
   padding: 0 12px max(12px, env(safe-area-inset-bottom));
 }
+/* ポップアップを閉じた直後、裏のボタンへのタップ突き抜けを防ぐための
+   一瞬だけ残す透明な層。見た目は何も出さない(黒背景を付けない)。 */
+.dim-calc-guard {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  background: transparent;
+}
+
 .dim-calc-popup {
   width: 100%;
   max-width: 360px;
