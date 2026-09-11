@@ -4,6 +4,8 @@ import { bomToCsv, computeAssemblyTable, type Bom } from '../lib/bom'
 import { chunkSegmentsForPrint, segmentsPerIsoPage } from '../lib/isoPagination'
 import { PrintIsometric } from './PrintIsometric'
 import { OrderDocModal } from './OrderDocModal'
+import { PaywallModal } from './PaywallModal'
+import { isSubscribed } from '../lib/subscription'
 import type { OrderDocKind, PipeProcurementDefaults } from '../lib/orderDoc'
 import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
@@ -111,6 +113,15 @@ export function BomModal({
   // 材料屋へ渡す帳票(発注書/見積もり依頼書)の作成ダイアログ。開いている間は
   // この集計結果をそのまま流し込む(集計ロジック側は一切変えない)。
   const [orderDocKind, setOrderDocKind] = useState<OrderDocKind | null>(null)
+  // PDF出力・CSV出力・発注書等は有料機能。未購読なら実行せず、案内画面を出す。
+  const [showPaywall, setShowPaywall] = useState(false)
+  function requireSubscription(action: () => void) {
+    if (isSubscribed()) {
+      action()
+    } else {
+      setShowPaywall(true)
+    }
+  }
 
   // アプリ全体はキャンバス独自のピンチズームと競合しないよう viewport で
   // ピンチズームを禁止している(user-scalable=no)が、PDFプレビュー中は
@@ -375,16 +386,32 @@ export function BomModal({
           </p>
         )}
         <div className="bom-actions">
-          <button className="bom-pdf" onClick={() => setPreviewOpen(true)} disabled={empty}>
+          <button
+            className="bom-pdf"
+            onClick={() => requireSubscription(() => setPreviewOpen(true))}
+            disabled={empty}
+          >
             PDFで見る
           </button>
-          <button className="bom-csv" onClick={downloadCsv} disabled={empty}>
+          <button
+            className="bom-csv"
+            onClick={() => requireSubscription(downloadCsv)}
+            disabled={empty}
+          >
             CSVダウンロード
           </button>
-          <button className="bom-csv" onClick={() => setOrderDocKind('order')} disabled={empty}>
+          <button
+            className="bom-csv"
+            onClick={() => requireSubscription(() => setOrderDocKind('order'))}
+            disabled={empty}
+          >
             発注書PDF作成
           </button>
-          <button className="bom-csv" onClick={() => setOrderDocKind('quote')} disabled={empty}>
+          <button
+            className="bom-csv"
+            onClick={() => requireSubscription(() => setOrderDocKind('quote'))}
+            disabled={empty}
+          >
             見積もり依頼書PDF作成
           </button>
           <button className="disclaimer-close" onClick={onClose}>
@@ -393,6 +420,8 @@ export function BomModal({
         </div>
       </div>
     </div>
+
+    {showPaywall && <PaywallModal onClose={() => setShowPaywall(false)} />}
 
     {/* 印刷専用レイアウト。position:fixed のモーダル(disclaimer-overlay)の中に
         置くと、印刷時にその祖先のfixed配置(=1ページ分の高さに固定)へ引きずられて

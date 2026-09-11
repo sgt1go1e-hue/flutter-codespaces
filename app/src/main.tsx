@@ -3,11 +3,21 @@ import { createRoot } from 'react-dom/client'
 import { BetaGate } from './components/BetaGate'
 import './styles.css'
 
+// 起動直後(Reactがまだマウントできていない段階)のクラッシュだけを画面に出す。
+// マウント後は、バックグラウンドのライブラリ(課金プラグイン等)が起こす
+// 捕捉されないPromiseの失敗などで画面全体を巻き込んで消してしまわないよう、
+// コンソールへのログのみにとどめる。
+let appMounted = false
+
 function showFatalError(err: unknown) {
-  const el = document.getElementById('root')
-  if (!el) return
   const msg =
     err instanceof Error ? `${err.name}: ${err.message}\n${err.stack ?? ''}` : String(err)
+  if (appMounted) {
+    console.error('起動後のエラー(画面表示はスキップ):', msg)
+    return
+  }
+  const el = document.getElementById('root')
+  if (!el) return
   el.innerHTML = `<pre style="white-space:pre-wrap;color:#fff;background:#900;padding:16px;font-size:12px;margin:0;">起動エラー:\n${msg.replace(/</g, '&lt;')}</pre>`
 }
 
@@ -20,6 +30,7 @@ try {
       <BetaGate />
     </StrictMode>,
   )
+  appMounted = true
 } catch (err) {
   showFatalError(err)
 }
