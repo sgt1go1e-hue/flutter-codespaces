@@ -661,21 +661,21 @@ export function DrawingCanvas({
       // 軸並行(AABB)サイズで見積もる。1本の線に2行を積んでいるため回転角は共通。
       const box1 = rotatedBoxSize(w1, lineBoxH, geom.textRotateDeg)
       const box2 = rotatedBoxSize(w2, lineBoxH, geom.textRotateDeg)
+      // 1行目・2行目は必ず一定間隔で連動して動く1組のラベルなので、重なり回避の
+      // 対象としては2行分をまとめた1つの箱として登録する（別々のジョブのまま
+      // 渡すと、回転した箱どうしのAABB判定が実際より過大評価され、自分自身の
+      // 1行目と2行目を「重なっている」と誤判定して無駄に引き離してしまい、
+      // その結果どちらかが別区間のラベルの上に飛んでいってしまうことがあった）。
+      const left = Math.min(geom.text1X - box1.w / 2, geom.text2X - box2.w / 2)
+      const right = Math.max(geom.text1X + box1.w / 2, geom.text2X + box2.w / 2)
+      const top = Math.min(geom.text1Y - box1.h / 2, geom.text2Y - box2.h / 2)
+      const bottom = Math.max(geom.text1Y + box1.h / 2, geom.text2Y + box2.h / 2)
       jobs.push({
-        key: `dim-line1-${s.id}`,
-        cx: geom.text1X,
-        cy: geom.text1Y,
-        w: box1.w,
-        h: box1.h,
-        pushX: side.nx,
-        pushY: side.ny,
-      })
-      jobs.push({
-        key: `dim-line2-${s.id}`,
-        cx: geom.text2X,
-        cy: geom.text2Y,
-        w: box2.w,
-        h: box2.h,
+        key: `dim-group-${s.id}`,
+        cx: (left + right) / 2,
+        cy: (top + bottom) / 2,
+        w: right - left,
+        h: bottom - top,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -1347,12 +1347,17 @@ export function DrawingCanvas({
               const geom = dimGeometry(s.start, s.end, side, uiScale)
               const extStart = dimExtensionLine(s.start, side, uiScale)
               const extEnd = dimExtensionLine(s.end, side, uiScale)
-              const line1Resolved = resolvedLabels.get(`dim-line1-${s.id}`)
-              const line1X = line1Resolved?.cx ?? geom.text1X
-              const line1Y = line1Resolved?.cy ?? geom.text1Y
-              const line2Resolved = resolvedLabels.get(`dim-line2-${s.id}`)
-              const line2X = line2Resolved?.cx ?? geom.text2X
-              const line2Y = line2Resolved?.cy ?? geom.text2Y
+              // 1行目・2行目は常に一体として動かす（groupJobの押し出し量を
+              // そのまま両方の行に適用し、行どうしの間隔は常に元のまま保つ）。
+              const groupResolved = resolvedLabels.get(`dim-group-${s.id}`)
+              const origGroupCx = (geom.text1X + geom.text2X) / 2
+              const origGroupCy = (geom.text1Y + geom.text2Y) / 2
+              const groupDx = groupResolved ? groupResolved.cx - origGroupCx : 0
+              const groupDy = groupResolved ? groupResolved.cy - origGroupCy : 0
+              const line1X = geom.text1X + groupDx
+              const line1Y = geom.text1Y + groupDy
+              const line2X = geom.text2X + groupDx
+              const line2Y = geom.text2Y + groupDy
               // 近接する他区間のラベルと重なるため押し出された場合、文字の位置と
               // 本来の寸法線上の位置が離れてしまい、どちらの配管の数字か分かり
               // づらくなる。一定以上ずれたときだけ、細い引き出し線でつなぐ。

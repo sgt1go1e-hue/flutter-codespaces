@@ -162,21 +162,19 @@ export function PrintIsometric({
       // 軸並行(AABB)サイズで見積もる。
       const box1 = rotatedBoxSize(w1, 16, geom.textRotateDeg)
       const box2 = rotatedBoxSize(w2, 18, geom.textRotateDeg)
+      // 1行目・2行目をまとめた1つの箱として登録する（理由はDrawingCanvas.tsxの
+      // 同箇所のコメント参照。自分自身の2行を誤って重なっていると判定して
+      // 無駄に引き離してしまう問題を避ける）。
+      const left = Math.min(geom.text1X - box1.w / 2, geom.text2X - box2.w / 2)
+      const right = Math.max(geom.text1X + box1.w / 2, geom.text2X + box2.w / 2)
+      const top = Math.min(geom.text1Y - box1.h / 2, geom.text2Y - box2.h / 2)
+      const bottom = Math.max(geom.text1Y + box1.h / 2, geom.text2Y + box2.h / 2)
       jobs.push({
-        key: `dim-line1-${s.id}`,
-        cx: geom.text1X,
-        cy: geom.text1Y,
-        w: box1.w,
-        h: box1.h,
-        pushX: side.nx,
-        pushY: side.ny,
-      })
-      jobs.push({
-        key: `dim-line2-${s.id}`,
-        cx: geom.text2X,
-        cy: geom.text2Y,
-        w: box2.w,
-        h: box2.h,
+        key: `dim-group-${s.id}`,
+        cx: (left + right) / 2,
+        cy: (top + bottom) / 2,
+        w: right - left,
+        h: bottom - top,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -542,12 +540,15 @@ export function PrintIsometric({
               const geom = dimGeometry(s.start, s.end, side, 1)
               const extStart = dimExtensionLine(s.start, side, 1)
               const extEnd = dimExtensionLine(s.end, side, 1)
-              const line1Resolved = resolvedLabels.get(`dim-line1-${s.id}`)
-              const line1X = line1Resolved?.cx ?? geom.text1X
-              const line1Y = line1Resolved?.cy ?? geom.text1Y
-              const line2Resolved = resolvedLabels.get(`dim-line2-${s.id}`)
-              const line2X = line2Resolved?.cx ?? geom.text2X
-              const line2Y = line2Resolved?.cy ?? geom.text2Y
+              const groupResolved = resolvedLabels.get(`dim-group-${s.id}`)
+              const origGroupCx = (geom.text1X + geom.text2X) / 2
+              const origGroupCy = (geom.text1Y + geom.text2Y) / 2
+              const groupDx = groupResolved ? groupResolved.cx - origGroupCx : 0
+              const groupDy = groupResolved ? groupResolved.cy - origGroupCy : 0
+              const line1X = geom.text1X + groupDx
+              const line1Y = geom.text1Y + groupDy
+              const line2X = geom.text2X + groupDx
+              const line2Y = geom.text2Y + groupDy
               // 近接する他区間のラベルと重なるため押し出された場合、文字の位置と
               // 本来の寸法線上の位置が離れてしまい、どちらの配管の数字か分かり
               // づらくなる。一定以上ずれたときだけ、細い引き出し線でつなぐ。
