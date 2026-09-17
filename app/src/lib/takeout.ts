@@ -695,6 +695,15 @@ export function computeEnds(
       if (!nbEnds) continue
       const nbOtherEnd = nb.end === 'start' ? 'end' : 'start'
       if (nbEnds[nb.end].role !== 'elbow' || nbEnds[nbOtherEnd].role !== 'elbow') continue
+      // 45°エルボが3つ以上連続する「クランク」配管では、隣り合う2区間が
+      // どちらもこのループの対象条件(両端エルボ・自身の継手が45°系)を満たして
+      // しまい、"キック→隣の長い区間へ畳み込む"はずが逆方向にも適用されて
+      // しまうことがあった(長い区間の全長を短いキック側から差し引いてしまい、
+      // 実際には十分収まるはずの切り寸法が大幅なマイナスになって
+      // 「継手が収まりません」と誤って出る不具合)。畳み込みは「自分より短い
+      // 区間(＝キック側)を自分(＝長い側)へ吸収する」方向にしか成立しないため、
+      // 相手(nb)が自分(s)以上の長さなら、自分がキック側なので畳み込まない。
+      if (s.centerLength != null && nb.seg.centerLength >= s.centerLength) continue
       const nbIsDiagonalKick =
         isFortyFiveFitting(nbEnds[nb.end].fittingId) ||
         isFortyFiveFitting(nbEnds[nbOtherEnd].fittingId)
