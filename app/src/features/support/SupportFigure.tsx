@@ -334,7 +334,7 @@ export default function SupportFigure({ design: d, onEdit, className, style }: S
     if (interactive) {
       chips.push({ key: `pl-${i}`, cx: xOf(c), cy: BAR_TOP - 18, text: t, target: { kind: 'pipe', index: i } });
     } else {
-      svg.push(txt(`pl-${i}`, xOf(c), BAR_TOP - 28, d.pipeSizes[i], { size: 13, bold: true, center: true }));
+      svg.push(txt(`pl-${i}`, xOf(c), BAR_TOP - 28, t, { size: 13, bold: true, center: true }));
     }
   });
 
