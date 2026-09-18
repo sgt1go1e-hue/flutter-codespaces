@@ -1,10 +1,13 @@
 import { useMemo, useRef, useState } from 'react'
 import type { DrawingMeta, FolderMeta } from '../lib/drawingStore'
+import type { SupportDoc } from '../lib/supportStore'
 import type { EnabledFeatures } from '../lib/featureToggles'
 
 interface Props {
   folders: FolderMeta[]
   drawings: DrawingMeta[]
+  /** サポート架台ファイル(図面と同じ現場・案件フォルダを共用するため、検索・未分類の更新日判定に使う)。 */
+  supportDocs: SupportDoc[]
   onOpenFolder: (folderId: string | null) => void
   onCreateFolder: () => void
   onRenameFolder: (id: string) => void
@@ -42,6 +45,7 @@ function formatDate(ms: number): string {
 export function FolderShelf({
   folders,
   drawings,
+  supportDocs,
   onOpenFolder,
   onCreateFolder,
   onRenameFolder,
@@ -66,26 +70,28 @@ export function FolderShelf({
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [query, setQuery] = useState('')
 
-  const unclassifiedUpdatedAt = drawings
+  const unclassifiedUpdatedAt = [...drawings, ...supportDocs]
     .filter((d) => d.folderId == null)
     .reduce((max, d) => Math.max(max, d.updatedAt), 0)
 
-  // 検索は「フォルダの絞り込み」だけを行う（フォルダ名、またはその中の図面名に
-  // 部分一致したフォルダを残す）。タップ先は従来どおりフォルダのままで、
-  // 図面を直接開く新しい導線は増やさない。
+  // 検索は「フォルダの絞り込み」だけを行う（フォルダ名、またはその中の図面名・
+  // 架台ファイル名に部分一致したフォルダを残す）。タップ先は従来どおりフォルダの
+  // ままで、図面/架台を直接開く新しい導線は増やさない。
   const q = query.trim().toLowerCase()
   const matchesFolder = useMemo(() => {
     if (!q) return null
     const hit = new Set<string>()
-    for (const d of drawings) {
+    for (const d of [...drawings, ...supportDocs]) {
       if ((d.name ?? '').toLowerCase().includes(q) && d.folderId != null) hit.add(d.folderId)
     }
     return hit
-  }, [q, drawings])
+  }, [q, drawings, supportDocs])
   const unclassifiedMatches =
     !q ||
     '未分類'.includes(query.trim()) ||
-    drawings.some((d) => d.folderId == null && (d.name ?? '').toLowerCase().includes(q))
+    [...drawings, ...supportDocs].some(
+      (d) => d.folderId == null && (d.name ?? '').toLowerCase().includes(q),
+    )
 
   const sortedFolders = [...folders]
     .sort((a, b) => b.updatedAt - a.updatedAt)

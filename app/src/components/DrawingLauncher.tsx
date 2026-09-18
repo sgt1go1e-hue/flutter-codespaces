@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { DrawingMeta, FolderMeta, StatusColor } from '../lib/drawingStore'
+import type { SupportDoc } from '../lib/supportStore'
 
 interface Props {
   drawings: DrawingMeta[]
@@ -17,6 +18,12 @@ interface Props {
    * 未分類(folderId=null)はフォルダの既定値を持たないため表示しない。
    */
   onEditFolderColors?: () => void
+  /** サポート架台ファイル(図面と同じ現場・案件フォルダを共用する)。 */
+  supportDocs: SupportDoc[]
+  onOpenSupport: (id: string) => void
+  onRenameSupport: (id: string, currentName: string) => void
+  onDeleteSupport: (id: string) => void
+  onMoveSupportToFolder: (id: string, folderId: string | null) => void
 }
 
 const STATUS_COLORS: StatusColor[] = ['white', 'red', 'green', 'blue']
@@ -51,11 +58,20 @@ export function DrawingLauncher({
   onMoveToFolder,
   onSetStatusColor,
   onEditFolderColors,
+  supportDocs,
+  onOpenSupport,
+  onRenameSupport,
+  onDeleteSupport,
+  onMoveSupportToFolder,
 }: Props) {
   const [menuId, setMenuId] = useState<string | null>(null)
+  const [supportMenuId, setSupportMenuId] = useState<string | null>(null)
   const folderName =
     folderId == null ? '未分類' : (folders.find((f) => f.id === folderId)?.name ?? '（不明なフォルダ）')
   const sorted = drawings
+    .filter((d) => d.folderId === folderId)
+    .sort((a, b) => b.updatedAt - a.updatedAt)
+  const sortedSupport = supportDocs
     .filter((d) => d.folderId === folderId)
     .sort((a, b) => b.updatedAt - a.updatedAt)
 
@@ -155,6 +171,85 @@ export function DrawingLauncher({
                         onClick={() => {
                           setMenuId(null)
                           onDelete(d.id)
+                        }}
+                      >
+                        削除
+                      </button>
+                    </div>
+                  </>
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+
+        <div className="home-section-head">
+          <span className="home-section-title">サポート架台</span>
+        </div>
+        {sortedSupport.length === 0 ? (
+          <p className="home-empty">このフォルダにはまだサポート架台がありません。</p>
+        ) : (
+          <ul className="home-drawing-list">
+            {sortedSupport.map((sd) => (
+              <li key={sd.id} className="home-drawing-card">
+                <div className="home-drawing-body">
+                  <button type="button" className="home-drawing-main" onClick={() => onOpenSupport(sd.id)}>
+                    <span className="home-drawing-name">{sd.name || formatDateTime(sd.updatedAt)}</span>
+                    <span className="home-drawing-meta">
+                      {sd.name ? `${formatDateTime(sd.updatedAt)} ・ ` : ''}
+                      {sd.count}台
+                    </span>
+                  </button>
+                  <div className="home-drawing-sub">
+                    <select
+                      className="home-move-select"
+                      value={sd.folderId ?? ''}
+                      aria-label="フォルダを移動"
+                      onChange={(e) => onMoveSupportToFolder(sd.id, e.target.value || null)}
+                    >
+                      <option value="">未分類</option>
+                      {folders.map((f) => (
+                        <option key={f.id} value={f.id}>
+                          {f.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  className="home-folder-menu-btn"
+                  aria-label="この架台ファイルのメニュー"
+                  onClick={() => setSupportMenuId((cur) => (cur === sd.id ? null : sd.id))}
+                >
+                  ⋯
+                </button>
+                {supportMenuId === sd.id && (
+                  <>
+                    <button
+                      type="button"
+                      className="home-menu-backdrop"
+                      aria-label="閉じる"
+                      onClick={() => setSupportMenuId(null)}
+                    />
+                    <div className="home-menu" role="menu">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => {
+                          setSupportMenuId(null)
+                          onRenameSupport(sd.id, sd.name ?? '')
+                        }}
+                      >
+                        名前を変更
+                      </button>
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="danger"
+                        onClick={() => {
+                          setSupportMenuId(null)
+                          onDeleteSupport(sd.id)
                         }}
                       >
                         削除

@@ -51,6 +51,9 @@ type Editing =
 
 interface Props {
   onClose: () => void
+  /** 保存した架台の配列。永続化(端末保存・フォルダ分け)はApp.tsx側で行う(controlled)。 */
+  sheet: HangerDesign[]
+  onChangeSheet: (sheet: HangerDesign[]) => void
 }
 
 /**
@@ -88,16 +91,13 @@ function nextDesign(d: HangerDesign): HangerDesign {
   return { ...d, pipeSizes: [], sleepers: [], spans: [] }
 }
 
-export function SupportDrawingPage({ onClose }: Props) {
+export function SupportDrawingPage({ onClose, sheet, onChangeSheet }: Props) {
   // 配管は最初から入れない。既定値が入っていると「今どこまで入力したのか」が
   // 分からなくなるため、必ずユーザーがサイズを選んで足していく形にする。
   const [d, setD] = useState<HangerDesign>(() =>
     createHangerDesign({ pipeSizes: [], sleepers: [], spans: [] }),
   )
   const [editing, setEditing] = useState<Editing>(null)
-  // 印刷/PDF用に貯めた架台。1現場で何台も作ることが多いため、1台ずつ
-  // 印刷するのではなくシートにまとめてから出力する。
-  const [sheet, setSheet] = useState<HangerDesign[]>([])
   const [perPage, setPerPage] = useState<SupportPerPage>(2)
   const [printOpen, setPrintOpen] = useState(false)
   const patch = (p: Partial<HangerDesign>) => setD((cur) => ({ ...cur, ...p }))
@@ -306,7 +306,7 @@ export function SupportDrawingPage({ onClose }: Props) {
           className="support-next-btn"
           disabled={!ready}
           onClick={() => {
-            setSheet((cur) => [...cur, JSON.parse(JSON.stringify(d)) as HangerDesign])
+            onChangeSheet([...sheet, JSON.parse(JSON.stringify(d)) as HangerDesign])
             setD((cur) => nextDesign(cur))
           }}
         >
@@ -330,12 +330,12 @@ export function SupportDrawingPage({ onClose }: Props) {
                     onClick={() => {
                       // 今入力中の架台(配管が1本以上あれば)を消してしまわないよう、
                       // 編集対象と入れ替える形でリストへ戻してから、選んだ架台を編集対象にする。
-                      setSheet((cur) => {
-                        const rest = cur.filter((_, k) => k !== i)
-                        return d.pipeSizes.length > 0
+                      const rest = sheet.filter((_, k) => k !== i)
+                      onChangeSheet(
+                        d.pipeSizes.length > 0
                           ? [...rest, JSON.parse(JSON.stringify(d)) as HangerDesign]
-                          : rest
-                      })
+                          : rest,
+                      )
                       setD(JSON.parse(JSON.stringify(sd)) as HangerDesign)
                     }}
                   >
@@ -344,7 +344,7 @@ export function SupportDrawingPage({ onClose }: Props) {
                   <button
                     type="button"
                     className="support-btn-danger"
-                    onClick={() => setSheet((cur) => cur.filter((_, k) => k !== i))}
+                    onClick={() => onChangeSheet(sheet.filter((_, k) => k !== i))}
                   >
                     削除
                   </button>
