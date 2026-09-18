@@ -326,6 +326,23 @@ export function SupportDrawingPage({ onClose }: Props) {
                   </span>
                   <button
                     type="button"
+                    className="support-btn"
+                    onClick={() => {
+                      // 今入力中の架台(配管が1本以上あれば)を消してしまわないよう、
+                      // 編集対象と入れ替える形でリストへ戻してから、選んだ架台を編集対象にする。
+                      setSheet((cur) => {
+                        const rest = cur.filter((_, k) => k !== i)
+                        return d.pipeSizes.length > 0
+                          ? [...rest, JSON.parse(JSON.stringify(d)) as HangerDesign]
+                          : rest
+                      })
+                      setD(JSON.parse(JSON.stringify(sd)) as HangerDesign)
+                    }}
+                  >
+                    編集
+                  </button>
+                  <button
+                    type="button"
                     className="support-btn-danger"
                     onClick={() => setSheet((cur) => cur.filter((_, k) => k !== i))}
                   >
