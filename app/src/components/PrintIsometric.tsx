@@ -152,7 +152,15 @@ export function PrintIsometric({
           : 11
       const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
       const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-      const geom = dimGeometry(s.start, s.end, side, 1, DIM_STANDOFF, s.dimAnchorAlong ?? 0.5)
+      const geom = dimGeometry(
+        s.start,
+        s.end,
+        side,
+        1,
+        DIM_STANDOFF,
+        s.dimAnchorAlong ?? 0.5,
+        s.dimLineOffset ?? { x: 0, y: 0 },
+      )
       dimArrowObstacles.push(
         { cx: geom.line.x1, cy: geom.line.y1, w: 16, h: 16 },
         { cx: geom.line.x2, cy: geom.line.y2, w: 16, h: 16 },
@@ -540,9 +548,17 @@ export function PrintIsometric({
               const my = s.start.y + (s.end.y - s.start.y) * t
               const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
               const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-              const geom = dimGeometry(s.start, s.end, side, 1, DIM_STANDOFF, s.dimAnchorAlong ?? 0.5)
-              const extStart = dimExtensionLine(s.start, side, 1)
-              const extEnd = dimExtensionLine(s.end, side, 1)
+              const geom = dimGeometry(
+                s.start,
+                s.end,
+                side,
+                1,
+                DIM_STANDOFF,
+                s.dimAnchorAlong ?? 0.5,
+                s.dimLineOffset ?? { x: 0, y: 0 },
+              )
+              const extStart = dimExtensionLine(s.start, { x: geom.line.x1, y: geom.line.y1 }, 1)
+              const extEnd = dimExtensionLine(s.end, { x: geom.line.x2, y: geom.line.y2 }, 1)
               const groupResolved = resolvedLabels.get(`dim-group-${s.id}`)
               const origGroupCx = (geom.text1X + geom.text2X) / 2
               const origGroupCy = (geom.text1Y + geom.text2Y) / 2
@@ -720,8 +736,8 @@ export function PrintIsometric({
         )
         const side = chooseDimSide(first.start, first.end, markPos ?? undefined)
         const g = dimGeometry(run.start, run.end, side, 1, DIM_THROUGH_STANDOFF)
-        const e1 = dimExtensionLine(run.start, side, 1, DIM_THROUGH_STANDOFF)
-        const e2 = dimExtensionLine(run.end, side, 1, DIM_THROUGH_STANDOFF)
+        const e1 = dimExtensionLine(run.start, { x: g.line.x1, y: g.line.y1 }, 1)
+        const e2 = dimExtensionLine(run.end, { x: g.line.x2, y: g.line.y2 }, 1)
         return (
           <g key={`through-${run.ids[0]}`} className="dim-group">
             <line className="dim-ext-line" x1={e1.x1} y1={e1.y1} x2={e1.x2} y2={e1.y2} />

@@ -1302,6 +1302,21 @@ export default function App() {
     )
   }
 
+  // 寸法線(矢羽根を含む)全体をドラッグして移動したとき、標準位置からの
+  // 相対オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
+  // ほぼ動かしていなければオフセットを消して標準位置へ戻す(手動リセット)。
+  function moveDimLine(id: string, offsetX: number, offsetY: number) {
+    if (!canEditStructure) return
+    const reset = Math.abs(offsetX) < 4 && Math.abs(offsetY) < 4
+    mutateSegments((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? { ...s, dimLineOffset: reset ? undefined : { x: offsetX, y: offsetY } }
+          : s,
+      ),
+    )
+  }
+
   // 寸法ラベルの引き出し線(点線)が接続する、寸法線上の位置(along)を
   // ドラッグして確定する（表示専用。切り寸法等には無関係）。
   function moveDimAnchor(id: string, along: number) {
@@ -1773,6 +1788,7 @@ export default function App() {
           onMoveFieldWeldMark={canEditStructure ? moveFieldWeldMark : undefined}
           onMoveDimLabel={canEditStructure ? moveDimLabel : undefined}
           onMoveDimAnchor={canEditStructure ? moveDimAnchor : undefined}
+          onMoveDimLine={canEditStructure ? moveDimLine : undefined}
         />
 
         {/* ドラッグ中のパーツ ghost */}
