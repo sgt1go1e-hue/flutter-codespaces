@@ -424,8 +424,6 @@ export function PrintIsometric({
     align: 'top' | 'bottom' | undefined,
     largeAtStart: boolean,
   ) {
-    const mx = (s.start.x + s.end.x) / 2
-    const my = (s.start.y + s.end.y) / 2
     const len = distance(s.start, s.end) || 1
     const dx = (s.end.x - s.start.x) / len
     const dy = (s.end.y - s.start.y) / len
@@ -435,16 +433,20 @@ export function PrintIsometric({
     const ny = ux
     const L = 13
     const W = 9
-    const largeCx = mx - ux * L
-    const largeCy = my - uy * L
+    // 大径側の面を必ず実際の継手位置(区間自身の大径側の端点)に一致させる。
+    // 理由はDrawingCanvas.tsxの同関数のコメント参照。
+    const junction = largeAtStart ? s.start : s.end
+    const reach = Math.min(2 * L, len)
+    const largeCx = junction.x
+    const largeCy = junction.y
     const c1 = { x: largeCx + nx * W, y: largeCy + ny * W }
     const c2 = { x: largeCx - nx * W, y: largeCy - ny * W }
-    let apex = { x: mx + ux * L, y: my + uy * L }
+    let apex = { x: junction.x + ux * reach, y: junction.y + uy * reach }
     if (kind === 'eccentric' && align) {
       const cTop = c1.y <= c2.y ? c1 : c2
       const cBot = c1.y <= c2.y ? c2 : c1
       const flush = align === 'bottom' ? cBot : cTop
-      apex = { x: flush.x + ux * 2 * L, y: flush.y + uy * 2 * L }
+      apex = { x: flush.x + ux * reach, y: flush.y + uy * reach }
     }
     return (
       <polygon

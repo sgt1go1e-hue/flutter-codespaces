@@ -1123,8 +1123,6 @@ export function DrawingCanvas({
     align: 'top' | 'bottom' | undefined,
     largeAtStart: boolean,
   ) {
-    const mx = (s.start.x + s.end.x) / 2
-    const my = (s.start.y + s.end.y) / 2
     const len = distance(s.start, s.end) || 1
     const dx = (s.end.x - s.start.x) / len
     const dy = (s.end.y - s.start.y) / len
@@ -1135,17 +1133,24 @@ export function DrawingCanvas({
     const ny = ux
     const L = 13 // 大径〜小径方向の半長
     const W = 9 // 底辺の半幅
-    const largeCx = mx - ux * L
-    const largeCy = my - uy * L
+    // 大径側の面は、必ずこの区間(レジューサー本体)自身の大径側の端点(＝実際の
+    // 継手位置)に一致させる。以前は区間の中点を基準に±Lへ配置していたため、
+    // タップ位置が区間の端(既存のノード)に近く、反対側が長い区間になった
+    // 場合に、記号が実際の継手位置から大きく離れた場所に表示されてしまう
+    // 不具合があった(区間が短いときだけ偶然ズレが目立たなかった)。
+    const junction = largeAtStart ? s.start : s.end
+    const reach = Math.min(2 * L, len)
+    const largeCx = junction.x
+    const largeCy = junction.y
     const c1 = { x: largeCx + nx * W, y: largeCy + ny * W }
     const c2 = { x: largeCx - nx * W, y: largeCy - ny * W }
-    let apex = { x: mx + ux * L, y: my + uy * L } // 小径側の中心（同心の頂点）
+    let apex = { x: junction.x + ux * reach, y: junction.y + uy * reach } // 小径側の中心（同心の頂点）
     if (kind === 'eccentric' && align) {
       // 画面上下で「面が揃う側」を決め、その角から頂点を配管方向へ伸ばす（斜辺=反対側）
       const cTop = c1.y <= c2.y ? c1 : c2
       const cBot = c1.y <= c2.y ? c2 : c1
       const flush = align === 'bottom' ? cBot : cTop
-      apex = { x: flush.x + ux * 2 * L, y: flush.y + uy * 2 * L }
+      apex = { x: flush.x + ux * reach, y: flush.y + uy * reach }
     }
     return (
       <polygon
