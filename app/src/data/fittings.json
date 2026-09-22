@@ -1182,6 +1182,7 @@
       "source": "nippon_joint_socket_SCH80",
       "drawingNo": "TB-0101-A",
       "dims": {
+        "10": 13.5,
         "15": 15.9,
         "20": 19.1,
         "25": 22.2,
@@ -1200,6 +1201,7 @@
       "source": "nippon_joint_socket_SCH80",
       "drawingNo": "TB-0401-A",
       "dims": {
+        "10": 7.9,
         "15": 11.1,
         "20": 12.7,
         "25": 14.3,
@@ -1218,6 +1220,7 @@
       "source": "nippon_joint_socket_SCH80",
       "drawingNo": "TB-0201-A",
       "dims": {
+        "10": { "run": 13.5, "branch": 13.5 },
         "15": { "run": 15.9, "branch": 15.9 },
         "20": { "run": 19.1, "branch": 19.1 },
         "25": { "run": 22.2, "branch": 22.2 },
@@ -1236,15 +1239,21 @@
       "source": "nippon_joint_socket_SCH80",
       "drawingNo": "TB-0202-A",
       "dims": {
+        "15_10": { "run": 15.9, "branch": 13.5 },
+        "20_10": { "run": 19.1, "branch": 13.5 },
         "20_15": { "run": 19.1, "branch": 15.9 },
+        "25_10": { "run": 22.2, "branch": 13.5 },
         "25_15": { "run": 22.2, "branch": 15.9 },
         "25_20": { "run": 22.2, "branch": 19.1 },
+        "32_10": { "run": 27.0, "branch": 13.5 },
         "32_15": { "run": 27.0, "branch": 15.9 },
         "32_20": { "run": 27.0, "branch": 19.1 },
         "32_25": { "run": 27.0, "branch": 22.2 },
+        "40_10": { "run": 31.8, "branch": 13.5 },
         "40_15": { "run": 31.8, "branch": 15.9 },
         "40_20": { "run": 31.8, "branch": 19.1 },
         "40_25": { "run": 31.8, "branch": 22.2 },
+        "50_10": { "run": 38.1, "branch": 13.5 },
         "50_15": { "run": 38.1, "branch": 15.9 },
         "50_20": { "run": 38.1, "branch": 19.1 },
         "50_25": { "run": 38.1, "branch": 22.2 }
