@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { Point, Segment } from '../types'
 import { distance } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
+import { lineColorHex } from '../data/lineColors'
 import {
   ELBOW_MARK_LABELS,
   elbowMarkEndKey,
@@ -470,7 +471,7 @@ export function PrintIsometric({
       {segments.map((s) => {
         const eff = effectiveById[s.id]
         const resolved = eff?.resolved ?? false
-        const stroke = resolved ? '#0369a1' : '#64748b'
+        const stroke = (s.colorId && lineColorHex(s.colorId)) || (resolved ? '#0369a1' : '#64748b')
         const pieces = breakLine(s.start, s.end, crossoverGaps[s.id] ?? [], CROSS_GAP)
         return (
           <g key={s.id}>
