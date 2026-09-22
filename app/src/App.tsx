@@ -1286,6 +1286,22 @@ export default function App() {
     )
   }
 
+  // 寸法ラベル(芯々/切り寸法)をドラッグして移動したとき、自動配置位置からの
+  // 相対オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
+  // ほぼ動かしていない(=自動配置の位置まで戻した)場合はオフセットを消して
+  // 自動配置へ戻す(手動でリセットする手段として使える)。
+  function moveDimLabel(id: string, offsetX: number, offsetY: number) {
+    if (!canEditStructure) return
+    const reset = Math.abs(offsetX) < 4 && Math.abs(offsetY) < 4
+    mutateSegments((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? { ...s, dimLabelOffset: reset ? undefined : { x: offsetX, y: offsetY } }
+          : s,
+      ),
+    )
+  }
+
   // 現場溶接マークをドラッグして移動したとき、対象点(t位置)からの相対
   // オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
   function moveFieldWeldMark(id: string, markId: string, offsetX: number, offsetY: number) {
@@ -1746,6 +1762,7 @@ export default function App() {
           onDeleteFieldWeldMark={canEditStructure ? deleteFieldWeldMark : undefined}
           onToggleFieldFitFlip={canEditStructure ? toggleFieldFitFlip : undefined}
           onMoveFieldWeldMark={canEditStructure ? moveFieldWeldMark : undefined}
+          onMoveDimLabel={canEditStructure ? moveDimLabel : undefined}
         />
 
         {/* ドラッグ中のパーツ ghost */}

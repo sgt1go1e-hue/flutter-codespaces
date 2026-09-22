@@ -120,6 +120,11 @@ interface Props {
   onMoveFieldWeldMark?: (segId: string, markId: string, offsetX: number, offsetY: number) => void
   /** 現場合わせ区間の端点三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
   onToggleFieldFitFlip?: (segId: string, at: 'start' | 'end') => void
+  /**
+   * 寸法ラベル(芯々/切り寸法)をドラッグして移動したとき、自動配置位置からの
+   * 相対オフセット(表示スケール=1のときのpx相当)を確定する（表示専用）。
+   */
+  onMoveDimLabel?: (segId: string, offsetX: number, offsetY: number) => void
 }
 
 // 「指が動いたかどうか」のごく小さいデッドゾーン(px、画面座標＝ズーム非依存)。
@@ -208,6 +213,7 @@ export function DrawingCanvas({
   onDeleteFieldWeldMark,
   onToggleFieldFitFlip,
   onMoveFieldWeldMark,
+  onMoveDimLabel,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
@@ -270,6 +276,24 @@ export function DrawingCanvas({
   const [fieldWeldDrag, setFieldWeldDrag] = useState<{
     segId: string
     markId: string
+    offsetX: number
+    offsetY: number
+  } | null>(null)
+
+  // 寸法ラベル(芯々/切り寸法の2段表記)のドラッグ移動用。fieldWeldDragと
+  // 全く同じ考え方(離すまでの移動量でタップ/ドラッグを判定し、移動中は
+  // stateでその場でプレビュー、離した時点で確定してApp側へ相対オフセットを渡す)。
+  const dimLabelDragRef = useRef<{
+    pointerId: number
+    segId: string
+    startClientX: number
+    startClientY: number
+    startOffsetX: number
+    startOffsetY: number
+    moved: boolean
+  } | null>(null)
+  const [dimLabelDrag, setDimLabelDrag] = useState<{
+    segId: string
     offsetX: number
     offsetY: number
   } | null>(null)
@@ -1037,6 +1061,53 @@ export function DrawingCanvas({
     setFieldWeldDrag(null)
   }
 
+  // 寸法ラベル(芯々/切り寸法)のドラッグ移動。タップ(=何もしない。選択は線の
+  // タップで行う)とドラッグ(=移動)を移動量で判定する点はfieldWeldと同じ。
+  // わずかに動かしただけ(タップ扱い)なら何もしない(既存のクリック挙動を壊さない)。
+  function handleDimLabelPointerDown(e: React.PointerEvent<SVGTextElement>, segId: string, s: Segment) {
+    if (!onMoveDimLabel) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const startOffsetX = s.dimLabelOffset?.x ?? 0
+    const startOffsetY = s.dimLabelOffset?.y ?? 0
+    dimLabelDragRef.current = {
+      pointerId: e.pointerId,
+      segId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startOffsetX,
+      startOffsetY,
+      moved: false,
+    }
+    setDimLabelDrag({ segId, offsetX: startOffsetX, offsetY: startOffsetY })
+  }
+
+  function handleDimLabelPointerMove(e: React.PointerEvent<SVGTextElement>) {
+    const d = dimLabelDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    const dxScreen = e.clientX - d.startClientX
+    const dyScreen = e.clientY - d.startClientY
+    if (Math.abs(dxScreen) > TAP_DEADZONE_PX || Math.abs(dyScreen) > TAP_DEADZONE_PX) {
+      d.moved = true
+    }
+    const offsetX = d.startOffsetX + dxScreen / view.scale / uiScale
+    const offsetY = d.startOffsetY + dyScreen / view.scale / uiScale
+    setDimLabelDrag({ segId: d.segId, offsetX, offsetY })
+  }
+
+  function handleDimLabelPointerUp(e: React.PointerEvent<SVGTextElement>) {
+    const d = dimLabelDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    dimLabelDragRef.current = null
+    if (d.moved) {
+      const final = dimLabelDrag && dimLabelDrag.segId === d.segId ? dimLabelDrag : null
+      onMoveDimLabel?.(d.segId, final?.offsetX ?? d.startOffsetX, final?.offsetY ?? d.startOffsetY)
+    }
+    setDimLabelDrag(null)
+  }
+
   // 現合(現物合わせ)区間の補足メモアイコン。常時全文表示すると画面が
   // 煩雑になるため、メモがあるときだけ小さいアイコンを出し、タップした
   // ときだけ内容を確認できるようにする。寸法線が出る側と重ならないよう
@@ -1359,10 +1430,28 @@ export function DrawingCanvas({
               const origGroupCy = (geom.text1Y + geom.text2Y) / 2
               const groupDx = groupResolved ? groupResolved.cx - origGroupCx : 0
               const groupDy = groupResolved ? groupResolved.cy - origGroupCy : 0
-              const line1X = geom.text1X + groupDx
-              const line1Y = geom.text1Y + groupDy
-              const line2X = geom.text2X + groupDx
-              const line2Y = geom.text2Y + groupDy
+              // 自動配置の上に、ユーザーがドラッグで加えた手動オフセットをさらに
+              // 足す(ドラッグ中はプレビュー用stateを、それ以外は確定済みの値を使う)。
+              const dimDragging = dimLabelDrag?.segId === s.id
+              const manualOffsetX =
+                (dimDragging ? dimLabelDrag!.offsetX : (s.dimLabelOffset?.x ?? 0)) * uiScale
+              const manualOffsetY =
+                (dimDragging ? dimLabelDrag!.offsetY : (s.dimLabelOffset?.y ?? 0)) * uiScale
+              const line1X = geom.text1X + groupDx + manualOffsetX
+              const line1Y = geom.text1Y + groupDy + manualOffsetY
+              const line2X = geom.text2X + groupDx + manualOffsetX
+              const line2Y = geom.text2Y + groupDy + manualOffsetY
+              const dimLabelHandlers = onMoveDimLabel
+                ? {
+                    pointerEvents: 'all' as const,
+                    style: { cursor: 'grab' },
+                    onPointerDown: (e: React.PointerEvent<SVGTextElement>) =>
+                      handleDimLabelPointerDown(e, s.id, s),
+                    onPointerMove: handleDimLabelPointerMove,
+                    onPointerUp: handleDimLabelPointerUp,
+                    onPointerCancel: handleDimLabelPointerUp,
+                  }
+                : {}
               // 近接する他区間のラベルと重なるため押し出された場合、文字の位置と
               // 本来の寸法線上の位置が離れてしまい、どちらの配管の数字か分かり
               // づらくなる。一定以上ずれたときだけ、細い引き出し線でつなぐ。
@@ -1417,6 +1506,7 @@ export function DrawingCanvas({
                       y={line1Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
+                      {...dimLabelHandlers}
                     >
                       {genGouLabelText(s.genGouQualifier, s.genGouDimension)}
                     </text>
@@ -1429,6 +1519,7 @@ export function DrawingCanvas({
                     y={line1Y}
                     textAnchor="middle"
                     transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
+                    {...dimLabelHandlers}
                   >
                     {c.mode} {c.center}
                   </text>
@@ -1440,6 +1531,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       (切 {c.cut}
                       {c.socketWeldGapWarning ? '（溶接代不足）' : ''}
@@ -1453,6 +1545,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       加工不可能（丸ニップル使用）
                     </text>
@@ -1464,6 +1557,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       加工不可能（差込み代不足）
                     </text>
@@ -1475,6 +1569,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       {c.reducerH != null
                         ? `レジューサー H=${c.reducerH}（継手直結）`
@@ -1488,6 +1583,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       継手不足
                     </text>

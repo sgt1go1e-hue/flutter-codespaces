@@ -547,10 +547,14 @@ export function PrintIsometric({
               const origGroupCy = (geom.text1Y + geom.text2Y) / 2
               const groupDx = groupResolved ? groupResolved.cx - origGroupCx : 0
               const groupDy = groupResolved ? groupResolved.cy - origGroupCy : 0
-              const line1X = geom.text1X + groupDx
-              const line1Y = geom.text1Y + groupDy
-              const line2X = geom.text2X + groupDx
-              const line2Y = geom.text2Y + groupDy
+              // 画面側でユーザーがドラッグして加えた手動オフセットも、印刷/PDFに
+              // 同じ見た目で反映する(印刷側はuiScale相当が常に1のためそのまま足す)。
+              const manualOffsetX = s.dimLabelOffset?.x ?? 0
+              const manualOffsetY = s.dimLabelOffset?.y ?? 0
+              const line1X = geom.text1X + groupDx + manualOffsetX
+              const line1Y = geom.text1Y + groupDy + manualOffsetY
+              const line2X = geom.text2X + groupDx + manualOffsetX
+              const line2Y = geom.text2Y + groupDy + manualOffsetY
               // 近接する他区間のラベルと重なるため押し出された場合、文字の位置と
               // 本来の寸法線上の位置が離れてしまい、どちらの配管の数字か分かり
               // づらくなる。一定以上ずれたときだけ、細い引き出し線でつなぐ。
