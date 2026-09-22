@@ -86,6 +86,11 @@ import type { Segment } from './types'
 
 // パーツをドロップしたとき、対象セグメントを拾うヒット距離(px)
 const DROP_HIT = 28
+// 配管どうしが交差(視覚的に近接)している箇所でパーツを置こうとしたとき、
+// どちらの配管に対する操作か判別できないほど僅差(px)なら、誤った側へ
+// 黙って置いてしまわないよう確認を挟む。DROP_HIT本体より十分小さい値にして、
+// 通常の(1本だけが近い)配置には影響しないようにする。
+const DROP_AMBIGUOUS_MARGIN = 10
 // 免責事項の版。文面を更新して再同意を求めたい場合はこの数値を上げる。
 const CONSENT_VERSION = 1
 
@@ -1353,16 +1358,43 @@ export default function App() {
   // 完全に共通化し、操作方法によって挙動が変わらないようにする。
   function placePartAtPoint(partId: string, p: Point) {
     if (!canEditStructure) return
+    // 配管どうしが視覚的に交差する箇所では、タップ位置から見て複数の配管が
+    // ほぼ同じ距離になり得る(データ上つながっていない別々の配管でも、画面上は
+    // 同じピクセル付近を通るため)。単純に最短距離の1本を黙って選んでしまうと、
+    // 意図と違う配管にパーツが付いてしまうことがある(現場からの報告で判明)。
+    // そのため、最も近い配管と次に近い配管の差がごく僅かで、かつその2本が
+    // 端点を共有していない(＝データ上つながっていない、たまたま近接しているだけ)
+    // ときは自動で選ばず、ズームしてやり直してもらう。つながっている2本
+    // (角の継手前後など)は、角のすぐ近くへパーツを置く普通の操作なので対象外。
     let best: Segment | null = null
-    let bestDist = DROP_HIT
+    let bestDist = Infinity
+    let second: Segment | null = null
+    let secondDist = Infinity
     for (const s of segments) {
       const d = distanceToSegment(p, s.start, s.end)
-      if (d <= bestDist) {
-        bestDist = d
+      if (d < bestDist) {
+        second = best
+        secondDist = bestDist
         best = s
+        bestDist = d
+      } else if (d < secondDist) {
+        second = s
+        secondDist = d
       }
     }
-    if (!best) return
+    if (!best || bestDist > DROP_HIT) return
+    const connected =
+      second != null &&
+      (samePoint(best.start, second.start) ||
+        samePoint(best.start, second.end) ||
+        samePoint(best.end, second.start) ||
+        samePoint(best.end, second.end))
+    if (second != null && !connected && secondDist - bestDist < DROP_AMBIGUOUS_MARGIN) {
+      window.alert(
+        '近くに配管が複数あり、どちらに置くか判別できませんでした。画面を拡大してから、もう一度お試しください。',
+      )
+      return
+    }
     const part = getPart(partId)
     if (!part) return
     const targetId = best.id
