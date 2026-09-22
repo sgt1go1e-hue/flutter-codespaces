@@ -1302,6 +1302,15 @@ export default function App() {
     )
   }
 
+  // 寸法ラベルの引き出し線(点線)が接続する、寸法線上の位置(along)を
+  // ドラッグして確定する（表示専用。切り寸法等には無関係）。
+  function moveDimAnchor(id: string, along: number) {
+    if (!canEditStructure) return
+    mutateSegments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, dimAnchorAlong: along } : s)),
+    )
+  }
+
   // 現場溶接マークをドラッグして移動したとき、対象点(t位置)からの相対
   // オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
   function moveFieldWeldMark(id: string, markId: string, offsetX: number, offsetY: number) {
@@ -1763,6 +1772,7 @@ export default function App() {
           onToggleFieldFitFlip={canEditStructure ? toggleFieldFitFlip : undefined}
           onMoveFieldWeldMark={canEditStructure ? moveFieldWeldMark : undefined}
           onMoveDimLabel={canEditStructure ? moveDimLabel : undefined}
+          onMoveDimAnchor={canEditStructure ? moveDimAnchor : undefined}
         />
 
         {/* ドラッグ中のパーツ ghost */}

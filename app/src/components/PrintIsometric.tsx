@@ -22,6 +22,7 @@ import {
   chooseDimSide,
   dimExtensionLine,
   dimGeometry,
+  DIM_STANDOFF,
   DIM_THROUGH_STANDOFF,
 } from '../lib/dimensionLine'
 import { computeThroughRuns } from '../lib/throughRun'
@@ -151,7 +152,7 @@ export function PrintIsometric({
           : 11
       const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
       const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-      const geom = dimGeometry(s.start, s.end, side, 1)
+      const geom = dimGeometry(s.start, s.end, side, 1, DIM_STANDOFF, s.dimAnchorAlong ?? 0.5)
       dimArrowObstacles.push(
         { cx: geom.line.x1, cy: geom.line.y1, w: 16, h: 16 },
         { cx: geom.line.x2, cy: geom.line.y2, w: 16, h: 16 },
@@ -539,7 +540,7 @@ export function PrintIsometric({
               const my = s.start.y + (s.end.y - s.start.y) * t
               const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
               const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-              const geom = dimGeometry(s.start, s.end, side, 1)
+              const geom = dimGeometry(s.start, s.end, side, 1, DIM_STANDOFF, s.dimAnchorAlong ?? 0.5)
               const extStart = dimExtensionLine(s.start, side, 1)
               const extEnd = dimExtensionLine(s.end, side, 1)
               const groupResolved = resolvedLabels.get(`dim-group-${s.id}`)

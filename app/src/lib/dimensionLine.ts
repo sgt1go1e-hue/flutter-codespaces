@@ -105,6 +105,13 @@ export function dimGeometry(
   scale: number,
   /** パイプからの距離。通り寸法の外側レーン等に使う（既定=通常の寸法線） */
   standoff: number = DIM_STANDOFF,
+  /**
+   * 寸法線上でのテキストの位置(0=始点側 ... 1=終点側)。既定は中点(0.5)。
+   * 密集した交差点等で既定の中点が悪い位置になる場合に、ユーザーが
+   * ドラッグで指定できるようにするためのもの(呼び出し側がSegmentの
+   * 保存値を渡す)。矢羽根に重ならないよう0.1〜0.9にクランプする。
+   */
+  along: number = 0.5,
 ): DimGeometry {
   const { nx, ny } = side
   const s = standoff * scale
@@ -117,8 +124,9 @@ export function dimGeometry(
   const arrowW = ARROW_WIDTH * scale
   const arrowStart = arrowPoints(p1, { x: ux, y: uy }, arrowLen, arrowW)
   const arrowEnd = arrowPoints(p2, { x: -ux, y: -uy }, arrowLen, arrowW)
-  const mx = (p1.x + p2.x) / 2
-  const my = (p1.y + p2.y) / 2
+  const t = Math.min(0.9, Math.max(0.1, along))
+  const mx = p1.x + t * (p2.x - p1.x)
+  const my = p1.y + t * (p2.y - p1.y)
   const gap1 = TEXT_GAP * scale
   const gap2 = (TEXT_GAP + LINE_STACK) * scale
   const rawDeg = (Math.atan2(uy, ux) * 180) / Math.PI

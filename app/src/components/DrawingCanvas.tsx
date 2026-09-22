@@ -125,6 +125,11 @@ interface Props {
    * 相対オフセット(表示スケール=1のときのpx相当)を確定する（表示専用）。
    */
   onMoveDimLabel?: (segId: string, offsetX: number, offsetY: number) => void
+  /**
+   * 寸法ラベルの引き出し線(点線)が接続する、寸法線上の位置(along、
+   * 0=始点側〜1=終点側)をドラッグで確定する（表示専用）。
+   */
+  onMoveDimAnchor?: (segId: string, along: number) => void
 }
 
 // 「指が動いたかどうか」のごく小さいデッドゾーン(px、画面座標＝ズーム非依存)。
@@ -214,6 +219,7 @@ export function DrawingCanvas({
   onToggleFieldFitFlip,
   onMoveFieldWeldMark,
   onMoveDimLabel,
+  onMoveDimAnchor,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
@@ -297,6 +303,15 @@ export function DrawingCanvas({
     offsetX: number
     offsetY: number
   } | null>(null)
+
+  // 寸法ラベルの引き出し線(点線)が接続する、寸法線上の位置(along)のドラッグ移動用。
+  // ラベル本体のドラッグ(dimLabelDrag)とは別の対象(寸法線上をスライドする点)。
+  const dimAnchorDragRef = useRef<{
+    pointerId: number
+    segId: string
+    moved: boolean
+  } | null>(null)
+  const [dimAnchorDrag, setDimAnchorDrag] = useState<{ segId: string; along: number } | null>(null)
 
   useEffect(() => {
     const el = svgRef.current
@@ -673,7 +688,7 @@ export function DrawingCanvas({
       const fs2 =
         (c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11) *
         uiScale
-      const geom = dimGeometry(s.start, s.end, side, uiScale)
+      const geom = dimGeometry(s.start, s.end, side, uiScale, DIM_STANDOFF, s.dimAnchorAlong ?? 0.5)
       dimArrowObstacles.push(
         { cx: geom.line.x1, cy: geom.line.y1, w: 16 * uiScale, h: 16 * uiScale },
         { cx: geom.line.x2, cy: geom.line.y2, w: 16 * uiScale, h: 16 * uiScale },
@@ -1108,6 +1123,39 @@ export function DrawingCanvas({
     setDimLabelDrag(null)
   }
 
+  // 引き出し線(点線)の、寸法線上の接続位置(along, 0=始点側〜1=終点側)の
+  // ドラッグ移動。タップ/ドラッグ判定はTAP_DEADZONE_PXと同じ考え方だが、
+  // こちらは「動いたかどうか」だけで十分(動いていなければ何もしない。
+  // タップで別の操作に化けるような既存の挙動が無いため)。
+  function handleDimAnchorPointerDown(e: React.PointerEvent<SVGCircleElement>, segId: string) {
+    if (!onMoveDimAnchor) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dimAnchorDragRef.current = { pointerId: e.pointerId, segId, moved: false }
+  }
+
+  function handleDimAnchorPointerMove(e: React.PointerEvent<SVGCircleElement>, s: Segment) {
+    const d = dimAnchorDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    const p = toLocal(e.clientX, e.clientY)
+    const { t } = projectOnSegment(p, s.start, s.end)
+    d.moved = true
+    setDimAnchorDrag({ segId: d.segId, along: t })
+  }
+
+  function handleDimAnchorPointerUp(e: React.PointerEvent<SVGCircleElement>) {
+    const d = dimAnchorDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    dimAnchorDragRef.current = null
+    if (d.moved) {
+      const final = dimAnchorDrag && dimAnchorDrag.segId === d.segId ? dimAnchorDrag : null
+      if (final) onMoveDimAnchor?.(d.segId, final.along)
+    }
+    setDimAnchorDrag(null)
+  }
+
   // 現合(現物合わせ)区間の補足メモアイコン。常時全文表示すると画面が
   // 煩雑になるため、メモがあるときだけ小さいアイコンを出し、タップした
   // ときだけ内容を確認できるようにする。寸法線が出る側と重ならないよう
@@ -1420,7 +1468,11 @@ export function DrawingCanvas({
               }
               const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
               const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-              const geom = dimGeometry(s.start, s.end, side, uiScale)
+              const dimAnchorDragging = dimAnchorDrag?.segId === s.id
+              const dimAnchorAlong = dimAnchorDragging
+                ? dimAnchorDrag!.along
+                : (s.dimAnchorAlong ?? 0.5)
+              const geom = dimGeometry(s.start, s.end, side, uiScale, DIM_STANDOFF, dimAnchorAlong)
               const extStart = dimExtensionLine(s.start, side, uiScale)
               const extEnd = dimExtensionLine(s.end, side, uiScale)
               // 1行目・2行目は常に一体として動かす（groupJobの押し出し量を
@@ -1494,6 +1546,24 @@ export function DrawingCanvas({
                       y1={origAnchorY}
                       x2={resolvedAnchorX}
                       y2={resolvedAnchorY}
+                    />
+                  )}
+                  {/* 引き出し線(点線)が寸法線に接続する位置は、寸法線上を
+                      スライドしてドラッグで動かせる(密集した交差点等で
+                      既定の中点が悪い位置になる場合の逃げ道)。ラベル自体の
+                      ドラッグとは別の、専用の小さな丸ハンドルとして出す。 */}
+                  {onMoveDimAnchor && (leaderNeeded || dimAnchorDragging) && (
+                    <circle
+                      className="dim-anchor-handle"
+                      cx={origAnchorX}
+                      cy={origAnchorY}
+                      r={5 * uiScale}
+                      pointerEvents="all"
+                      style={{ cursor: 'grab' }}
+                      onPointerDown={(e) => handleDimAnchorPointerDown(e, s.id)}
+                      onPointerMove={(e) => handleDimAnchorPointerMove(e, s)}
+                      onPointerUp={handleDimAnchorPointerUp}
+                      onPointerCancel={handleDimAnchorPointerUp}
                     />
                   )}
                   {/* 現合(現物合わせ)区間: 確定寸法として誤読されないよう、通常の
