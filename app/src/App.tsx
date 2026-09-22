@@ -1934,6 +1934,8 @@ export default function App() {
               return folder?.name ?? meta?.name ?? ''
             })()
           }
+          // 印刷/PDFの見出しに出す、この図面自体の名前(図面一覧で付けた名前)。
+          drawingName={drawingIndex.find((d) => d.id === drawingId)?.name}
           // フランジの引きしろ・パッキン厚は切り寸法に織り込み済みなので、
           // 印刷物にも条件として残す（表示用に渡すだけで計算はしない）。
           flangeAllow={defaults.flangeAllow ?? 0}
