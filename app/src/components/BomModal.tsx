@@ -5,7 +5,7 @@ import { chunkSegmentsForPrint, segmentsPerIsoPage } from '../lib/isoPagination'
 import { PrintIsometric } from './PrintIsometric'
 import { OrderDocModal } from './OrderDocModal'
 import { PaywallModal } from './PaywallModal'
-import { isSubscribed } from '../lib/subscription'
+import { hasFullAccess } from '../lib/subscription'
 import type { OrderDocKind, PipeProcurementDefaults } from '../lib/orderDoc'
 import type { Segment } from '../types'
 import type { Effective } from '../lib/inheritance'
@@ -116,7 +116,7 @@ export function BomModal({
   // PDF出力・CSV出力・発注書等は有料機能。未購読なら実行せず、案内画面を出す。
   const [showPaywall, setShowPaywall] = useState(false)
   function requireSubscription(action: () => void) {
-    if (isSubscribed()) {
+    if (hasFullAccess()) {
       action()
     } else {
       setShowPaywall(true)

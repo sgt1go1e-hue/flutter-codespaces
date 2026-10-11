@@ -9,6 +9,8 @@
     "dev": "vite",
     "build": "tsc --noEmit && vite build",
     "build:beta": "tsc --noEmit && vite build --mode beta --outDir dist-beta",
+    "build:capacitor": "tsc --noEmit && vite build --mode capacitor",
+    "sync:mobile": "npm run build:capacitor && cap sync",
     "preview": "vite preview",
     "test:units": "node scripts/test-units.mjs"
   },

@@ -6,6 +6,8 @@ import { DisclaimerModal } from './components/DisclaimerModal'
 import { DailyGreetingModal } from './components/DailyGreetingModal'
 import { BomModal } from './components/BomModal'
 import { CompanyInfoModal } from './components/CompanyInfoModal'
+import { PaywallModal } from './components/PaywallModal'
+import { hasFullAccess } from './lib/subscription'
 import { MenuOrderModal } from './components/MenuOrderModal'
 import { DEFAULT_MENU_ORDER, sanitizeMenuOrder, type MenuItemId } from './lib/menuOrder'
 import { DrawingLauncher } from './components/DrawingLauncher'
@@ -354,6 +356,9 @@ export default function App() {
   const [reviewDisclaimer, setReviewDisclaimer] = useState(false)
   // 自社情報(発注書・見積依頼書の差出人欄)。ホームの設定メニューから編集する。
   const [showCompanyInfo, setShowCompanyInfo] = useState(false)
+  // 職長プラン（購入・確認）画面。ホームの設定メニューからも開けるようにして、
+  // 図面を描かなくても課金導線にたどり着けるようにする（App Store審査対策も兼ねる）。
+  const [showPaywall, setShowPaywall] = useState(false)
   // 日替わり挨拶メッセージ。最後に表示した日付(端末保存)と今日の日付が
   // 違えば、その日まだ見せていないので1回だけ表示する。
   const [lastGreetingDate, setLastGreetingDate] = useLocalStorage(
@@ -655,9 +660,19 @@ export default function App() {
     setScreen(drawingId ? 'drawing' : 'launcher')
   }
 
+  // 無料版で使えるのは「アイソメ図を描く」ことと、クイック計算まで。パーツ配置・
+  // 材料拾い出し・窒素計算・サポート架台図面・PDF/CSV/発注書は、購読済みか
+  // 無料お試し期間中のときだけ使える。それ以外は購入案内を出す。
+  function requirePaid(action: () => void) {
+    if (hasFullAccess()) action()
+    else setShowPaywall(true)
+  }
+
   function openNitrogenCalc() {
-    setEraserMode(false)
-    setScreen('nitrogen')
+    requirePaid(() => {
+      setEraserMode(false)
+      setScreen('nitrogen')
+    })
   }
 
   // 窒素計算を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
@@ -666,8 +681,10 @@ export default function App() {
   }
 
   function openSupportDrawing() {
-    setEraserMode(false)
-    setScreen('support')
+    requirePaid(() => {
+      setEraserMode(false)
+      setScreen('support')
+    })
   }
 
   // サポート架台図面を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
@@ -1414,10 +1431,12 @@ export default function App() {
       <button
         key="bom"
         className="primary"
-        onClick={() => {
-          setEraserMode(false)
-          setShowBom(true)
-        }}
+        onClick={() =>
+          requirePaid(() => {
+            setEraserMode(false)
+            setShowBom(true)
+          })
+        }
         disabled={segments.length === 0}
       >
         集計・拾い出し
@@ -1496,6 +1515,7 @@ export default function App() {
             onOpenDisclaimer={() => setReviewDisclaimer(true)}
             onOpenCompanyInfo={() => setShowCompanyInfo(true)}
             onOpenSettings={openSettings}
+            onOpenPaywall={() => setShowPaywall(true)}
           />
         ) : (
           <DrawingLauncher
@@ -1556,16 +1576,20 @@ export default function App() {
           操作自体は位置に関係なく機能する）。フル編集権限のときだけ表示する。 */}
       {canEditStructure && (
         <PartsPalette
-          onDragStart={(partId, x, y) => {
-            setSelectedPartId(null)
-            setPartDrag({ partId, x, y })
-          }}
+          onDragStart={(partId, x, y) =>
+            requirePaid(() => {
+              setSelectedPartId(null)
+              setPartDrag({ partId, x, y })
+            })
+          }
           draggingId={partDrag?.partId ?? null}
           selectedId={selectedPartId}
-          onSelect={(partId) => {
-            setEraserMode(false)
-            setSelectedPartId((cur) => (cur === partId ? null : partId))
-          }}
+          onSelect={(partId) =>
+            requirePaid(() => {
+              setEraserMode(false)
+              setSelectedPartId((cur) => (cur === partId ? null : partId))
+            })
+          }
           open={partsOpen}
           onToggle={() => setPartsOpen((v) => !v)}
           drawingName={drawingIndex.find((d) => d.id === drawingId)?.name}
@@ -1792,6 +1816,7 @@ export default function App() {
         />
       )}
       {showCompanyInfo && <CompanyInfoModal onClose={() => setShowCompanyInfo(false)} />}
+      {showPaywall && <PaywallModal onClose={() => setShowPaywall(false)} />}
       {/* 日替わり挨拶（初回同意が済んでいる通常画面でのみ、その日1回だけ表示） */}
       {!needConsent && showDailyGreeting && (
         <DailyGreetingModal onClose={closeDailyGreeting} />

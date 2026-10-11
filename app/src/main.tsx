@@ -1,6 +1,7 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import { BetaGate } from './components/BetaGate'
+import { startTrialIfNeeded } from './lib/subscription'
 import './styles.css'
 
 // 起動直後(Reactがまだマウントできていない段階)のクラッシュだけを画面に出す。
@@ -23,6 +24,8 @@ function showFatalError(err: unknown) {
 
 window.addEventListener('error', (e) => showFatalError(e.error ?? e.message))
 window.addEventListener('unhandledrejection', (e) => showFatalError(e.reason))
+
+startTrialIfNeeded()
 
 try {
   createRoot(document.getElementById('root')!).render(

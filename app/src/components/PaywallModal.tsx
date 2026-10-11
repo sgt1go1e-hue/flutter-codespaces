@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import {
   getSubscriptionProduct,
   initSubscriptionStore,
@@ -7,6 +7,8 @@ import {
   onSubscriptionChange,
   purchaseSubscription,
   restorePurchases,
+  TRIAL_DAYS,
+  trialDaysLeft,
 } from '../lib/subscription'
 
 interface Props {
@@ -21,6 +23,9 @@ export function PaywallModal({ onClose }: Props) {
   const [busy, setBusy] = useState<'purchase' | 'restore' | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [ready, setReady] = useState(false)
+  // パーツのタップ等で開いたとき、指を離した直後のclickが暗い背景に当たって
+  // 開いた瞬間に閉じてしまうのを防ぐ(開いてから短時間の背景タップは無視する)。
+  const openedAt = useRef(Date.now())
 
   useEffect(() => {
     const off = onSubscriptionChange(() => setSubscribedState(isSubscribed()))
@@ -43,6 +48,10 @@ export function PaywallModal({ onClose }: Props) {
     product = undefined
   }
   const priceLabel = product?.pricing?.price ?? '月額500円（税込・参考価格）'
+  const titleLabel = product?.title || '職長プラン'
+  const trialLeft = trialDaysLeft()
+  const PRIVACY_URL = 'https://sgt1go1e-hue.github.io/flutter-codespaces/legal/privacy.html'
+  const TERMS_URL = 'https://sgt1go1e-hue.github.io/flutter-codespaces/legal/terms.html'
 
   async function handlePurchase() {
     setError(null)
@@ -69,7 +78,13 @@ export function PaywallModal({ onClose }: Props) {
   }
 
   return (
-    <div className="disclaimer-overlay" onClick={onClose}>
+    <div
+      className="disclaimer-overlay"
+      onClick={() => {
+        if (Date.now() - openedAt.current < 500) return
+        onClose()
+      }}
+    >
       <div className="bom-card" onClick={(e) => e.stopPropagation()}>
         <div className="disclaimer-header">有料機能</div>
         <div className="bom-body">
@@ -83,8 +98,18 @@ export function PaywallModal({ onClose }: Props) {
             </p>
           ) : (
             <>
+              {trialLeft > 0 ? (
+                <p className="panel-hint">
+                  <strong>無料お試し期間中です。あと{trialLeft}日間</strong>
+                  、すべての機能をお使いいただけます（初回起動から{TRIAL_DAYS}日間）。期間が終わると、下の機能は{titleLabel}への加入が必要になります。
+                </p>
+              ) : (
+                <p className="panel-hint">
+                  {TRIAL_DAYS}日間の無料お試し期間は終了しました。
+                </p>
+              )}
               <p className="panel-hint">
-                月額プランに加入すると、次の機能が使えるようになります。
+                <strong>{titleLabel}</strong>に加入すると、次の機能が使えるようになります。
               </p>
               <ul className="panel-hint" style={{ margin: '4px 0 12px', paddingLeft: '1.2em' }}>
                 <li>パーツ（フランジ等）の配置</li>
@@ -93,9 +118,22 @@ export function PaywallModal({ onClose }: Props) {
                 <li>材料拾い出し（BOM）・CSV出力</li>
                 <li>窒素計算</li>
               </ul>
+              {/* サブスクリプションのタイトル・期間・価格・利用規約/プライバシーポリシーへの
+                  機能するリンクは、Appleの審査ガイドライン3.1.2(c)により購入画面内への
+                  明示が必須。ここでまとめて表示する。 */}
               <p className="panel-hint">
+                {titleLabel}／期間：1ヶ月ごと自動更新／
                 <strong>{priceLabel}</strong>
-                （自動更新。いつでもストアの設定から解約できます）
+                （いつでもストアの設定から解約できます）
+              </p>
+              <p className="panel-hint">
+                <a href={TERMS_URL} target="_blank" rel="noreferrer">
+                  利用規約
+                </a>
+                {' ・ '}
+                <a href={PRIVACY_URL} target="_blank" rel="noreferrer">
+                  プライバシーポリシー
+                </a>
               </p>
               {error && <p className="panel-hint dim-cut">{error}</p>}
             </>

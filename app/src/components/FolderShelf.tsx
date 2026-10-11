@@ -24,6 +24,8 @@ interface Props {
   onOpenCompanyInfo: () => void
   /** 「仕様のオンオフ」設定画面を開く。 */
   onOpenSettings: () => void
+  /** 職長プラン（購入・確認）画面を開く。図面を描かなくてもホームから直接たどり着けるようにする。 */
+  onOpenPaywall: () => void
 }
 
 function formatDate(ms: number): string {
@@ -57,6 +59,7 @@ export function FolderShelf({
   onOpenDisclaimer,
   onOpenCompanyInfo,
   onOpenSettings,
+  onOpenPaywall,
 }: Props) {
   const fileInputRef = useRef<HTMLInputElement>(null)
   // 開いているフォルダカードのメニュー(名前を変更/削除)のid。
@@ -167,6 +170,16 @@ export function FolderShelf({
                 }}
               >
                 仕様のオンオフ
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setSettingsOpen(false)
+                  onOpenPaywall()
+                }}
+              >
+                職長プランについて
               </button>
             </div>
           </>
