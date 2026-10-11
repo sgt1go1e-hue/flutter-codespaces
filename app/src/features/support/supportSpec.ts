@@ -60,7 +60,7 @@ export function uboltHoleSpacing(size: string, ubolt: string): number | null {
 }
 
 /** スリーパー（昭和 L-DA+U）の標準保温厚(mm)。 */
-export const SLEEPER_THICKNESSES = [20, 25, 30, 40, 50];
+export const SLEEPER_THICKNESSES = [20, 25, 30, 40, 50, 65];
 
 // 「配管サイズ|保温厚T」ごとの穴々（P寸法・生値）。参照時に偶数へ丸める。
 const SLEEPER_TABLE: Record<string, number> = {
@@ -76,6 +76,10 @@ const SLEEPER_TABLE: Record<string, number> = {
   '125A|25': 203, '125A|30': 213, '125A|40': 233, '125A|50': 253,
   '150A|25': 228, '150A|30': 238, '150A|40': 258, '150A|50': 278,
   '200A|30': 289, '200A|40': 309, '200A|50': 329, // T20/25なし
+  // T65は確実な資料が無いため、25A/40Aのみ「T50の値+32」の簡易換算で暫定登録
+  // （現場での実使用向けの当座の数値。正式な資料が手に入り次第、実測値に
+  // 差し替えること）。
+  '25A|65': 145 + 32, '40A|65': 160 + 32,
 };
 
 /** スリーパーの穴々を引く。未登録なら null。奇数は+1して偶数に丸める。 */

@@ -2,6 +2,7 @@ import { useMemo } from 'react'
 import type { Point, Segment } from '../types'
 import { distance } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
+import { lineColorHex } from '../data/lineColors'
 import {
   ELBOW_MARK_LABELS,
   elbowMarkEndKey,
@@ -22,6 +23,7 @@ import {
   chooseDimSide,
   dimExtensionLine,
   dimGeometry,
+  DIM_STANDOFF,
   DIM_THROUGH_STANDOFF,
 } from '../lib/dimensionLine'
 import { computeThroughRuns } from '../lib/throughRun'
@@ -151,7 +153,15 @@ export function PrintIsometric({
           : 11
       const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
       const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-      const geom = dimGeometry(s.start, s.end, side, 1)
+      const geom = dimGeometry(
+        s.start,
+        s.end,
+        side,
+        1,
+        DIM_STANDOFF,
+        s.dimAnchorAlong ?? 0.5,
+        s.dimLineOffset ?? { x: 0, y: 0 },
+      )
       dimArrowObstacles.push(
         { cx: geom.line.x1, cy: geom.line.y1, w: 16, h: 16 },
         { cx: geom.line.x2, cy: geom.line.y2, w: 16, h: 16 },
@@ -162,21 +172,19 @@ export function PrintIsometric({
       // 軸並行(AABB)サイズで見積もる。
       const box1 = rotatedBoxSize(w1, 16, geom.textRotateDeg)
       const box2 = rotatedBoxSize(w2, 18, geom.textRotateDeg)
+      // 1行目・2行目をまとめた1つの箱として登録する（理由はDrawingCanvas.tsxの
+      // 同箇所のコメント参照。自分自身の2行を誤って重なっていると判定して
+      // 無駄に引き離してしまう問題を避ける）。
+      const left = Math.min(geom.text1X - box1.w / 2, geom.text2X - box2.w / 2)
+      const right = Math.max(geom.text1X + box1.w / 2, geom.text2X + box2.w / 2)
+      const top = Math.min(geom.text1Y - box1.h / 2, geom.text2Y - box2.h / 2)
+      const bottom = Math.max(geom.text1Y + box1.h / 2, geom.text2Y + box2.h / 2)
       jobs.push({
-        key: `dim-line1-${s.id}`,
-        cx: geom.text1X,
-        cy: geom.text1Y,
-        w: box1.w,
-        h: box1.h,
-        pushX: side.nx,
-        pushY: side.ny,
-      })
-      jobs.push({
-        key: `dim-line2-${s.id}`,
-        cx: geom.text2X,
-        cy: geom.text2Y,
-        w: box2.w,
-        h: box2.h,
+        key: `dim-group-${s.id}`,
+        cx: (left + right) / 2,
+        cy: (top + bottom) / 2,
+        w: right - left,
+        h: bottom - top,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -426,8 +434,6 @@ export function PrintIsometric({
     align: 'top' | 'bottom' | undefined,
     largeAtStart: boolean,
   ) {
-    const mx = (s.start.x + s.end.x) / 2
-    const my = (s.start.y + s.end.y) / 2
     const len = distance(s.start, s.end) || 1
     const dx = (s.end.x - s.start.x) / len
     const dy = (s.end.y - s.start.y) / len
@@ -437,16 +443,20 @@ export function PrintIsometric({
     const ny = ux
     const L = 13
     const W = 9
-    const largeCx = mx - ux * L
-    const largeCy = my - uy * L
+    // 大径側の面を必ず実際の継手位置(区間自身の大径側の端点)に一致させる。
+    // 理由はDrawingCanvas.tsxの同関数のコメント参照。
+    const junction = largeAtStart ? s.start : s.end
+    const reach = Math.min(2 * L, len)
+    const largeCx = junction.x
+    const largeCy = junction.y
     const c1 = { x: largeCx + nx * W, y: largeCy + ny * W }
     const c2 = { x: largeCx - nx * W, y: largeCy - ny * W }
-    let apex = { x: mx + ux * L, y: my + uy * L }
+    let apex = { x: junction.x + ux * reach, y: junction.y + uy * reach }
     if (kind === 'eccentric' && align) {
       const cTop = c1.y <= c2.y ? c1 : c2
       const cBot = c1.y <= c2.y ? c2 : c1
       const flush = align === 'bottom' ? cBot : cTop
-      apex = { x: flush.x + ux * 2 * L, y: flush.y + uy * 2 * L }
+      apex = { x: flush.x + ux * reach, y: flush.y + uy * reach }
     }
     return (
       <polygon
@@ -461,7 +471,7 @@ export function PrintIsometric({
       {segments.map((s) => {
         const eff = effectiveById[s.id]
         const resolved = eff?.resolved ?? false
-        const stroke = resolved ? '#0369a1' : '#64748b'
+        const stroke = (s.colorId && lineColorHex(s.colorId)) || (resolved ? '#0369a1' : '#64748b')
         const pieces = breakLine(s.start, s.end, crossoverGaps[s.id] ?? [], CROSS_GAP)
         return (
           <g key={s.id}>
@@ -539,15 +549,30 @@ export function PrintIsometric({
               const my = s.start.y + (s.end.y - s.start.y) * t
               const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
               const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-              const geom = dimGeometry(s.start, s.end, side, 1)
-              const extStart = dimExtensionLine(s.start, side, 1)
-              const extEnd = dimExtensionLine(s.end, side, 1)
-              const line1Resolved = resolvedLabels.get(`dim-line1-${s.id}`)
-              const line1X = line1Resolved?.cx ?? geom.text1X
-              const line1Y = line1Resolved?.cy ?? geom.text1Y
-              const line2Resolved = resolvedLabels.get(`dim-line2-${s.id}`)
-              const line2X = line2Resolved?.cx ?? geom.text2X
-              const line2Y = line2Resolved?.cy ?? geom.text2Y
+              const geom = dimGeometry(
+                s.start,
+                s.end,
+                side,
+                1,
+                DIM_STANDOFF,
+                s.dimAnchorAlong ?? 0.5,
+                s.dimLineOffset ?? { x: 0, y: 0 },
+              )
+              const extStart = dimExtensionLine(s.start, { x: geom.line.x1, y: geom.line.y1 }, 1)
+              const extEnd = dimExtensionLine(s.end, { x: geom.line.x2, y: geom.line.y2 }, 1)
+              const groupResolved = resolvedLabels.get(`dim-group-${s.id}`)
+              const origGroupCx = (geom.text1X + geom.text2X) / 2
+              const origGroupCy = (geom.text1Y + geom.text2Y) / 2
+              const groupDx = groupResolved ? groupResolved.cx - origGroupCx : 0
+              const groupDy = groupResolved ? groupResolved.cy - origGroupCy : 0
+              // 画面側でユーザーがドラッグして加えた手動オフセットも、印刷/PDFに
+              // 同じ見た目で反映する(印刷側はuiScale相当が常に1のためそのまま足す)。
+              const manualOffsetX = s.dimLabelOffset?.x ?? 0
+              const manualOffsetY = s.dimLabelOffset?.y ?? 0
+              const line1X = geom.text1X + groupDx + manualOffsetX
+              const line1Y = geom.text1Y + groupDy + manualOffsetY
+              const line2X = geom.text2X + groupDx + manualOffsetX
+              const line2Y = geom.text2Y + groupDy + manualOffsetY
               // 近接する他区間のラベルと重なるため押し出された場合、文字の位置と
               // 本来の寸法線上の位置が離れてしまい、どちらの配管の数字か分かり
               // づらくなる。一定以上ずれたときだけ、細い引き出し線でつなぐ。
@@ -712,8 +737,8 @@ export function PrintIsometric({
         )
         const side = chooseDimSide(first.start, first.end, markPos ?? undefined)
         const g = dimGeometry(run.start, run.end, side, 1, DIM_THROUGH_STANDOFF)
-        const e1 = dimExtensionLine(run.start, side, 1, DIM_THROUGH_STANDOFF)
-        const e2 = dimExtensionLine(run.end, side, 1, DIM_THROUGH_STANDOFF)
+        const e1 = dimExtensionLine(run.start, { x: g.line.x1, y: g.line.y1 }, 1)
+        const e2 = dimExtensionLine(run.end, { x: g.line.x2, y: g.line.y2 }, 1)
         return (
           <g key={`through-${run.ids[0]}`} className="dim-group">
             <line className="dim-ext-line" x1={e1.x1} y1={e1.y1} x2={e1.x2} y2={e1.y2} />

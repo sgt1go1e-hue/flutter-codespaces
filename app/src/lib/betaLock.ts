@@ -9,7 +9,7 @@
 // 合言葉(パスワード)による認証も撤廃し、期限日前ならURLを開くだけで使える。
 
 /** 期限日の既定値(JSTの日付)。ビルド時に VITE_BETA_END_DATE で上書きできる。 */
-export const DEFAULT_BETA_END_DATE = '2026-09-15'
+export const DEFAULT_BETA_END_DATE = '2026-10-01'
 
 export function isBetaLockEnabled(): boolean {
   return import.meta.env.VITE_BETA_LOCK === 'true'

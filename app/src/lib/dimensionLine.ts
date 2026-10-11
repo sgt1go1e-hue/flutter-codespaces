@@ -105,11 +105,29 @@ export function dimGeometry(
   scale: number,
   /** パイプからの距離。通り寸法の外側レーン等に使う（既定=通常の寸法線） */
   standoff: number = DIM_STANDOFF,
+  /**
+   * 寸法線上でのテキストの位置(0=始点側 ... 1=終点側)。既定は中点(0.5)。
+   * 密集した交差点等で既定の中点が悪い位置になる場合に、ユーザーが
+   * ドラッグで指定できるようにするためのもの(呼び出し側がSegmentの
+   * 保存値を渡す)。矢羽根に重ならないよう0.1〜0.9にクランプする。
+   */
+  along: number = 0.5,
+  /**
+   * 寸法線(矢羽根を含む)全体を、標準の位置からさらにずらす手動オフセット
+   * (baseline=scale1のときのpx相当。呼び出し側がSegmentの保存値を渡す)。
+   * 密集した交差点等で、測っている配管のすぐ近くでは矢羽根がどの配管の
+   *ものか分かりにくいとき、寸法線ごとわかりやすい場所へ引き離すためのもの。
+   * パイプ端点からの寸法補助線(dimExtensionLine)は、このズレた位置まで
+   * 届くよう呼び出し側で実際のline座標を使う(斜めに伸びることがある)。
+   */
+  lineOffset: Point = { x: 0, y: 0 },
 ): DimGeometry {
   const { nx, ny } = side
   const s = standoff * scale
-  const p1 = { x: start.x + nx * s, y: start.y + ny * s }
-  const p2 = { x: end.x + nx * s, y: end.y + ny * s }
+  const offX = lineOffset.x * scale
+  const offY = lineOffset.y * scale
+  const p1 = { x: start.x + nx * s + offX, y: start.y + ny * s + offY }
+  const p2 = { x: end.x + nx * s + offX, y: end.y + ny * s + offY }
   const len = Math.hypot(p2.x - p1.x, p2.y - p1.y) || 1
   const ux = (p2.x - p1.x) / len
   const uy = (p2.y - p1.y) / len
@@ -117,8 +135,9 @@ export function dimGeometry(
   const arrowW = ARROW_WIDTH * scale
   const arrowStart = arrowPoints(p1, { x: ux, y: uy }, arrowLen, arrowW)
   const arrowEnd = arrowPoints(p2, { x: -ux, y: -uy }, arrowLen, arrowW)
-  const mx = (p1.x + p2.x) / 2
-  const my = (p1.y + p2.y) / 2
+  const t = Math.min(0.9, Math.max(0.1, along))
+  const mx = p1.x + t * (p2.x - p1.x)
+  const my = p1.y + t * (p2.y - p1.y)
   const gap1 = TEXT_GAP * scale
   const gap2 = (TEXT_GAP + LINE_STACK) * scale
   const rawDeg = (Math.atan2(uy, ux) * 180) / Math.PI
@@ -134,19 +153,28 @@ export function dimGeometry(
   }
 }
 
-/** パイプ端点から、寸法線(dim standoff)まで伸びる寸法補助線。 */
+/**
+ * パイプ端点から、実際の寸法線の端点(target。dimGeometryが返すline.x1/y1や
+ * x2/y2をそのまま渡す)まで伸びる寸法補助線。
+ * 以前はside(パイプに垂直な向き)+standoffから機械的に計算していたが、
+ * 寸法線ごと手動オフセットで動かせるようにしたため、実際の寸法線の位置
+ * (target)を直接受け取り、そこへ向かう向きで補助線を引く形に変更した
+ * (寸法線が引き離されているときは斜めに伸びる)。
+ */
 export function dimExtensionLine(
   point: Point,
-  side: DimSide,
+  target: Point,
   scale: number,
-  standoff: number = DIM_STANDOFF,
 ): { x1: number; y1: number; x2: number; y2: number } {
+  const len = Math.hypot(target.x - point.x, target.y - point.y) || 1
+  const ux = (target.x - point.x) / len
+  const uy = (target.y - point.y) / len
   const gap = EXT_LINE_GAP * scale
-  const to = (standoff + EXT_LINE_OVERSHOOT) * scale
+  const overshoot = EXT_LINE_OVERSHOOT * scale
   return {
-    x1: point.x + side.nx * gap,
-    y1: point.y + side.ny * gap,
-    x2: point.x + side.nx * to,
-    y2: point.y + side.ny * to,
+    x1: point.x + ux * gap,
+    y1: point.y + uy * gap,
+    x2: target.x + ux * overshoot,
+    y2: target.y + uy * overshoot,
   }
 }

@@ -31,6 +31,8 @@ interface Props {
   procurementDefaults?: PipeProcurementDefaults
   /** 発注書・見積依頼書の「現場名」の初期値(この図面が入っているフォルダ名)。 */
   siteName?: string
+  /** この図面自体の名前(図面一覧で付けた名前)。印刷/PDFの見出しに表示する。 */
+  drawingName?: string
   /**
    * フランジの引きしろ(mm)。切り寸法の計算で既にフランジ端から控除されている
    * 値をそのまま受け取り、印刷物に条件として明記するためだけに使う
@@ -73,6 +75,7 @@ export function BomModal({
   onRenumber,
   procurementDefaults,
   siteName = '',
+  drawingName,
   flangeAllow = 0,
   gasketMm = 0,
   onClose,
@@ -441,6 +444,7 @@ export function BomModal({
         </div>
         <div className="preview-page">
         <h1>配管アイソメ図 材料集計表</h1>
+        {drawingName && <p className="print-meta print-drawing-name">図面名: {drawingName}</p>}
         <p className="print-meta">作成日: {dateStr}</p>
         {/* フランジの引きしろ・パッキン厚は切り寸法に織り込み済みなので、
             加工側が条件を確認できるよう印刷物にも必ず残す。 */}
@@ -473,6 +477,7 @@ export function BomModal({
                     <h2>
                       アイソメ図
                       {isoPages.length > 1 ? `（${i + 1}/${isoPages.length}）` : ''}
+                      {drawingName ? ` - ${drawingName}` : ''}
                     </h2>
                     <PrintIsometric
                       segments={pageSegments}

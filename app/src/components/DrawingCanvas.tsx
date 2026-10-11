@@ -120,6 +120,21 @@ interface Props {
   onMoveFieldWeldMark?: (segId: string, markId: string, offsetX: number, offsetY: number) => void
   /** 現場合わせ区間の端点三角をタップしたとき、その向きを反転する（表示専用トグル）。 */
   onToggleFieldFitFlip?: (segId: string, at: 'start' | 'end') => void
+  /**
+   * 寸法ラベル(芯々/切り寸法)をドラッグして移動したとき、自動配置位置からの
+   * 相対オフセット(表示スケール=1のときのpx相当)を確定する（表示専用）。
+   */
+  onMoveDimLabel?: (segId: string, offsetX: number, offsetY: number) => void
+  /**
+   * 寸法ラベルの引き出し線(点線)が接続する、寸法線上の位置(along、
+   * 0=始点側〜1=終点側)をドラッグで確定する（表示専用）。
+   */
+  onMoveDimAnchor?: (segId: string, along: number) => void
+  /**
+   * 寸法線(矢羽根を含む)全体をドラッグして移動したとき、標準位置からの
+   * 相対オフセット(表示スケール=1のときのpx相当)を確定する（表示専用）。
+   */
+  onMoveDimLine?: (segId: string, offsetX: number, offsetY: number) => void
 }
 
 // 「指が動いたかどうか」のごく小さいデッドゾーン(px、画面座標＝ズーム非依存)。
@@ -208,6 +223,9 @@ export function DrawingCanvas({
   onDeleteFieldWeldMark,
   onToggleFieldFitFlip,
   onMoveFieldWeldMark,
+  onMoveDimLabel,
+  onMoveDimAnchor,
+  onMoveDimLine,
 }: Props) {
   const svgRef = useRef<SVGSVGElement>(null)
   const [preview, setPreview] = useState<{ start: Point; end: Point } | null>(
@@ -270,6 +288,50 @@ export function DrawingCanvas({
   const [fieldWeldDrag, setFieldWeldDrag] = useState<{
     segId: string
     markId: string
+    offsetX: number
+    offsetY: number
+  } | null>(null)
+
+  // 寸法ラベル(芯々/切り寸法の2段表記)のドラッグ移動用。fieldWeldDragと
+  // 全く同じ考え方(離すまでの移動量でタップ/ドラッグを判定し、移動中は
+  // stateでその場でプレビュー、離した時点で確定してApp側へ相対オフセットを渡す)。
+  const dimLabelDragRef = useRef<{
+    pointerId: number
+    segId: string
+    startClientX: number
+    startClientY: number
+    startOffsetX: number
+    startOffsetY: number
+    moved: boolean
+  } | null>(null)
+  const [dimLabelDrag, setDimLabelDrag] = useState<{
+    segId: string
+    offsetX: number
+    offsetY: number
+  } | null>(null)
+
+  // 寸法ラベルの引き出し線(点線)が接続する、寸法線上の位置(along)のドラッグ移動用。
+  // ラベル本体のドラッグ(dimLabelDrag)とは別の対象(寸法線上をスライドする点)。
+  const dimAnchorDragRef = useRef<{
+    pointerId: number
+    segId: string
+    moved: boolean
+  } | null>(null)
+  const [dimAnchorDrag, setDimAnchorDrag] = useState<{ segId: string; along: number } | null>(null)
+
+  // 寸法線(矢羽根を含む)全体のドラッグ移動用。dimLabelDragと全く同じ考え方
+  // (2Dの相対オフセットを対象にした平行移動)。
+  const dimLineDragRef = useRef<{
+    pointerId: number
+    segId: string
+    startClientX: number
+    startClientY: number
+    startOffsetX: number
+    startOffsetY: number
+    moved: boolean
+  } | null>(null)
+  const [dimLineDrag, setDimLineDrag] = useState<{
+    segId: string
     offsetX: number
     offsetY: number
   } | null>(null)
@@ -649,7 +711,15 @@ export function DrawingCanvas({
       const fs2 =
         (c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11) *
         uiScale
-      const geom = dimGeometry(s.start, s.end, side, uiScale)
+      const geom = dimGeometry(
+        s.start,
+        s.end,
+        side,
+        uiScale,
+        DIM_STANDOFF,
+        s.dimAnchorAlong ?? 0.5,
+        s.dimLineOffset ?? { x: 0, y: 0 },
+      )
       dimArrowObstacles.push(
         { cx: geom.line.x1, cy: geom.line.y1, w: 16 * uiScale, h: 16 * uiScale },
         { cx: geom.line.x2, cy: geom.line.y2, w: 16 * uiScale, h: 16 * uiScale },
@@ -661,21 +731,21 @@ export function DrawingCanvas({
       // 軸並行(AABB)サイズで見積もる。1本の線に2行を積んでいるため回転角は共通。
       const box1 = rotatedBoxSize(w1, lineBoxH, geom.textRotateDeg)
       const box2 = rotatedBoxSize(w2, lineBoxH, geom.textRotateDeg)
+      // 1行目・2行目は必ず一定間隔で連動して動く1組のラベルなので、重なり回避の
+      // 対象としては2行分をまとめた1つの箱として登録する（別々のジョブのまま
+      // 渡すと、回転した箱どうしのAABB判定が実際より過大評価され、自分自身の
+      // 1行目と2行目を「重なっている」と誤判定して無駄に引き離してしまい、
+      // その結果どちらかが別区間のラベルの上に飛んでいってしまうことがあった）。
+      const left = Math.min(geom.text1X - box1.w / 2, geom.text2X - box2.w / 2)
+      const right = Math.max(geom.text1X + box1.w / 2, geom.text2X + box2.w / 2)
+      const top = Math.min(geom.text1Y - box1.h / 2, geom.text2Y - box2.h / 2)
+      const bottom = Math.max(geom.text1Y + box1.h / 2, geom.text2Y + box2.h / 2)
       jobs.push({
-        key: `dim-line1-${s.id}`,
-        cx: geom.text1X,
-        cy: geom.text1Y,
-        w: box1.w,
-        h: box1.h,
-        pushX: side.nx,
-        pushY: side.ny,
-      })
-      jobs.push({
-        key: `dim-line2-${s.id}`,
-        cx: geom.text2X,
-        cy: geom.text2Y,
-        w: box2.w,
-        h: box2.h,
+        key: `dim-group-${s.id}`,
+        cx: (left + right) / 2,
+        cy: (top + bottom) / 2,
+        w: right - left,
+        h: bottom - top,
         pushX: side.nx,
         pushY: side.ny,
       })
@@ -1037,6 +1107,132 @@ export function DrawingCanvas({
     setFieldWeldDrag(null)
   }
 
+  // 寸法ラベル(芯々/切り寸法)のドラッグ移動。タップ(=何もしない。選択は線の
+  // タップで行う)とドラッグ(=移動)を移動量で判定する点はfieldWeldと同じ。
+  // わずかに動かしただけ(タップ扱い)なら何もしない(既存のクリック挙動を壊さない)。
+  function handleDimLabelPointerDown(e: React.PointerEvent<SVGTextElement>, segId: string, s: Segment) {
+    if (!onMoveDimLabel) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const startOffsetX = s.dimLabelOffset?.x ?? 0
+    const startOffsetY = s.dimLabelOffset?.y ?? 0
+    dimLabelDragRef.current = {
+      pointerId: e.pointerId,
+      segId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startOffsetX,
+      startOffsetY,
+      moved: false,
+    }
+    setDimLabelDrag({ segId, offsetX: startOffsetX, offsetY: startOffsetY })
+  }
+
+  function handleDimLabelPointerMove(e: React.PointerEvent<SVGTextElement>) {
+    const d = dimLabelDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    const dxScreen = e.clientX - d.startClientX
+    const dyScreen = e.clientY - d.startClientY
+    if (Math.abs(dxScreen) > TAP_DEADZONE_PX || Math.abs(dyScreen) > TAP_DEADZONE_PX) {
+      d.moved = true
+    }
+    const offsetX = d.startOffsetX + dxScreen / view.scale / uiScale
+    const offsetY = d.startOffsetY + dyScreen / view.scale / uiScale
+    setDimLabelDrag({ segId: d.segId, offsetX, offsetY })
+  }
+
+  function handleDimLabelPointerUp(e: React.PointerEvent<SVGTextElement>) {
+    const d = dimLabelDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    dimLabelDragRef.current = null
+    if (d.moved) {
+      const final = dimLabelDrag && dimLabelDrag.segId === d.segId ? dimLabelDrag : null
+      onMoveDimLabel?.(d.segId, final?.offsetX ?? d.startOffsetX, final?.offsetY ?? d.startOffsetY)
+    }
+    setDimLabelDrag(null)
+  }
+
+  // 引き出し線(点線)の、寸法線上の接続位置(along, 0=始点側〜1=終点側)の
+  // ドラッグ移動。タップ/ドラッグ判定はTAP_DEADZONE_PXと同じ考え方だが、
+  // こちらは「動いたかどうか」だけで十分(動いていなければ何もしない。
+  // タップで別の操作に化けるような既存の挙動が無いため)。
+  function handleDimAnchorPointerDown(e: React.PointerEvent<SVGCircleElement>, segId: string) {
+    if (!onMoveDimAnchor) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    dimAnchorDragRef.current = { pointerId: e.pointerId, segId, moved: false }
+  }
+
+  function handleDimAnchorPointerMove(e: React.PointerEvent<SVGCircleElement>, s: Segment) {
+    const d = dimAnchorDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    const p = toLocal(e.clientX, e.clientY)
+    const { t } = projectOnSegment(p, s.start, s.end)
+    d.moved = true
+    setDimAnchorDrag({ segId: d.segId, along: t })
+  }
+
+  function handleDimAnchorPointerUp(e: React.PointerEvent<SVGCircleElement>) {
+    const d = dimAnchorDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    dimAnchorDragRef.current = null
+    if (d.moved) {
+      const final = dimAnchorDrag && dimAnchorDrag.segId === d.segId ? dimAnchorDrag : null
+      if (final) onMoveDimAnchor?.(d.segId, final.along)
+    }
+    setDimAnchorDrag(null)
+  }
+
+  // 寸法線(矢羽根を含む)全体のドラッグ移動。dimLabelのドラッグ処理と
+  // 全く同じ考え方(2Dの相対オフセットの平行移動)。
+  function handleDimLinePointerDown(e: React.PointerEvent<SVGLineElement>, segId: string, s: Segment) {
+    if (!onMoveDimLine) return
+    e.stopPropagation()
+    e.currentTarget.setPointerCapture(e.pointerId)
+    const startOffsetX = s.dimLineOffset?.x ?? 0
+    const startOffsetY = s.dimLineOffset?.y ?? 0
+    dimLineDragRef.current = {
+      pointerId: e.pointerId,
+      segId,
+      startClientX: e.clientX,
+      startClientY: e.clientY,
+      startOffsetX,
+      startOffsetY,
+      moved: false,
+    }
+    setDimLineDrag({ segId, offsetX: startOffsetX, offsetY: startOffsetY })
+  }
+
+  function handleDimLinePointerMove(e: React.PointerEvent<SVGLineElement>) {
+    const d = dimLineDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    const dxScreen = e.clientX - d.startClientX
+    const dyScreen = e.clientY - d.startClientY
+    if (Math.abs(dxScreen) > TAP_DEADZONE_PX || Math.abs(dyScreen) > TAP_DEADZONE_PX) {
+      d.moved = true
+    }
+    const offsetX = d.startOffsetX + dxScreen / view.scale / uiScale
+    const offsetY = d.startOffsetY + dyScreen / view.scale / uiScale
+    setDimLineDrag({ segId: d.segId, offsetX, offsetY })
+  }
+
+  function handleDimLinePointerUp(e: React.PointerEvent<SVGLineElement>) {
+    const d = dimLineDragRef.current
+    if (!d || e.pointerId !== d.pointerId) return
+    e.stopPropagation()
+    dimLineDragRef.current = null
+    if (d.moved) {
+      const final = dimLineDrag && dimLineDrag.segId === d.segId ? dimLineDrag : null
+      onMoveDimLine?.(d.segId, final?.offsetX ?? d.startOffsetX, final?.offsetY ?? d.startOffsetY)
+    }
+    setDimLineDrag(null)
+  }
+
   // 現合(現物合わせ)区間の補足メモアイコン。常時全文表示すると画面が
   // 煩雑になるため、メモがあるときだけ小さいアイコンを出し、タップした
   // ときだけ内容を確認できるようにする。寸法線が出る側と重ならないよう
@@ -1123,8 +1319,6 @@ export function DrawingCanvas({
     align: 'top' | 'bottom' | undefined,
     largeAtStart: boolean,
   ) {
-    const mx = (s.start.x + s.end.x) / 2
-    const my = (s.start.y + s.end.y) / 2
     const len = distance(s.start, s.end) || 1
     const dx = (s.end.x - s.start.x) / len
     const dy = (s.end.y - s.start.y) / len
@@ -1135,17 +1329,24 @@ export function DrawingCanvas({
     const ny = ux
     const L = 13 // 大径〜小径方向の半長
     const W = 9 // 底辺の半幅
-    const largeCx = mx - ux * L
-    const largeCy = my - uy * L
+    // 大径側の面は、必ずこの区間(レジューサー本体)自身の大径側の端点(＝実際の
+    // 継手位置)に一致させる。以前は区間の中点を基準に±Lへ配置していたため、
+    // タップ位置が区間の端(既存のノード)に近く、反対側が長い区間になった
+    // 場合に、記号が実際の継手位置から大きく離れた場所に表示されてしまう
+    // 不具合があった(区間が短いときだけ偶然ズレが目立たなかった)。
+    const junction = largeAtStart ? s.start : s.end
+    const reach = Math.min(2 * L, len)
+    const largeCx = junction.x
+    const largeCy = junction.y
     const c1 = { x: largeCx + nx * W, y: largeCy + ny * W }
     const c2 = { x: largeCx - nx * W, y: largeCy - ny * W }
-    let apex = { x: mx + ux * L, y: my + uy * L } // 小径側の中心（同心の頂点）
+    let apex = { x: junction.x + ux * reach, y: junction.y + uy * reach } // 小径側の中心（同心の頂点）
     if (kind === 'eccentric' && align) {
       // 画面上下で「面が揃う側」を決め、その角から頂点を配管方向へ伸ばす（斜辺=反対側）
       const cTop = c1.y <= c2.y ? c1 : c2
       const cBot = c1.y <= c2.y ? c2 : c1
       const flush = align === 'bottom' ? cBot : cTop
-      apex = { x: flush.x + ux * 2 * L, y: flush.y + uy * 2 * L }
+      apex = { x: flush.x + ux * reach, y: flush.y + uy * reach }
     }
     return (
       <polygon
@@ -1344,15 +1545,54 @@ export function DrawingCanvas({
               }
               const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
               const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
-              const geom = dimGeometry(s.start, s.end, side, uiScale)
-              const extStart = dimExtensionLine(s.start, side, uiScale)
-              const extEnd = dimExtensionLine(s.end, side, uiScale)
-              const line1Resolved = resolvedLabels.get(`dim-line1-${s.id}`)
-              const line1X = line1Resolved?.cx ?? geom.text1X
-              const line1Y = line1Resolved?.cy ?? geom.text1Y
-              const line2Resolved = resolvedLabels.get(`dim-line2-${s.id}`)
-              const line2X = line2Resolved?.cx ?? geom.text2X
-              const line2Y = line2Resolved?.cy ?? geom.text2Y
+              const dimAnchorDragging = dimAnchorDrag?.segId === s.id
+              const dimAnchorAlong = dimAnchorDragging
+                ? dimAnchorDrag!.along
+                : (s.dimAnchorAlong ?? 0.5)
+              const dimLineDragging = dimLineDrag?.segId === s.id
+              const dimLineOffset = dimLineDragging
+                ? { x: dimLineDrag!.offsetX, y: dimLineDrag!.offsetY }
+                : (s.dimLineOffset ?? { x: 0, y: 0 })
+              const geom = dimGeometry(
+                s.start,
+                s.end,
+                side,
+                uiScale,
+                DIM_STANDOFF,
+                dimAnchorAlong,
+                dimLineOffset,
+              )
+              const extStart = dimExtensionLine(s.start, { x: geom.line.x1, y: geom.line.y1 }, uiScale)
+              const extEnd = dimExtensionLine(s.end, { x: geom.line.x2, y: geom.line.y2 }, uiScale)
+              // 1行目・2行目は常に一体として動かす（groupJobの押し出し量を
+              // そのまま両方の行に適用し、行どうしの間隔は常に元のまま保つ）。
+              const groupResolved = resolvedLabels.get(`dim-group-${s.id}`)
+              const origGroupCx = (geom.text1X + geom.text2X) / 2
+              const origGroupCy = (geom.text1Y + geom.text2Y) / 2
+              const groupDx = groupResolved ? groupResolved.cx - origGroupCx : 0
+              const groupDy = groupResolved ? groupResolved.cy - origGroupCy : 0
+              // 自動配置の上に、ユーザーがドラッグで加えた手動オフセットをさらに
+              // 足す(ドラッグ中はプレビュー用stateを、それ以外は確定済みの値を使う)。
+              const dimDragging = dimLabelDrag?.segId === s.id
+              const manualOffsetX =
+                (dimDragging ? dimLabelDrag!.offsetX : (s.dimLabelOffset?.x ?? 0)) * uiScale
+              const manualOffsetY =
+                (dimDragging ? dimLabelDrag!.offsetY : (s.dimLabelOffset?.y ?? 0)) * uiScale
+              const line1X = geom.text1X + groupDx + manualOffsetX
+              const line1Y = geom.text1Y + groupDy + manualOffsetY
+              const line2X = geom.text2X + groupDx + manualOffsetX
+              const line2Y = geom.text2Y + groupDy + manualOffsetY
+              const dimLabelHandlers = onMoveDimLabel
+                ? {
+                    pointerEvents: 'all' as const,
+                    style: { cursor: 'grab' },
+                    onPointerDown: (e: React.PointerEvent<SVGTextElement>) =>
+                      handleDimLabelPointerDown(e, s.id, s),
+                    onPointerMove: handleDimLabelPointerMove,
+                    onPointerUp: handleDimLabelPointerUp,
+                    onPointerCancel: handleDimLabelPointerUp,
+                  }
+                : {}
               // 近接する他区間のラベルと重なるため押し出された場合、文字の位置と
               // 本来の寸法線上の位置が離れてしまい、どちらの配管の数字か分かり
               // づらくなる。一定以上ずれたときだけ、細い引き出し線でつなぐ。
@@ -1386,6 +1626,25 @@ export function DrawingCanvas({
                     x2={geom.line.x2}
                     y2={geom.line.y2}
                   />
+                  {/* 寸法線(矢羽根含む)全体をドラッグで動かすための、見えない
+                      太い当たり判定線。細い実線のままだと指でつかみにくいため。 */}
+                  {onMoveDimLine && (
+                    <line
+                      className="dim-line-hit"
+                      x1={geom.line.x1}
+                      y1={geom.line.y1}
+                      x2={geom.line.x2}
+                      y2={geom.line.y2}
+                      stroke="transparent"
+                      strokeWidth={16 * uiScale}
+                      pointerEvents="stroke"
+                      style={{ cursor: 'grab' }}
+                      onPointerDown={(e) => handleDimLinePointerDown(e, s.id, s)}
+                      onPointerMove={handleDimLinePointerMove}
+                      onPointerUp={handleDimLinePointerUp}
+                      onPointerCancel={handleDimLinePointerUp}
+                    />
+                  )}
                   <polygon className="dim-arrow" points={geom.arrowStart} />
                   <polygon className="dim-arrow" points={geom.arrowEnd} />
                   {leaderNeeded && (
@@ -1395,6 +1654,24 @@ export function DrawingCanvas({
                       y1={origAnchorY}
                       x2={resolvedAnchorX}
                       y2={resolvedAnchorY}
+                    />
+                  )}
+                  {/* 引き出し線(点線)が寸法線に接続する位置は、寸法線上を
+                      スライドしてドラッグで動かせる(密集した交差点等で
+                      既定の中点が悪い位置になる場合の逃げ道)。ラベル自体の
+                      ドラッグとは別の、専用の小さな丸ハンドルとして出す。 */}
+                  {onMoveDimAnchor && (leaderNeeded || dimAnchorDragging) && (
+                    <circle
+                      className="dim-anchor-handle"
+                      cx={origAnchorX}
+                      cy={origAnchorY}
+                      r={5 * uiScale}
+                      pointerEvents="all"
+                      style={{ cursor: 'grab' }}
+                      onPointerDown={(e) => handleDimAnchorPointerDown(e, s.id)}
+                      onPointerMove={(e) => handleDimAnchorPointerMove(e, s)}
+                      onPointerUp={handleDimAnchorPointerUp}
+                      onPointerCancel={handleDimAnchorPointerUp}
                     />
                   )}
                   {/* 現合(現物合わせ)区間: 確定寸法として誤読されないよう、通常の
@@ -1407,6 +1684,7 @@ export function DrawingCanvas({
                       y={line1Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
+                      {...dimLabelHandlers}
                     >
                       {genGouLabelText(s.genGouQualifier, s.genGouDimension)}
                     </text>
@@ -1419,6 +1697,7 @@ export function DrawingCanvas({
                     y={line1Y}
                     textAnchor="middle"
                     transform={`rotate(${geom.textRotateDeg} ${line1X} ${line1Y})`}
+                    {...dimLabelHandlers}
                   >
                     {c.mode} {c.center}
                   </text>
@@ -1430,6 +1709,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       (切 {c.cut}
                       {c.socketWeldGapWarning ? '（溶接代不足）' : ''}
@@ -1443,6 +1723,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       加工不可能（丸ニップル使用）
                     </text>
@@ -1454,6 +1735,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       加工不可能（差込み代不足）
                     </text>
@@ -1465,6 +1747,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       {c.reducerH != null
                         ? `レジューサー H=${c.reducerH}（継手直結）`
@@ -1478,6 +1761,7 @@ export function DrawingCanvas({
                       y={line2Y}
                       textAnchor="middle"
                       transform={`rotate(${geom.textRotateDeg} ${line2X} ${line2Y})`}
+                      {...dimLabelHandlers}
                     >
                       継手不足
                     </text>
@@ -1501,8 +1785,8 @@ export function DrawingCanvas({
         const markPos = nearestElbow45Mark(elbow45Marks, (run.start.x + run.end.x) / 2, (run.start.y + run.end.y) / 2)
         const side = chooseDimSide(first.start, first.end, markPos ?? undefined)
         const g = dimGeometry(run.start, run.end, side, uiScale, DIM_THROUGH_STANDOFF)
-        const e1 = dimExtensionLine(run.start, side, uiScale, DIM_THROUGH_STANDOFF)
-        const e2 = dimExtensionLine(run.end, side, uiScale, DIM_THROUGH_STANDOFF)
+        const e1 = dimExtensionLine(run.start, { x: g.line.x1, y: g.line.y1 }, uiScale)
+        const e2 = dimExtensionLine(run.end, { x: g.line.x2, y: g.line.y2 }, uiScale)
         return (
           <g key={`through-${run.ids[0]}`} className="dim-group" pointerEvents="none">
             <line className="dim-ext-line" x1={e1.x1} y1={e1.y1} x2={e1.x2} y2={e1.y2} />

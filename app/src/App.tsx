@@ -46,6 +46,17 @@ import {
 import { FolderShelf } from './components/FolderShelf'
 import { SettingsPage } from './components/SettingsPage'
 import {
+  type SupportDoc,
+  makeSupportDocId,
+  loadSupportIndex,
+  saveSupportIndex,
+  loadSupportSheet,
+  saveSupportSheet,
+  deleteSupportSheet,
+} from './lib/supportStore'
+import type { HangerDesign } from './features/support/hangerDesign'
+
+import {
   DEFAULT_ENABLED_FEATURES,
   sanitizeEnabledFeatures,
   type EnabledFeatures,
@@ -77,6 +88,11 @@ import type { Segment } from './types'
 
 // パーツをドロップしたとき、対象セグメントを拾うヒット距離(px)
 const DROP_HIT = 28
+// 配管どうしが交差(視覚的に近接)している箇所でパーツを置こうとしたとき、
+// どちらの配管に対する操作か判別できないほど僅差(px)なら、誤った側へ
+// 黙って置いてしまわないよう確認を挟む。DROP_HIT本体より十分小さい値にして、
+// 通常の(1本だけが近い)配置には影響しないようにする。
+const DROP_AMBIGUOUS_MARGIN = 10
 // 免責事項の版。文面を更新して再同意を求めたい場合はこの数値を上げる。
 const CONSENT_VERSION = 1
 
@@ -305,6 +321,10 @@ export default function App() {
   const [homeView, setHomeView] = useState<'shelf' | { folderId: string | null }>('shelf')
   const [drawingId, setDrawingId] = useState<string | null>(null)
   const [segments, setSegments] = useState<Segment[]>([])
+  // サポート架台図面(複数ファイル管理。図面と同じ現場・案件フォルダを共用する)。
+  const [supportIndex, setSupportIndex] = useState<SupportDoc[]>(() => loadSupportIndex())
+  const [supportDocId, setSupportDocId] = useState<string | null>(null)
+  const [supportSheet, setSupportSheet] = useState<HangerDesign[]>([])
   const [selectedId, setSelectedId] = useState<string | null>(null)
   // 配管ライン色分け(系統)の色↔系統名対応表。今開いている図面のもの。
   // 図面が自分自身の対応表をまだ一度も保存していなければ、所属フォルダの
@@ -547,6 +567,39 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [segments, drawingId])
 
+  // 開いているサポート架台ファイルを自動保存し、一覧の更新日時・台数を更新する。
+  // 図面の自動保存(上のeffect)と同じ考え方(何も保存していない新規ファイルは
+  // 一覧を汚さないよう登録を見送る)。
+  useEffect(() => {
+    if (!supportDocId) return
+    saveSupportSheet(supportDocId, supportSheet)
+    let touchedFolderId: string | null = null
+    setSupportIndex((prev) => {
+      const now = Date.now()
+      const existing = prev.find((m) => m.id === supportDocId)
+      if (!existing && supportSheet.length === 0) return prev
+      touchedFolderId = existing?.folderId ?? null
+      const next = existing
+        ? prev.map((m) =>
+            m.id === supportDocId ? { ...m, updatedAt: now, count: supportSheet.length } : m,
+          )
+        : [
+            ...prev,
+            {
+              id: supportDocId,
+              createdAt: now,
+              updatedAt: now,
+              count: supportSheet.length,
+              folderId: null,
+            },
+          ]
+      saveSupportIndex(next)
+      return next
+    })
+    if (touchedFolderId) touchFolder(touchedFolderId)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [supportSheet, supportDocId])
+
   // 共有ファイルから受け取った図面のメモを自動保存する（通常のローカル図面には
   // このキー自体を作らない）。
   useEffect(() => {
@@ -680,9 +733,18 @@ export default function App() {
     setScreen(drawingId ? 'drawing' : 'launcher')
   }
 
-  function openSupportDrawing() {
+  // idを渡すと既存のサポート架台ファイルを開く。省略時は新規(未分類・未保存)を作る。
+  // サポート架台図面は有料機能なので、購読済み・無料お試し期間中でなければ購入案内を出す。
+  function openSupportDrawing(id?: string) {
     requirePaid(() => {
       setEraserMode(false)
+      if (id) {
+        setSupportDocId(id)
+        setSupportSheet(loadSupportSheet(id))
+      } else {
+        setSupportDocId(makeSupportDocId())
+        setSupportSheet([])
+      }
       setScreen('support')
     })
   }
@@ -690,6 +752,44 @@ export default function App() {
   // サポート架台図面を閉じたら、開いていた図面があればそこへ、なければランチャーへ戻る
   function closeSupportDrawing() {
     setScreen(drawingId ? 'drawing' : 'launcher')
+  }
+
+  function renameSupportDoc(id: string, currentName: string) {
+    const input = window.prompt(
+      '架台ファイルの名前を入力してください（空にすると未設定に戻ります）',
+      currentName,
+    )
+    if (input === null) return
+    const name = input.trim()
+    setSupportIndex((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, name: name || undefined } : m))
+      saveSupportIndex(next)
+      return next
+    })
+  }
+
+  function deleteSupportDoc(id: string) {
+    if (!window.confirm('この架台ファイルを削除しますか？元に戻せません。')) return
+    setSupportIndex((prev) => {
+      const next = prev.filter((m) => m.id !== id)
+      saveSupportIndex(next)
+      return next
+    })
+    deleteSupportSheet(id)
+    if (supportDocId === id) {
+      setSupportDocId(null)
+      setSupportSheet([])
+    }
+  }
+
+  /** サポート架台ファイルを別の現場・案件フォルダ（またはnull=未分類）へ移動する。 */
+  function moveSupportDocToFolder(id: string, folderId: string | null) {
+    setSupportIndex((prev) => {
+      const next = prev.map((m) => (m.id === id ? { ...m, folderId } : m))
+      saveSupportIndex(next)
+      return next
+    })
+    if (folderId) touchFolder(folderId)
   }
 
   function openSettings() {
@@ -804,10 +904,12 @@ export default function App() {
   }
 
   function deleteFolder(id: string) {
-    const containedCount = drawingIndex.filter((m) => m.folderId === id).length
+    const drawingCount = drawingIndex.filter((m) => m.folderId === id).length
+    const supportCount = supportIndex.filter((m) => m.folderId === id).length
+    const containedCount = drawingCount + supportCount
     const msg =
       containedCount > 0
-        ? `このフォルダを削除しますか？中の${containedCount}件の図面は「未分類」に戻ります。`
+        ? `このフォルダを削除しますか？中の${containedCount}件（図面${drawingCount}件・架台${supportCount}件）は「未分類」に戻ります。`
         : 'このフォルダを削除しますか？'
     if (!window.confirm(msg)) return
     setFolders((prev) => {
@@ -818,6 +920,11 @@ export default function App() {
     setDrawingIndex((prev) => {
       const next = prev.map((m) => (m.folderId === id ? { ...m, folderId: null } : m))
       saveIndex(next)
+      return next
+    })
+    setSupportIndex((prev) => {
+      const next = prev.map((m) => (m.folderId === id ? { ...m, folderId: null } : m))
+      saveSupportIndex(next)
       return next
     })
     setHomeView((v) => (v !== 'shelf' && v.folderId === id ? 'shelf' : v))
@@ -1197,6 +1304,46 @@ export default function App() {
     )
   }
 
+  // 寸法ラベル(芯々/切り寸法)をドラッグして移動したとき、自動配置位置からの
+  // 相対オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
+  // ほぼ動かしていない(=自動配置の位置まで戻した)場合はオフセットを消して
+  // 自動配置へ戻す(手動でリセットする手段として使える)。
+  function moveDimLabel(id: string, offsetX: number, offsetY: number) {
+    if (!canEditStructure) return
+    const reset = Math.abs(offsetX) < 4 && Math.abs(offsetY) < 4
+    mutateSegments((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? { ...s, dimLabelOffset: reset ? undefined : { x: offsetX, y: offsetY } }
+          : s,
+      ),
+    )
+  }
+
+  // 寸法線(矢羽根を含む)全体をドラッグして移動したとき、標準位置からの
+  // 相対オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
+  // ほぼ動かしていなければオフセットを消して標準位置へ戻す(手動リセット)。
+  function moveDimLine(id: string, offsetX: number, offsetY: number) {
+    if (!canEditStructure) return
+    const reset = Math.abs(offsetX) < 4 && Math.abs(offsetY) < 4
+    mutateSegments((prev) =>
+      prev.map((s) =>
+        s.id === id
+          ? { ...s, dimLineOffset: reset ? undefined : { x: offsetX, y: offsetY } }
+          : s,
+      ),
+    )
+  }
+
+  // 寸法ラベルの引き出し線(点線)が接続する、寸法線上の位置(along)を
+  // ドラッグして確定する（表示専用。切り寸法等には無関係）。
+  function moveDimAnchor(id: string, along: number) {
+    if (!canEditStructure) return
+    mutateSegments((prev) =>
+      prev.map((s) => (s.id === id ? { ...s, dimAnchorAlong: along } : s)),
+    )
+  }
+
   // 現場溶接マークをドラッグして移動したとき、対象点(t位置)からの相対
   // オフセットを確定して保存する（表示専用。切り寸法等には無関係）。
   function moveFieldWeldMark(id: string, markId: string, offsetX: number, offsetY: number) {
@@ -1269,16 +1416,43 @@ export default function App() {
   // 完全に共通化し、操作方法によって挙動が変わらないようにする。
   function placePartAtPoint(partId: string, p: Point) {
     if (!canEditStructure) return
+    // 配管どうしが視覚的に交差する箇所では、タップ位置から見て複数の配管が
+    // ほぼ同じ距離になり得る(データ上つながっていない別々の配管でも、画面上は
+    // 同じピクセル付近を通るため)。単純に最短距離の1本を黙って選んでしまうと、
+    // 意図と違う配管にパーツが付いてしまうことがある(現場からの報告で判明)。
+    // そのため、最も近い配管と次に近い配管の差がごく僅かで、かつその2本が
+    // 端点を共有していない(＝データ上つながっていない、たまたま近接しているだけ)
+    // ときは自動で選ばず、ズームしてやり直してもらう。つながっている2本
+    // (角の継手前後など)は、角のすぐ近くへパーツを置く普通の操作なので対象外。
     let best: Segment | null = null
-    let bestDist = DROP_HIT
+    let bestDist = Infinity
+    let second: Segment | null = null
+    let secondDist = Infinity
     for (const s of segments) {
       const d = distanceToSegment(p, s.start, s.end)
-      if (d <= bestDist) {
-        bestDist = d
+      if (d < bestDist) {
+        second = best
+        secondDist = bestDist
         best = s
+        bestDist = d
+      } else if (d < secondDist) {
+        second = s
+        secondDist = d
       }
     }
-    if (!best) return
+    if (!best || bestDist > DROP_HIT) return
+    const connected =
+      second != null &&
+      (samePoint(best.start, second.start) ||
+        samePoint(best.start, second.end) ||
+        samePoint(best.end, second.start) ||
+        samePoint(best.end, second.end))
+    if (second != null && !connected && secondDist - bestDist < DROP_AMBIGUOUS_MARGIN) {
+      window.alert(
+        '近くに配管が複数あり、どちらに置くか判別できませんでした。画面を拡大してから、もう一度お試しください。',
+      )
+      return
+    }
     const part = getPart(partId)
     if (!part) return
     const targetId = best.id
@@ -1500,6 +1674,7 @@ export default function App() {
           <FolderShelf
             folders={folders}
             drawings={drawingIndex}
+            supportDocs={supportIndex}
             onOpenFolder={(folderId) => setHomeView({ folderId })}
             onCreateFolder={createFolder}
             onRenameFolder={renameFolder}
@@ -1507,7 +1682,7 @@ export default function App() {
             onCreate={createNewDrawing}
             onQuickCalc={openQuickCalc}
             onNitrogenCalc={openNitrogenCalc}
-            onSupportDrawing={openSupportDrawing}
+            onSupportDrawing={() => openSupportDrawing()}
             onImportFile={importShareFile}
             enabledFeatures={enabledFeatures}
             theme={theme}
@@ -1531,6 +1706,11 @@ export default function App() {
             onEditFolderColors={
               homeView.folderId != null ? () => setEditFolderColorsId(homeView.folderId) : undefined
             }
+            supportDocs={supportIndex}
+            onOpenSupport={openSupportDrawing}
+            onRenameSupport={renameSupportDoc}
+            onDeleteSupport={deleteSupportDoc}
+            onMoveSupportToFolder={moveSupportDocToFolder}
           />
         ))}
 
@@ -1556,7 +1736,13 @@ export default function App() {
 
       {screen === 'nitrogen' && <NitrogenCalc onClose={closeNitrogenCalc} />}
 
-      {screen === 'support' && <SupportDrawingPage onClose={closeSupportDrawing} />}
+      {screen === 'support' && (
+        <SupportDrawingPage
+          onClose={closeSupportDrawing}
+          sheet={supportSheet}
+          onChangeSheet={setSupportSheet}
+        />
+      )}
 
       {screen === 'drawing' && (
         <>
@@ -1625,6 +1811,9 @@ export default function App() {
           onDeleteFieldWeldMark={canEditStructure ? deleteFieldWeldMark : undefined}
           onToggleFieldFitFlip={canEditStructure ? toggleFieldFitFlip : undefined}
           onMoveFieldWeldMark={canEditStructure ? moveFieldWeldMark : undefined}
+          onMoveDimLabel={canEditStructure ? moveDimLabel : undefined}
+          onMoveDimAnchor={canEditStructure ? moveDimAnchor : undefined}
+          onMoveDimLine={canEditStructure ? moveDimLine : undefined}
         />
 
         {/* ドラッグ中のパーツ ghost */}
@@ -1770,6 +1959,8 @@ export default function App() {
               return folder?.name ?? meta?.name ?? ''
             })()
           }
+          // 印刷/PDFの見出しに出す、この図面自体の名前(図面一覧で付けた名前)。
+          drawingName={drawingIndex.find((d) => d.id === drawingId)?.name}
           // フランジの引きしろ・パッキン厚は切り寸法に織り込み済みなので、
           // 印刷物にも条件として残す（表示用に渡すだけで計算はしない）。
           flangeAllow={defaults.flangeAllow ?? 0}
