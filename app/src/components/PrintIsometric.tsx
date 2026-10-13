@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import type { Point, Segment } from '../types'
 import { distance } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
@@ -52,17 +53,17 @@ interface Props {
   showThroughDim?: boolean
   /** 90°ショートエルボの「ショート」マークを表示するか（画面表示と揃える）。 */
   showShortMark?: boolean
+  /**
+   * 印刷/PDFの文字(寸法・サイズ・継手マーク等)の拡大率。BomModal側の
+   * 「文字サイズ」設定から渡される。SVGの--ui-scaleへ反映し、関連する
+   * font-size/stroke-widthのcalc()を連動させる(画面側のDrawingCanvasの
+   * 表示には影響しない、別スコープのため)。既定1.4は「小さすぎて読み
+   * づらい」という要望に対する底上げ後の値。
+   */
+  textScale?: number
 }
 
 const CROSS_GAP = 9
-
-// 印刷/PDFの文字が小さく読みづらいという要望により、styles.css の
-// .print-iso-svg { --ui-scale: 1.4 } で実際の描画(font-size/stroke-width)を
-// 底上げしている。重なり回避(labelLayout.ts)の当たり判定の箱も、実際に
-// 大きくなった文字サイズに合わせて見積もらないと、文字サイズだけ大きくなって
-// 箱の見積もりが追いつかず、ラベルどうしが重なって見えてしまう。
-// DrawingCanvas.tsx の uiScale と同じ考え方で、ここでも同じ係数を掛ける。
-const PRINT_UI_SCALE = 1.4
 
 // 指定座標に最も近い45°マーク（一定距離内にあるものだけ）。無ければnull。
 function nearestElbow45Mark(marks: Point[], x: number, y: number): Point | null {
@@ -91,7 +92,13 @@ export function PrintIsometric({
   baseSlopeDenom,
   showThroughDim = false,
   showShortMark = true,
+  textScale = 1.4,
 }: Props) {
+  // 重なり回避(labelLayout.ts)の当たり判定の箱も、実際に大きくなった文字
+  // サイズに合わせて見積もらないと、文字サイズだけ大きくなって箱の見積もりが
+  // 追いつかず、ラベルどうしが重なって見えてしまう。DrawingCanvas.tsx の
+  // uiScale と同じ考え方で、ここでも同じ係数を掛ける。
+  const PRINT_UI_SCALE = textScale
   // 通り寸法(曲がるまで一直線に続く区間の合計)。表示専用。
   const throughRuns = useMemo(
     () => (showThroughDim ? computeThroughRuns(segments, cutById) : []),
@@ -283,7 +290,7 @@ export function PrintIsometric({
       h: 22 * PRINT_UI_SCALE,
     }))
     return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles, ...dimArrowObstacles])
-  }, [segments, cutById, effectiveById, crossoverGaps, baseSlopeDenom, markEnds])
+  }, [segments, cutById, effectiveById, crossoverGaps, baseSlopeDenom, markEnds, PRINT_UI_SCALE])
 
   const viewBox = useMemo(() => {
     if (segments.length === 0) return '0 0 200 200'
@@ -500,7 +507,12 @@ export function PrintIsometric({
   }
 
   return (
-    <svg className="print-iso-svg" viewBox={viewBox} preserveAspectRatio="xMidYMid meet">
+    <svg
+      className="print-iso-svg"
+      viewBox={viewBox}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ '--ui-scale': textScale } as CSSProperties}
+    >
       {segments.map((s) => {
         const eff = effectiveById[s.id]
         const resolved = eff?.resolved ?? false

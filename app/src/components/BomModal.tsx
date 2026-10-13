@@ -103,6 +103,10 @@ export function BomModal({
   // 図が縮むだけで、明細(パイプ1本ごとの切り寸法)は詳細のまま残る
   // （「1ページに集約」は明細も小計だけに省略されてしまうため、それとは別物）。
   const [splitIso, setSplitIso] = useState(true)
+  // 印刷/PDFの文字(寸法・サイズ・継手マーク等)の大きさ。「小さすぎて老眼には
+  // 読みづらい」という要望を受けて標準を1.4倍に底上げしたが、紙面に収まる
+  // 量とのトレードオフもあるため、現場ごとに選べるようにする。
+  const [textScale, setTextScale] = useState(1.4)
   const a3Landscape1Page = paperSize === 'a3' && orientation === 'landscape' && compact
   // 「分割する」を選んだままだとアイソメ図が何ページに分かれるか（設定画面で
   // 事前に知らせるため。実際の分割は印刷レイアウト側で同じ関数を使って行う）。
@@ -356,6 +360,29 @@ export function BomModal({
             </button>
           </div>
         </div>
+        <div className="pdf-paper-row">
+          <div className="pdf-paper-group">
+            <span className="pdf-paper-label">文字サイズ</span>
+            <button
+              className={`pdf-mode-btn${textScale === 1 ? ' active' : ''}`}
+              onClick={() => setTextScale(1)}
+            >
+              標準
+            </button>
+            <button
+              className={`pdf-mode-btn${textScale === 1.4 ? ' active' : ''}`}
+              onClick={() => setTextScale(1.4)}
+            >
+              大きめ
+            </button>
+            <button
+              className={`pdf-mode-btn${textScale === 1.8 ? ' active' : ''}`}
+              onClick={() => setTextScale(1.8)}
+            >
+              特大
+            </button>
+          </div>
+        </div>
         {/* 「1ページに集約」は元々アイソメ図を分割しないため、この選択肢は
             「詳細（複数ページ）」のときだけ意味を持つ。 */}
         {!compact && (
@@ -487,6 +514,7 @@ export function BomModal({
                       baseSlopeDenom={baseSlopeDenom}
                       showThroughDim={showThroughDim}
                       showShortMark={showShortMark}
+                      textScale={textScale}
                     />
                   </div>
                 </div>

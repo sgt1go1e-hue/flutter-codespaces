@@ -2492,11 +2492,10 @@ fieldset.panel-grid:disabled {
   height: 620px;
   border: 1px solid #999;
   background: #fff;
-  /* 印刷/PDFの文字(寸法・サイズ・継手マーク等)が小さすぎて読みづらいという
-     要望により、--ui-scaleを底上げする(このクラスの子孫では既定値1の代わりに
-     これが使われ、font-size/stroke-widthのcalc()が連動して一回り大きくなる)。
-     画面側(DrawingCanvas)の表示には影響しない(別スコープのため)。 */
-  --ui-scale: 1.4;
+  /* --ui-scaleは PrintIsometric.tsx 側でインラインstyleとして要素ごとに
+     設定する(BomModalの「文字サイズ」設定値をそのまま反映するため)。
+     font-size/stroke-widthのcalc()がこれに連動する。画面側(DrawingCanvas)
+     の表示には影響しない(別スコープのため)。 */
 }
 
 /* 1ページ集約モード: アイソメ図を縮小して改ページせずに続け、パイプ明細は
