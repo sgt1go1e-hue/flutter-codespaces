@@ -380,6 +380,12 @@ body {
   font-weight: 500;
 }
 
+.home-import-hint {
+  margin: 4px 2px 0;
+  font-size: 11.5px;
+  color: var(--home-ink-3);
+}
+
 /* --- フォルダセクション --- */
 .home-section-head {
   display: flex;
@@ -3672,6 +3678,14 @@ fieldset.panel-grid:disabled {
   margin: 0;
   color: var(--hint);
   font-size: 13px;
+}
+
+/* 受け取った相手がファイルを直接タップして開くと、中身(JSON)がそのまま
+   表示されてしまい「文字化けした」と誤解されやすいという報告があったため、
+   正しい開き方を注意書きとして目立たせる。 */
+.share-modal-warn {
+  color: var(--label-zero);
+  font-weight: 600;
 }
 
 .share-permission-options {

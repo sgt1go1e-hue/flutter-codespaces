@@ -223,6 +223,12 @@ export function FolderShelf({
         >
           共有ファイルを開く
         </button>
+        {/* 送られてきたファイルをFiles・メッセージ等で直接タップして開くと、
+            中身(JSON)がそのまま表示されてしまい「文字化けした」と誤解されやすい。
+            必ずこのボタンから選んで開く必要があることを明示する。 */}
+        <p className="home-import-hint">
+          受け取ったファイルは直接タップせず、必ずこのボタンから選んで開いてください
+        </p>
         <input
           ref={fileInputRef}
           type="file"
