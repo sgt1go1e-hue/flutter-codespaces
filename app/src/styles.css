@@ -3008,44 +3008,6 @@ fieldset.panel-grid:disabled {
   font-size: 12.5px;
 }
 
-.qc-config {
-  grid-template-columns: 1fr 1fr;
-}
-
-.qc-ends {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
-}
-
-.qc-end {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  background: var(--panel);
-  border: 1px solid var(--border);
-  border-radius: 12px;
-  padding: 10px;
-}
-
-.qc-end select {
-  appearance: none;
-  background: var(--field-bg);
-  color: var(--text);
-  border: 1px solid var(--border);
-  border-radius: 10px;
-  padding: 10px 12px;
-  font-size: 14px;
-  min-height: 44px;
-  width: 100%;
-}
-
-.qc-basis-toggle button {
-  font-size: 12px;
-  padding: 8px 4px;
-  min-height: 38px;
-}
-
 .qc-overall {
   background: var(--panel);
   border: 1px solid var(--border);
@@ -3129,6 +3091,569 @@ fieldset.panel-grid:disabled {
 .qc-history-row b {
   color: var(--label-cut);
   font-variant-numeric: tabular-nums;
+}
+
+.qc-history-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.qc-history-clear {
+  background: none;
+  border: none;
+  color: var(--hint);
+  font-size: 13px;
+  padding: 4px 8px;
+}
+
+.qc-history-row {
+  gap: 8px;
+  align-items: baseline;
+}
+
+.qc-history-time {
+  flex-shrink: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-history-sum {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.qc-history-row b {
+  flex-shrink: 0;
+}
+
+/* --- クイック計算: タブ・仕様バー・絵 --- */
+.qc-tabs {
+  flex-shrink: 0;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.qc-tabs button {
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: var(--hint);
+  font-size: 16px;
+  font-weight: 800;
+  min-height: 48px;
+}
+
+.qc-tabs button.active {
+  color: var(--text);
+  border-bottom-color: var(--accent);
+}
+
+.qc-screen .qc-body {
+  gap: 10px;
+  padding-top: 10px;
+}
+
+/* 縦に並べたスクロール領域の中身が、高さ不足で潰れないようにする */
+.qc-screen .qc-body > * {
+  flex-shrink: 0;
+}
+
+.qc-spec {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.qc-spec-bar {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  background: none;
+  border: none;
+  color: var(--text);
+  padding: 10px 14px;
+  text-align: left;
+}
+
+.qc-spec-main {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.qc-spec-sub {
+  flex: 1;
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.qc-spec-caret {
+  color: var(--hint);
+  font-size: 12px;
+}
+
+.qc-spec-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 0 12px 12px;
+}
+
+.qc-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.qc-chips.scroll {
+  flex-wrap: nowrap;
+  overflow-x: auto;
+  scrollbar-width: none;
+  margin: 0 -14px;
+  padding: 0 14px;
+}
+
+.qc-chips.scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.qc-chips.scroll .qc-chip {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
+.qc-chip {
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  padding: 7px 13px;
+  font-size: 14px;
+  font-weight: 700;
+  min-height: 38px;
+  touch-action: manipulation;
+}
+
+.qc-chip.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-on);
+}
+
+.qc-chips-size .qc-chip {
+  min-width: 58px;
+  border-radius: 10px;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-figure-card {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 8px 6px 6px;
+}
+
+.qc-figure-hint {
+  color: var(--hint);
+  font-size: 12px;
+  text-align: center;
+}
+
+.qd-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.qd-tube-out {
+  fill: none;
+  stroke: var(--text);
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+}
+
+.qd-tube-out.accent {
+  stroke: var(--accent);
+}
+
+.qd-tube-in {
+  fill: none;
+  stroke: var(--bg);
+  stroke-linecap: butt;
+  stroke-linejoin: round;
+}
+
+.qd-solid {
+  fill: var(--bg);
+  stroke: var(--text);
+  stroke-width: 3;
+}
+
+.qd-flange {
+  fill: var(--text);
+}
+
+.qd-flange.accent {
+  fill: var(--accent);
+}
+
+.qd-cutmark {
+  stroke: var(--text);
+  stroke-width: 3;
+}
+
+.qd-cutmark.accent {
+  stroke: var(--accent);
+}
+
+.qd-center {
+  fill: none;
+  stroke: var(--hint);
+  stroke-width: 1;
+  stroke-dasharray: 10 3 2 3;
+}
+
+.qd-ext {
+  stroke: var(--hint);
+  stroke-width: 0.8;
+}
+
+.qd-dim {
+  stroke: var(--hint);
+  stroke-width: 1.2;
+}
+
+.qd-arrow {
+  fill: var(--hint);
+}
+
+.qd-dim.strong {
+  stroke: var(--accent);
+}
+
+.qd-arrow.strong {
+  fill: var(--accent);
+}
+
+.qd-dim.cut {
+  stroke: var(--label-cut);
+  stroke-width: 1.6;
+}
+
+.qd-arrow.cut {
+  fill: var(--label-cut);
+}
+
+.qd-label-a {
+  fill: var(--accent);
+  font-size: 19px;
+  font-weight: 800;
+}
+
+.qd-label-s {
+  fill: var(--hint);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.qd-label-s.big {
+  font-size: 16px;
+}
+
+.qd-label-cut {
+  fill: var(--label-cut);
+  font-size: 21px;
+  font-weight: 900;
+}
+
+.qd-label-cut.none {
+  fill: var(--hint);
+}
+
+.qd-label-cut.bad {
+  fill: var(--label-over);
+}
+
+.qd-fig-num {
+  fill: var(--text);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.qd-select-frame {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.5;
+  stroke-dasharray: 5 4;
+  opacity: 0.8;
+}
+
+.qd-hit {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.qc-end-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 10px;
+}
+
+.qc-end-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+}
+
+.qc-end-tabs button {
+  background: var(--field-bg);
+  color: var(--hint);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-height: 40px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.qc-end-tabs button.active {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+
+.qc-round {
+  display: flex;
+  gap: 6px;
+}
+
+.qc-round button {
+  flex: 1;
+  background: var(--field-bg);
+  color: var(--hint);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px 4px;
+  font-size: 13px;
+  font-weight: 700;
+  min-height: 36px;
+}
+
+.qc-round button.active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: var(--accent-on);
+}
+
+.qc-inline-field {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: var(--hint);
+  font-size: 13px;
+}
+
+.qc-inline-field select,
+.qc-inline-field input {
+  flex: 1;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 15px;
+  min-height: 40px;
+}
+
+.qc-warn {
+  background: rgba(251, 191, 36, 0.12);
+  border: 1px solid var(--label-zero);
+  color: var(--label-zero);
+  border-radius: 10px;
+  padding: 8px 12px;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.qc-answer {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  padding: 10px 14px;
+}
+
+.qc-answer.bad {
+  border-color: var(--label-over);
+}
+
+.qc-answer-row {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+
+.qc-answer-label {
+  color: var(--label-cut);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.qc-answer-value {
+  flex: 1;
+  text-align: right;
+  color: var(--label-cut);
+  font-size: 40px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+  line-height: 1.1;
+}
+
+.qc-answer-unit {
+  color: var(--hint);
+  font-size: 15px;
+}
+
+.qc-answer-msg {
+  color: var(--label-over);
+  font-size: 16px;
+  font-weight: 800;
+  padding: 6px 0;
+}
+
+.qc-answer-msg.zero {
+  color: var(--label-zero);
+}
+
+.qc-answer-formula {
+  color: var(--hint);
+  font-size: 12.5px;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-screen .qc-overall {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 14px;
+}
+
+.qc-overall-tag {
+  color: var(--accent);
+  font-size: 22px;
+  font-weight: 900;
+}
+
+.qc-screen .qc-overall-display {
+  flex: 1;
+  text-align: right;
+}
+
+.qc-screen .qc-key {
+  min-height: 50px;
+}
+
+.qc-fig-title {
+  text-align: center;
+  font-size: 24px;
+  font-weight: 900;
+  color: var(--text);
+}
+
+.qc-fig-sub {
+  display: flex;
+  justify-content: space-between;
+  padding: 0 8px;
+  color: var(--accent);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.qc-fig-values {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px 18px;
+  padding: 4px 8px 6px;
+}
+
+.qc-fig-value {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  color: var(--hint);
+  font-size: 14px;
+}
+
+.qc-fig-value b {
+  color: var(--text);
+  font-size: 30px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-fig-note {
+  color: var(--hint);
+  font-size: 11.5px;
+  padding: 0 8px 4px;
+}
+
+.qc-table-wrap {
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.qc-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-table th {
+  background: var(--panel);
+  color: var(--hint);
+  font-size: 12.5px;
+  font-weight: 700;
+  padding: 8px 6px;
+  text-align: right;
+}
+
+.qc-table td {
+  color: var(--text);
+  font-size: 15px;
+  padding: 9px 6px;
+  text-align: right;
+  border-top: 1px solid var(--border-soft);
+}
+
+.qc-table th:first-child,
+.qc-table td:first-child {
+  text-align: left;
+  padding-left: 12px;
+}
+
+.qc-table th:last-child,
+.qc-table td:last-child {
+  padding-right: 12px;
+}
+
+.qc-table tr.active td {
+  background: var(--accent);
+  color: var(--accent-on);
+  font-weight: 800;
 }
 
 /* --- 窒素計算(気密試験)画面 --- */

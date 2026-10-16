@@ -1,13 +1,10 @@
-import { useMemo, useState } from 'react'
-import {
-  pipeTypes,
-  sizesForPipeType,
-  getSizeInfo,
-  connectionMethods,
-} from '../data/masters'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { pipeTypes, sizesForPipeType, getSizeInfo, connectionMethods, nominalOf } from '../data/masters'
 import type { RoundMode } from '../lib/cutlength'
 import {
   computeQuickCut,
+  computeOffset45,
+  connectionKindOf,
   type QuickCalcInput,
   type QuickEndInput,
   type QuickFittingKind,
@@ -19,350 +16,659 @@ import {
   calcEvaluate,
   type CalcState,
 } from '../lib/calcExpr'
+import {
+  FITTING_GROUPS,
+  fittingsOfGroup,
+  fittingChipLabel,
+  shapeOf,
+  dimKeyLabel,
+  nominalLabel,
+  dimRows,
+  dimHeaders,
+  inchLabel,
+} from '../lib/fittingTable'
+import type { ConnectionKind } from '../lib/takeout'
+import { useLocalStorage } from '../hooks/useLocalStorage'
 import { CalcKeypad } from './CalcKeypad'
+import { StraightDiagram, OffsetDiagram, FittingFigure } from './QuickCalcDiagrams'
 
 interface Props {
   onClose: () => void
 }
 
+type Tab = 'straight' | 'offset' | 'table'
+
+const TABS: { id: Tab; label: string }[] = [
+  { id: 'straight', label: '芯引き' },
+  { id: 'offset', label: '45°振り' },
+  { id: 'table', label: '引しろ表' },
+]
+
 const END_KIND_OPTIONS: { value: QuickFittingKind; label: string }[] = [
-  { value: 'free', label: 'フリー端（継手なし）' },
-  { value: 'elbow90_long', label: '90°エルボ（ロング）' },
-  { value: 'elbow90_short', label: '90°エルボ（ショート）' },
-  { value: 'elbow45', label: '45°エルボ' },
-  { value: 'tee', label: 'T（メイン側）' },
-  { value: 'tee_branch', label: 'T（枝側）' },
+  { value: 'free', label: 'なし' },
+  { value: 'elbow90_long', label: '90°L' },
+  { value: 'elbow90_short', label: '90°S' },
+  { value: 'elbow45', label: '45°' },
+  { value: 'tee', label: 'T ラン' },
+  { value: 'tee_branch', label: 'T 枝' },
   { value: 'flange', label: 'フランジ' },
 ]
 
 const needsCounterpart = (k: QuickFittingKind) => k === 'tee' || k === 'tee_branch'
 
-function defaultEnd(): QuickEndInput {
-  return { kind: 'free', basis: 'center' }
+interface Prefs {
+  tab: Tab
+  pipeType?: string
+  size?: string
+  connection?: string
+  vpSeries?: 'dv' | 'ts'
+  roundMode: RoundMode
+  rawMode: boolean
+  left: QuickEndInput
+  right: QuickEndInput
+  offsetGiven: 'offset' | 'travel'
+  tableGroup?: ConnectionKind
+  tableFitting?: string
+  tableKey?: string
 }
+
+const DEFAULT_PREFS: Prefs = {
+  tab: 'straight',
+  roundMode: 'round',
+  rawMode: false,
+  left: { kind: 'elbow90_long', basis: 'center' },
+  right: { kind: 'elbow90_long', basis: 'center' },
+  offsetGiven: 'offset',
+}
+
+// 前回の管種・サイズ・継手を覚えておき、開いたらすぐ寸法を打てるようにする
+const PREFS_KEY = 'quickcalc.prefs.v1'
+const HISTORY_KEY = 'quickcalc.history.v1'
+const HISTORY_MAX = 30
 
 interface HistoryEntry {
   id: string
+  at: number
   summary: string
   cut: number
 }
 
-function EndFittingEditor({
-  label,
-  end,
-  onChange,
-  sizes,
-  ownSize,
-  isFree,
+const fmt = (n: number | undefined) => (n == null ? '—' : String(Math.round(n * 10) / 10))
+
+function timeLabel(at: number): string {
+  const d = new Date(at)
+  const now = new Date()
+  const hm = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
+  return d.toDateString() === now.toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`
+}
+
+function Chips<T extends string>({
+  options,
+  value,
+  onPick,
+  className,
+  scroll,
 }: {
-  label: string
-  end: QuickEndInput
-  onChange: (patch: Partial<QuickEndInput>) => void
-  sizes: { code: string; label: string }[]
-  ownSize?: string
-  isFree: boolean
+  options: { value: T; label: string }[]
+  value: T | undefined
+  onPick: (v: T) => void
+  className?: string
+  /** 1行で横スクロールにする（選択中のボタンが見える位置まで自動で寄せる） */
+  scroll?: boolean
 }) {
+  const ref = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!scroll) return
+    const box = ref.current
+    const active = box?.querySelector<HTMLElement>('.qc-chip.active')
+    if (!box || !active) return
+    box.scrollLeft = active.offsetLeft - (box.clientWidth - active.offsetWidth) / 2
+  }, [scroll, value])
   return (
-    <div className="qc-end">
-      <div className="field-label">{label}</div>
-      <select
-        value={end.kind}
-        onChange={(e) => onChange({ kind: e.target.value as QuickFittingKind })}
-      >
-        {END_KIND_OPTIONS.map((o) => (
-          <option key={o.value} value={o.value}>
-            {o.label}
-          </option>
-        ))}
-      </select>
-
-      {needsCounterpart(end.kind) && (
-        <select
-          value={end.counterpartSize ?? ownSize ?? ''}
-          onChange={(e) => onChange({ counterpartSize: e.target.value || undefined })}
+    <div
+      ref={ref}
+      className={`qc-chips${scroll ? ' scroll' : ''}${className ? ` ${className}` : ''}`}
+    >
+      {options.map((o) => (
+        <button
+          key={o.value}
+          type="button"
+          className={`qc-chip${o.value === value ? ' active' : ''}`}
+          onClick={() => onPick(o.value)}
         >
-          <option value="">相手径を選択</option>
-          {sizes.map((s) => (
-            <option key={s.code} value={s.code}>
-              {s.label}（相手径）
-            </option>
-          ))}
-        </select>
-      )}
-
-      {end.kind === 'flange' && (
-        <div className="field">
-          <span className="field-note">フランジ引きしろ(mm)</span>
-          <input
-            className="num-input"
-            type="number"
-            inputMode="decimal"
-            value={end.flangeAllow ?? ''}
-            onChange={(e) =>
-              onChange({ flangeAllow: e.target.value === '' ? undefined : Number(e.target.value) })
-            }
-          />
-        </div>
-      )}
-
-      {!isFree && (
-        <div className="round-toggle qc-basis-toggle">
-          <button
-            type="button"
-            className={end.basis === 'center' ? 'active' : ''}
-            onClick={() => onChange({ basis: 'center' })}
-          >
-            芯々基準
-          </button>
-          <button
-            type="button"
-            className={end.basis === 'face' ? 'active' : ''}
-            onClick={() => onChange({ basis: 'face' })}
-          >
-            芯先（端面）基準
-          </button>
-        </div>
-      )}
-      {isFree && <p className="field-note">フリー端は自動的に端面基準になります</p>}
+          {o.label}
+        </button>
+      ))}
     </div>
   )
 }
 
 export function QuickCalc({ onClose }: Props) {
-  const [pipeType, setPipeType] = useState<string | undefined>(undefined)
-  const [size, setSize] = useState<string | undefined>(undefined)
-  const [connection, setConnection] = useState<string | undefined>(undefined)
-  const [vpSeries, setVpSeries] = useState<'dv' | 'ts' | undefined>(undefined)
-  const [roundMode, setRoundMode] = useState<RoundMode>('round')
-  const [rawMode, setRawMode] = useState(false) // 「そのまま」＝丸めなし表示
-  const [left, setLeft] = useState<QuickEndInput>(defaultEnd())
-  const [right, setRight] = useState<QuickEndInput>(defaultEnd())
-  const [calc, setCalc] = useState<CalcState>(initialCalcState)
-  const [history, setHistory] = useState<HistoryEntry[]>([])
+  const [stored, setStored] = useLocalStorage<Partial<Prefs>>(PREFS_KEY, {})
+  const prefs: Prefs = { ...DEFAULT_PREFS, ...stored }
+  const setPrefs = (patch: Partial<Prefs>) => setStored((prev) => ({ ...prev, ...patch }))
+  const { tab, pipeType, size, connection, vpSeries, roundMode, rawMode, left, right } = prefs
+
+  const [history, setHistory] = useLocalStorage<HistoryEntry[]>(HISTORY_KEY, [])
+  const [calcStraight, setCalcStraight] = useState<CalcState>(initialCalcState)
+  const [calcOffset, setCalcOffset] = useState<CalcState>(initialCalcState)
+  const [selectedEnd, setSelectedEnd] = useState<'left' | 'right'>('left')
+  const [specOpen, setSpecOpen] = useState(!prefs.size)
 
   const sizes = sizesForPipeType(pipeType)
   const od = getSizeInfo(size)?.od
+  const pipeShort = pipeTypes.find((p) => p.id === pipeType)?.short
+  const connLabel =
+    pipeType === 'vp'
+      ? vpSeries === 'ts'
+        ? 'TS継手'
+        : 'DV継手'
+      : (connectionMethods.find((c) => c.id === connection)?.name ?? '溶接')
 
-  const overall = calcCurrentTotal(calc)
-
+  // ---- 芯引き ----
+  const overall = calcCurrentTotal(calcStraight)
   const input: QuickCalcInput = useMemo(
-    () => ({
-      pipeType,
-      size,
-      connection,
-      vpSeries,
-      overall,
-      roundMode,
-      left,
-      right,
-    }),
+    () => ({ pipeType, size, connection, vpSeries, overall, roundMode, left, right }),
     [pipeType, size, connection, vpSeries, overall, roundMode, left, right],
   )
-
   const result = useMemo(() => computeQuickCut(input), [input])
+  const straightCut =
+    result.status === 'ok' ? (rawMode && result.rawCut != null ? result.rawCut : result.cut) : undefined
 
-  const displayCut =
-    result.status === 'ok'
-      ? rawMode && result.rawCut != null
-        ? result.rawCut
-        : result.cut
+  // ---- 45°振り ----
+  const offsetValue = calcCurrentTotal(calcOffset)
+  const offsetResult = useMemo(
+    () =>
+      computeOffset45({
+        pipeType,
+        size,
+        connection,
+        vpSeries,
+        given: prefs.offsetGiven,
+        value: offsetValue,
+        roundMode,
+      }),
+    [pipeType, size, connection, vpSeries, prefs.offsetGiven, offsetValue, roundMode],
+  )
+  const offsetCut =
+    offsetResult.status === 'ok'
+      ? rawMode && offsetResult.rawCut != null
+        ? offsetResult.rawCut
+        : offsetResult.cut
       : undefined
 
-  function updateLeft(patch: Partial<QuickEndInput>) {
-    setLeft((prev) => ({ ...prev, ...patch }))
-  }
-  function updateRight(patch: Partial<QuickEndInput>) {
-    setRight((prev) => ({ ...prev, ...patch }))
+  const end = selectedEnd === 'left' ? left : right
+  function updateEnd(patch: Partial<QuickEndInput>) {
+    const key = selectedEnd
+    setStored((prev) => {
+      const cur = { ...DEFAULT_PREFS, ...prev }[key]
+      return { ...prev, [key]: { ...cur, ...patch } }
+    })
   }
 
-  function pressEqual() {
-    setCalc((s) => {
+  function addHistory(summary: string, cut: number) {
+    setHistory((h) =>
+      [{ id: `${Date.now()}`, at: Date.now(), summary, cut }, ...h].slice(0, HISTORY_MAX),
+    )
+  }
+
+  function specText() {
+    return `${size ?? 'サイズ?'} ${pipeShort ?? ''}`.trim()
+  }
+
+  function pressEqualStraight() {
+    setCalcStraight((s) => {
       const { value, error } = calcEvaluate(s)
       if (error) return { ...s, error }
       if (value == null) return s
       return calcStateFromValue(value)
     })
+    if (straightCut != null) {
+      const ends = `${END_KIND_OPTIONS.find((o) => o.value === left.kind)?.label}〜${END_KIND_OPTIONS.find((o) => o.value === right.kind)?.label}`
+      addHistory(`芯引き ${specText()} ${ends} a${fmt(overall)}`, straightCut)
+    }
   }
 
-  function recordHistory() {
-    if (result.status !== 'ok' || result.cut == null) return
-    const pipeLabel = pipeTypes.find((p) => p.id === pipeType)?.short ?? '—'
-    const summary = `${pipeLabel} ${size ?? '—'} / 全体${overall ?? '—'}mm`
-    setHistory((h) =>
-      [{ id: `${Date.now()}`, summary, cut: result.cut! }, ...h].slice(0, 8),
-    )
+  function pressEqualOffset() {
+    setCalcOffset((s) => {
+      const { value, error } = calcEvaluate(s)
+      if (error) return { ...s, error }
+      if (value == null) return s
+      return calcStateFromValue(value)
+    })
+    if (offsetCut != null) {
+      addHistory(`45°振り ${specText()} b${fmt(offsetResult.offset)} c${fmt(offsetResult.travel)}`, offsetCut)
+    }
   }
+
+  // ---- 引しろ表 ----
+  const specKind = connectionKindOf(pipeType, vpSeries, connection)
+  const tableGroup = prefs.tableGroup ?? specKind
+  const groupFittings = fittingsOfGroup(tableGroup)
+  const tableFitting =
+    groupFittings.find((f) => f.id === prefs.tableFitting) ?? groupFittings[0]
+  const tableKeys = tableFitting ? Object.keys(tableFitting.dims) : []
+  // サイズ未選択なら、芯引きで選んでいるサイズに合わせる
+  const specNominal = String(nominalOf(size) ?? '')
+  const tableKey =
+    prefs.tableKey && tableKeys.includes(prefs.tableKey)
+      ? prefs.tableKey
+      : (tableKeys.find((k) => k === specNominal || k.startsWith(`${specNominal}_`)) ?? tableKeys[0])
+  // 径違い("40_25")は、大きい方→小さい方の2段で選ぶ（組み合わせが多く1列だと探しにくい）
+  const isPair = tableKeys.some((k) => k.includes('_'))
+  const pairFirsts = isPair ? [...new Set(tableKeys.map((k) => k.split('_')[0]))] : []
+  const pairFirst = tableKey?.split('_')[0]
+  const pairSeconds = isPair ? tableKeys.filter((k) => k.split('_')[0] === pairFirst) : []
+  const tableRows = tableFitting && tableKey ? dimRows(tableFitting, tableFitting.dims[tableKey]) : []
+  const groupInfo = FITTING_GROUPS.find((g) => g.kind === tableGroup)
+  const tableInch = tableKey && !tableKey.includes('_') ? inchLabel(tableKey, tableGroup) : ''
+
+  const roundToggle = (
+    <div className="qc-round">
+      <button
+        className={!rawMode && roundMode === 'round' ? 'active' : ''}
+        onClick={() => setPrefs({ rawMode: false, roundMode: 'round' })}
+      >
+        四捨五入
+      </button>
+      <button
+        className={!rawMode && roundMode === 'floor' ? 'active' : ''}
+        onClick={() => setPrefs({ rawMode: false, roundMode: 'floor' })}
+      >
+        切り捨て
+      </button>
+      <button className={rawMode ? 'active' : ''} onClick={() => setPrefs({ rawMode: true })}>
+        小数
+      </button>
+    </div>
+  )
+
+  const historyBlock = history.length > 0 && (
+    <div className="qc-history">
+      <div className="qc-history-head">
+        <span className="field-label">履歴</span>
+        <button type="button" className="qc-history-clear" onClick={() => setHistory([])}>
+          消す
+        </button>
+      </div>
+      {history.map((h) => (
+        <div key={h.id} className="qc-history-row">
+          <span className="qc-history-time">{timeLabel(h.at)}</span>
+          <span className="qc-history-sum">{h.summary}</span>
+          <b>L {h.cut}</b>
+        </div>
+      ))}
+    </div>
+  )
 
   return (
     <div className="qc-screen">
       <header className="topbar">
-        <div className="title">クイック計算（芯引き）</div>
+        <div className="title">クイック計算</div>
         <div className="tools">
           <button onClick={onClose}>作図に戻る</button>
         </div>
       </header>
 
+      <nav className="qc-tabs">
+        {TABS.map((t) => (
+          <button
+            key={t.id}
+            type="button"
+            className={tab === t.id ? 'active' : ''}
+            onClick={() => setPrefs({ tab: t.id })}
+          >
+            {t.label}
+          </button>
+        ))}
+      </nav>
+
       <div className="qc-body">
-        <div className="panel-grid qc-config">
-          <label className="field">
-            <span className="field-label">管種</span>
-            <select
-              value={pipeType ?? ''}
-              onChange={(e) => {
-                const v = e.target.value || undefined
-                setPipeType(v)
-                setSize(undefined)
-                if (v !== 'vp') setVpSeries(undefined)
-              }}
-            >
-              <option value="">未設定</option>
-              {pipeTypes.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          <label className="field">
-            <span className="field-label">
-              サイズ{od != null && <span className="field-note">⌀{od}</span>}
-            </span>
-            <select value={size ?? ''} onChange={(e) => setSize(e.target.value || undefined)}>
-              <option value="">未設定</option>
-              {sizes.map((s) => (
-                <option key={s.code} value={s.code}>
-                  {s.label}
-                </option>
-              ))}
-            </select>
-          </label>
-
-          {pipeType === 'vp' ? (
-            <label className="field">
-              <span className="field-label">継手タイプ</span>
-              <select
-                value={vpSeries ?? ''}
-                onChange={(e) => setVpSeries((e.target.value || undefined) as 'dv' | 'ts' | undefined)}
-              >
-                <option value="">未設定（自動でDV継手）</option>
-                <option value="dv">DV継手（排水）</option>
-                <option value="ts">TS継手（給水）</option>
-              </select>
-            </label>
-          ) : (
-            <label className="field">
-              <span className="field-label">接続方法</span>
-              <select
-                value={connection ?? ''}
-                onChange={(e) => setConnection(e.target.value || undefined)}
-              >
-                <option value="">未設定</option>
-                {connectionMethods.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
-        </div>
-
-        <div className="field">
-          <span className="field-label">切り寸法の丸め</span>
-          <div className="round-toggle">
-            <button
-              className={!rawMode && roundMode === 'round' ? 'active' : ''}
-              onClick={() => {
-                setRawMode(false)
-                setRoundMode('round')
-              }}
-            >
-              四捨五入
+        {tab !== 'table' && (
+          <div className="qc-spec">
+            <button type="button" className="qc-spec-bar" onClick={() => setSpecOpen((o) => !o)}>
+              <span className="qc-spec-main">
+                【{size ?? 'サイズを選ぶ'}
+                {pipeShort ? ` ${pipeShort}` : ''}】
+              </span>
+              <span className="qc-spec-sub">
+                {connLabel}
+                {od != null && ` ⌀${od}`}
+              </span>
+              <span className="qc-spec-caret">{specOpen ? '▲' : '▼'}</span>
             </button>
-            <button
-              className={!rawMode && roundMode === 'floor' ? 'active' : ''}
-              onClick={() => {
-                setRawMode(false)
-                setRoundMode('floor')
-              }}
-            >
-              切り捨て
-            </button>
-            <button className={rawMode ? 'active' : ''} onClick={() => setRawMode(true)}>
-              そのまま
-            </button>
-          </div>
-        </div>
-
-        <div className="qc-ends">
-          <EndFittingEditor
-            label="左端"
-            end={left}
-            onChange={updateLeft}
-            sizes={sizes}
-            ownSize={size}
-            isFree={left.kind === 'free'}
-          />
-          <EndFittingEditor
-            label="右端"
-            end={right}
-            onChange={updateRight}
-            sizes={sizes}
-            ownSize={size}
-            isFree={right.kind === 'free'}
-          />
-        </div>
-
-        <div
-          className={`qc-result${result.status === 'over' || result.error ? ' over' : ''}${result.status === 'zero' ? ' zero' : ''}`}
-        >
-          {result.error ? (
-            <div className="qc-result-error">{result.error}</div>
-          ) : result.status === 'zero' ? (
-            <div className="qc-result-value zero">パイプ0mm（継手直結）</div>
-          ) : displayCut != null ? (
-            <>
-              <div className="qc-result-label">切り寸法</div>
-              <div className="qc-result-value">{displayCut} mm</div>
-            </>
-          ) : (
-            <div className="qc-result-placeholder">サイズと全体寸法を入力してください</div>
-          )}
-          <div className="qc-result-sub">
-            <span>控え s1: {result.startAllow} mm</span>
-            <span>控え s2: {result.endAllow} mm</span>
-          </div>
-        </div>
-
-        <div className="qc-overall">
-          <div className="field-label">
-            全体寸法(mm)
-            {calc.error && <span className="qc-calc-error">{calc.error}</span>}
-          </div>
-          <div className="qc-overall-display">{calc.display || '0'}</div>
-        </div>
-
-        <CalcKeypad
-          onChange={setCalc}
-          onEqual={() => {
-            pressEqual()
-            recordHistory()
-          }}
-        />
-
-        {history.length > 0 && (
-          <div className="qc-history">
-            <div className="field-label">履歴（この画面を開いている間のみ）</div>
-            {history.map((h) => (
-              <div key={h.id} className="qc-history-row">
-                <span>{h.summary}</span>
-                <b>{h.cut} mm</b>
+            {specOpen && (
+              <div className="qc-spec-panel">
+                <div className="field-label">管種</div>
+                <Chips
+                  options={pipeTypes.map((p) => ({ value: p.id, label: p.short }))}
+                  value={pipeType}
+                  onPick={(v) => {
+                    const keep = sizesForPipeType(v).some((s) => s.code === size)
+                    setPrefs({
+                      pipeType: v,
+                      size: keep ? size : undefined,
+                      vpSeries: v === 'vp' ? vpSeries : undefined,
+                    })
+                  }}
+                />
+                <div className="field-label">{pipeType === 'vp' ? '継手' : '接続'}</div>
+                {pipeType === 'vp' ? (
+                  <Chips
+                    options={[
+                      { value: 'dv', label: 'DV（排水）' },
+                      { value: 'ts', label: 'TS（給水）' },
+                    ]}
+                    value={vpSeries ?? 'dv'}
+                    onPick={(v) => setPrefs({ vpSeries: v as 'dv' | 'ts' })}
+                  />
+                ) : (
+                  <Chips
+                    options={connectionMethods.map((c) => ({ value: c.id, label: c.name.replace('（ソケット）', '') }))}
+                    value={connection ?? 'weld'}
+                    onPick={(v) => setPrefs({ connection: v })}
+                  />
+                )}
+                <div className="field-label">サイズ</div>
+                <Chips
+                  className="qc-chips-size"
+                  options={sizes.map((s) => ({ value: s.code, label: s.label }))}
+                  value={size}
+                  onPick={(v) => {
+                    setPrefs({ size: v })
+                    setSpecOpen(false)
+                  }}
+                />
               </div>
-            ))}
+            )}
           </div>
+        )}
+
+        {tab === 'straight' && (
+          <>
+            <div className="qc-figure-card">
+              <StraightDiagram
+                leftKind={left.kind}
+                rightKind={right.kind}
+                leftFace={left.basis === 'face'}
+                rightFace={right.basis === 'face'}
+                selected={selectedEnd}
+                onSelect={setSelectedEnd}
+                overallText={overall != null ? fmt(overall) : '?'}
+                s1Text={fmt(result.startAllow)}
+                s2Text={fmt(result.endAllow)}
+                cutText={straightCut != null ? fmt(straightCut) : result.status === 'zero' ? '0' : '?'}
+                cutState={straightCut != null ? 'ok' : result.status === 'over' ? 'bad' : 'none'}
+              />
+              <div className="qc-figure-hint">図の左右をタップして、端の継手を選びます</div>
+            </div>
+
+            <div className="qc-end-editor">
+              <div className="qc-end-tabs">
+                <button
+                  type="button"
+                  className={selectedEnd === 'left' ? 'active' : ''}
+                  onClick={() => setSelectedEnd('left')}
+                >
+                  左端 s1
+                </button>
+                <button
+                  type="button"
+                  className={selectedEnd === 'right' ? 'active' : ''}
+                  onClick={() => setSelectedEnd('right')}
+                >
+                  右端 s2
+                </button>
+              </div>
+              <Chips
+                options={END_KIND_OPTIONS}
+                value={end.kind}
+                onPick={(v) => updateEnd({ kind: v })}
+              />
+              {end.kind !== 'free' && (
+                <div className="qc-round qc-basis">
+                  <button
+                    className={end.basis === 'center' ? 'active' : ''}
+                    onClick={() => updateEnd({ basis: 'center' })}
+                  >
+                    継手の芯から測る
+                  </button>
+                  <button
+                    className={end.basis === 'face' ? 'active' : ''}
+                    onClick={() => updateEnd({ basis: 'face' })}
+                  >
+                    管の端から測る
+                  </button>
+                </div>
+              )}
+              {needsCounterpart(end.kind) && (
+                <label className="qc-inline-field">
+                  <span>{end.kind === 'tee' ? '枝のサイズ' : 'ランのサイズ'}</span>
+                  <select
+                    value={end.counterpartSize ?? size ?? ''}
+                    onChange={(e) => updateEnd({ counterpartSize: e.target.value || undefined })}
+                  >
+                    {sizes.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
+              {end.kind === 'flange' && (
+                <label className="qc-inline-field">
+                  <span>フランジ引きしろ(mm)</span>
+                  <input
+                    className="num-input"
+                    type="number"
+                    inputMode="decimal"
+                    value={end.flangeAllow ?? ''}
+                    onChange={(e) =>
+                      updateEnd({ flangeAllow: e.target.value === '' ? undefined : Number(e.target.value) })
+                    }
+                  />
+                </label>
+              )}
+            </div>
+
+            {(result.startMissing || result.endMissing) && (
+              <div className="qc-warn">
+                {result.startMissing && result.endMissing ? '両端' : result.startMissing ? '左端' : '右端'}
+                の継手は、このサイズの寸法データがありません（控え0で計算しています）
+              </div>
+            )}
+
+            <div className={`qc-answer${result.status === 'over' ? ' bad' : ''}`}>
+              {result.error && !(result.status === 'none' && overall == null && size) ? (
+                <div className="qc-answer-msg">{result.error}</div>
+              ) : result.status === 'zero' ? (
+                <div className="qc-answer-msg zero">管 0mm（継手どうし直結）</div>
+              ) : (
+                <div className="qc-answer-row">
+                  <span className="qc-answer-label">切り寸 L</span>
+                  <span className="qc-answer-value">{straightCut != null ? fmt(straightCut) : '—'}</span>
+                  <span className="qc-answer-unit">mm</span>
+                </div>
+              )}
+              <div className="qc-answer-formula">
+                L = a {fmt(overall)} − s1 {fmt(result.startAllow)} − s2 {fmt(result.endAllow)}
+              </div>
+              {roundToggle}
+            </div>
+
+            <div className="qc-overall">
+              <span className="qc-overall-tag">a</span>
+              <div className="qc-overall-display">{calcStraight.display || '0'}</div>
+              {calcStraight.error && <span className="qc-calc-error">{calcStraight.error}</span>}
+            </div>
+            <CalcKeypad onChange={setCalcStraight} onEqual={pressEqualStraight} />
+            {historyBlock}
+          </>
+        )}
+
+        {tab === 'offset' && (
+          <>
+            <div className="qc-figure-card">
+              <OffsetDiagram
+                given={prefs.offsetGiven}
+                onGiven={(g) => setPrefs({ offsetGiven: g })}
+                offsetText={fmt(offsetResult.offset) === '—' ? '?' : fmt(offsetResult.offset)}
+                travelText={fmt(offsetResult.travel) === '—' ? '?' : fmt(offsetResult.travel)}
+                sText={fmt(offsetResult.allow)}
+                cutText={offsetCut != null ? fmt(offsetCut) : offsetResult.status === 'zero' ? '0' : '?'}
+                cutState={offsetCut != null ? 'ok' : offsetResult.status === 'over' ? 'bad' : 'none'}
+              />
+              <div className="qc-figure-hint">両端45°エルボ。斜めの芯々 c = オフセット b × 1.414</div>
+            </div>
+
+            <div className="qc-round qc-given">
+              <button
+                className={prefs.offsetGiven === 'offset' ? 'active' : ''}
+                onClick={() => setPrefs({ offsetGiven: 'offset' })}
+              >
+                オフセット b を入れる
+              </button>
+              <button
+                className={prefs.offsetGiven === 'travel' ? 'active' : ''}
+                onClick={() => setPrefs({ offsetGiven: 'travel' })}
+              >
+                斜めの芯々 c を入れる
+              </button>
+            </div>
+
+            {offsetResult.missing && (
+              <div className="qc-warn">45°エルボは、このサイズの寸法データがありません（控え0で計算しています）</div>
+            )}
+
+            <div className={`qc-answer${offsetResult.status === 'over' ? ' bad' : ''}`}>
+              {offsetResult.error && !(offsetResult.status === 'none' && offsetValue == null && size) ? (
+                <div className="qc-answer-msg">{offsetResult.error}</div>
+              ) : offsetResult.status === 'zero' ? (
+                <div className="qc-answer-msg zero">管 0mm（エルボどうし直結）</div>
+              ) : (
+                <div className="qc-answer-row">
+                  <span className="qc-answer-label">切り寸 L</span>
+                  <span className="qc-answer-value">{offsetCut != null ? fmt(offsetCut) : '—'}</span>
+                  <span className="qc-answer-unit">mm</span>
+                </div>
+              )}
+              <div className="qc-answer-formula">
+                L = c {fmt(offsetResult.travel)} − s1 {fmt(offsetResult.allow)} − s2 {fmt(offsetResult.allow)}
+              </div>
+              {roundToggle}
+            </div>
+
+            <div className="qc-overall">
+              <span className="qc-overall-tag">{prefs.offsetGiven === 'offset' ? 'b' : 'c'}</span>
+              <div className="qc-overall-display">{calcOffset.display || '0'}</div>
+              {calcOffset.error && <span className="qc-calc-error">{calcOffset.error}</span>}
+            </div>
+            <CalcKeypad onChange={setCalcOffset} onEqual={pressEqualOffset} />
+            {historyBlock}
+          </>
+        )}
+
+        {tab === 'table' && (
+          <>
+            <Chips
+              scroll
+              options={FITTING_GROUPS.map((g) => ({ value: g.kind, label: g.label }))}
+              value={tableGroup}
+              onPick={(v) => setPrefs({ tableGroup: v, tableFitting: undefined, tableKey: undefined })}
+            />
+            <Chips
+              scroll
+              className="qc-chips-fitting"
+              options={groupFittings.map((f) => ({ value: f.id, label: fittingChipLabel(f) }))}
+              value={tableFitting?.id}
+              onPick={(v) => setPrefs({ tableFitting: v, tableKey: undefined })}
+            />
+            {isPair ? (
+              <>
+                <Chips
+                  scroll
+                  className="qc-chips-size"
+                  options={pairFirsts.map((n) => ({ value: n, label: nominalLabel(n, tableGroup) }))}
+                  value={pairFirst}
+                  onPick={(n) => setPrefs({ tableKey: tableKeys.find((k) => k.split('_')[0] === n) })}
+                />
+                <Chips
+                  scroll
+                  className="qc-chips-size"
+                  options={pairSeconds.map((k) => ({ value: k, label: `×${nominalLabel(k.split('_')[1], tableGroup)}` }))}
+                  value={tableKey}
+                  onPick={(v) => setPrefs({ tableKey: v })}
+                />
+              </>
+            ) : (
+              <Chips
+                scroll
+                className="qc-chips-size"
+                options={tableKeys.map((k) => ({ value: k, label: dimKeyLabel(k, tableGroup) }))}
+                value={tableKey}
+                onPick={(v) => setPrefs({ tableKey: v })}
+              />
+            )}
+
+            {tableFitting && tableKey && (
+              <div className="qc-figure-card">
+                <div className="qc-fig-title">
+                  【{dimKeyLabel(tableKey, tableGroup)}
+                  {tableInch && ` (${tableInch})`}】
+                </div>
+                <div className="qc-fig-sub">
+                  <span>{fittingChipLabel(tableFitting)}</span>
+                  <span>{tableFitting.drawingNo ?? ''}</span>
+                </div>
+                <FittingFigure shape={shapeOf(tableFitting)} values={tableRows.map((r) => r.value)} />
+                <div className="qc-fig-values">
+                  {tableRows.map((r) => (
+                    <div key={r.label} className="qc-fig-value">
+                      <span>{r.label}</span>
+                      <b>{r.value}</b>
+                      <span>mm</span>
+                    </div>
+                  ))}
+                </div>
+                <div className="qc-fig-note">
+                  {groupInfo?.maker}。芯（中心）から差込み底・端面までの寸法です。現物・カタログと照合してお使いください。
+                </div>
+              </div>
+            )}
+
+            {tableFitting && (
+              <div className="qc-table-wrap">
+                <table className="qc-table">
+                  <thead>
+                    <tr>
+                      <th>サイズ</th>
+                      {dimHeaders(tableFitting).map((h) => (
+                        <th key={h}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {tableKeys.map((k) => (
+                      <tr
+                        key={k}
+                        className={k === tableKey ? 'active' : ''}
+                        onClick={() => setPrefs({ tableKey: k })}
+                      >
+                        <td>{dimKeyLabel(k, tableGroup)}</td>
+                        {dimRows(tableFitting, tableFitting.dims[k]).map((r) => (
+                          <td key={r.label}>{r.value}</td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
   )
 }
+

@@ -4,7 +4,7 @@
 // 新規のデータ定義・計算式の重複実装はしない。
 import type { RoundMode } from './cutlength'
 import { computeCutFromAllowances } from './cutlength'
-import { elbowTakeoutById, teeTakeout, type ConnectionKind } from './takeout'
+import { elbowTakeoutById, teeTakeout, OFFSET_45_FACTOR, type ConnectionKind } from './takeout'
 
 export type QuickFittingKind =
   | 'free'
@@ -45,6 +45,9 @@ export interface QuickCalcResult {
   endAllow: number
   startFittingId?: string
   endFittingId?: string
+  /** 継手を選んでいるのに、そのサイズの寸法が継手マスタに無い端（控えを0として計算している） */
+  startMissing?: boolean
+  endMissing?: boolean
   rawCut?: number
   cut?: number
   status: 'none' | 'ok' | 'zero' | 'over'
@@ -54,7 +57,7 @@ export interface QuickCalcResult {
 
 // セグメントの接続方法(connection)・管種(pipeType)から、エルボ/チーズの
 // 継手idを出し分けるための種別。resolveEnd()の自動判定と同じルール。
-function connectionKindOf(
+export function connectionKindOf(
   pipeType?: string,
   vpSeries?: 'dv' | 'ts',
   connection?: string,
@@ -65,7 +68,7 @@ function connectionKindOf(
   return 'buttweld'
 }
 
-function elbowFittingId(
+export function elbowFittingId(
   kind: 'elbow90_long' | 'elbow90_short' | 'elbow45',
   ck: ConnectionKind,
 ): string {
@@ -142,6 +145,8 @@ export function computeQuickCut(input: QuickCalcInput): QuickCalcResult {
     input.vpSeries,
     input.connection,
   )
+  const startMissing = isMissing(left)
+  const endMissing = isMissing(right)
 
   if (left.mm + right.mm > input.overall) {
     return {
@@ -149,6 +154,8 @@ export function computeQuickCut(input: QuickCalcInput): QuickCalcResult {
       endAllow: right.mm,
       startFittingId: left.fittingId,
       endFittingId: right.fittingId,
+      startMissing,
+      endMissing,
       status: 'over',
       error: '全体寸法が継手の控え寸法より短いです',
     }
@@ -165,8 +172,65 @@ export function computeQuickCut(input: QuickCalcInput): QuickCalcResult {
     endAllow: right.mm,
     startFittingId: left.fittingId,
     endFittingId: right.fittingId,
+    startMissing,
+    endMissing,
     rawCut,
     cut,
     status,
   }
+}
+
+// 継手マスタに該当サイズが無いと elbowTakeoutById/teeTakeout は0を返す。
+// 黙って0のまま計算すると切り寸が長くなるので、UIで注意を出せるよう区別する。
+function isMissing(end: { mm: number; fittingId?: string }): boolean {
+  return end.fittingId != null && end.mm === 0
+}
+
+// --- 45°振り(直角三角形)の芯引き ---
+// 両端45°エルボのオフセット配管。作図画面と同じ「オフセット量×1.414」で
+// 斜辺(芯々)を出し、両端の45°エルボの控えを引いて切り寸法を求める。
+
+export interface Offset45Input {
+  pipeType?: string
+  size?: string
+  connection?: string
+  vpSeries?: 'dv' | 'ts'
+  /** 入力した値がオフセット量(a=b)か斜辺の芯々(c)か */
+  given: 'offset' | 'travel'
+  value?: number
+  roundMode: RoundMode
+}
+
+export interface Offset45Result {
+  offset?: number
+  travel?: number
+  allow: number
+  fittingId?: string
+  missing?: boolean
+  rawCut?: number
+  cut?: number
+  status: 'none' | 'ok' | 'zero' | 'over'
+  error?: string
+}
+
+export function computeOffset45(input: Offset45Input): Offset45Result {
+  const ck = connectionKindOf(input.pipeType, input.vpSeries, input.connection)
+  const fittingId = elbowFittingId('elbow45', ck)
+  const allow = input.size ? elbowTakeoutById(fittingId, input.size) : 0
+  const base = { allow, fittingId, missing: !!input.size && allow === 0 }
+  if (!input.size) return { ...base, status: 'none', error: 'サイズを選択してください' }
+  const v = input.value
+  if (v == null || Number.isNaN(v)) {
+    return { ...base, status: 'none', error: input.given === 'offset' ? 'オフセット寸法を入力してください' : '芯々寸法を入力してください' }
+  }
+  if (v < 0) return { ...base, status: 'none', error: '0以上で入力してください' }
+  if (v > MAX_DIGITS_VALUE) return { ...base, status: 'none', error: '5桁を超えました' }
+
+  const offset = input.given === 'offset' ? v : Math.round((v / OFFSET_45_FACTOR) * 10) / 10
+  const travel = input.given === 'travel' ? v : Math.round(v * OFFSET_45_FACTOR * 10) / 10
+  if (allow * 2 > travel) {
+    return { ...base, offset, travel, status: 'over', error: '寸法が45°エルボの控え寸法より短いです' }
+  }
+  const { rawCut, cut, status } = computeCutFromAllowances(travel, allow, allow, input.roundMode)
+  return { ...base, offset, travel, rawCut, cut, status }
 }
