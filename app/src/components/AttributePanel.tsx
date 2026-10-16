@@ -884,14 +884,19 @@ export function SegmentPanel({
             const dimField = (
               <label className="field dim-field" key="dim">
                 <span className="field-label">
-                  {isKickSegment ? '芯々寸法(自動計算, mm)' : '芯々寸法(mm)'}
+                  {isKickSegment && segment.kickFold ? '芯々寸法(自動計算, mm)' : '芯々寸法(mm)'}
                 </span>
                 <DimCalcInput
                   ref={dimRef}
                   className="num-input"
                   placeholder="例: 1200"
                   value={segment.centerLength}
-                  onCommit={(v) => onChange({ centerLength: v })}
+                  // ここを直接編集した場合は「現物として別個に切り出す配管」の
+                  // 実測値を入力したとみなし、逃げ寸法欄からの畳み込み指定
+                  // (kickFold)を解除する。両端エルボに挟まれているだけの
+                  // 普通のクランク配管まで無条件に隣へ畳み込んでしまい、
+                  // 切り寸が誤って大幅に長くなる不具合を防ぐため。
+                  onCommit={(v) => onChange({ centerLength: v, kickFold: undefined })}
                 />
               </label>
             )
@@ -922,12 +927,17 @@ export function SegmentPanel({
                   }
                   onChange={(e) => {
                     if (e.target.value === '') {
-                      onChange({ centerLength: undefined })
+                      onChange({ centerLength: undefined, kickFold: undefined })
                       return
                     }
                     const offset = Number(e.target.value)
                     if (Number.isNaN(offset)) return
-                    onChange({ centerLength: Math.round(offset * OFFSET_45_FACTOR * 10) / 10 })
+                    // この欄を使った＝現場の逃げ寸法としての一連の測り方なので、
+                    // 隣接する長い区間への畳み込み(kickFold)対象にする。
+                    onChange({
+                      centerLength: Math.round(offset * OFFSET_45_FACTOR * 10) / 10,
+                      kickFold: true,
+                    })
                   }}
                 />
               </label>

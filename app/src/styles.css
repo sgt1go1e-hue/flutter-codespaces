@@ -380,6 +380,12 @@ body {
   font-weight: 500;
 }
 
+.home-import-hint {
+  margin: 4px 2px 0;
+  font-size: 11.5px;
+  color: var(--home-ink-3);
+}
+
 /* --- フォルダセクション --- */
 .home-section-head {
   display: flex;
@@ -929,7 +935,10 @@ body {
    下線は廃止した。 */
 .dim-center {
   fill: var(--label-sub); /* 外側レーン: 芯々寸法（控えめ） */
-  font-size: calc(10.5px * var(--ui-scale, 1));
+  /* 以前は切り寸法(.dim-cut)より一回り小さくしていたが、印刷で文字を
+     大きくした際にこちらだけ小さいままで埋もれて読めなくなるという
+     指摘を受け、同じ大きさに揃えた(色・太さの違いで役割は区別できる)。 */
+  font-size: calc(12.5px * var(--ui-scale, 1));
   font-weight: 600;
   paint-order: stroke;
   stroke: var(--label-outline);
@@ -2492,6 +2501,10 @@ fieldset.panel-grid:disabled {
   height: 620px;
   border: 1px solid #999;
   background: #fff;
+  /* --ui-scaleは PrintIsometric.tsx 側でインラインstyleとして要素ごとに
+     設定する(BomModalの「文字サイズ」設定値をそのまま反映するため)。
+     font-size/stroke-widthのcalc()がこれに連動する。画面側(DrawingCanvas)
+     の表示には影響しない(別スコープのため)。 */
 }
 
 /* 1ページ集約モード: アイソメ図を縮小して改ページせずに続け、パイプ明細は
@@ -3668,6 +3681,14 @@ fieldset.panel-grid:disabled {
   margin: 0;
   color: var(--hint);
   font-size: 13px;
+}
+
+/* 受け取った相手がファイルを直接タップして開くと、中身(JSON)がそのまま
+   表示されてしまい「文字化けした」と誤解されやすいという報告があったため、
+   正しい開き方を注意書きとして目立たせる。 */
+.share-modal-warn {
+  color: var(--label-zero);
+  font-weight: 600;
 }
 
 .share-permission-options {

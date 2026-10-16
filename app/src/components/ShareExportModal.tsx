@@ -85,6 +85,9 @@ export function ShareExportModal({
         <p className="share-modal-desc">
           相手に許可する権限レベルを選んでください。共有ファイルはLINE・AirDrop・メール等、端末標準の方法で送れます（サーバーは使用しません）。
         </p>
+        <p className="share-modal-desc share-modal-warn">
+          受け取った相手がファイルを直接タップして開くと、文字の羅列（データの中身）がそのまま表示されてしまいます。相手には「ファイルを直接開かず、このアプリのホーム画面にある『共有ファイルを開く』から選んで開いてください」とお伝えください。
+        </p>
 
         <div className="share-permission-options">
           {SHARE_PERMISSIONS.map((p) => (

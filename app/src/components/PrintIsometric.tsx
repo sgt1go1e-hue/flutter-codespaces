@@ -1,4 +1,5 @@
 import { useMemo } from 'react'
+import type { CSSProperties } from 'react'
 import type { Point, Segment } from '../types'
 import { distance } from '../lib/isometric'
 import { breakLine } from '../lib/crossover'
@@ -52,6 +53,14 @@ interface Props {
   showThroughDim?: boolean
   /** 90°ショートエルボの「ショート」マークを表示するか（画面表示と揃える）。 */
   showShortMark?: boolean
+  /**
+   * 印刷/PDFの文字(寸法・サイズ・継手マーク等)の拡大率。BomModal側の
+   * 「文字サイズ」設定から渡される。SVGの--ui-scaleへ反映し、関連する
+   * font-size/stroke-widthのcalc()を連動させる(画面側のDrawingCanvasの
+   * 表示には影響しない、別スコープのため)。既定1.4は「小さすぎて読み
+   * づらい」という要望に対する底上げ後の値。
+   */
+  textScale?: number
 }
 
 const CROSS_GAP = 9
@@ -83,7 +92,13 @@ export function PrintIsometric({
   baseSlopeDenom,
   showThroughDim = false,
   showShortMark = true,
+  textScale = 1.4,
 }: Props) {
+  // 重なり回避(labelLayout.ts)の当たり判定の箱も、実際に大きくなった文字
+  // サイズに合わせて見積もらないと、文字サイズだけ大きくなって箱の見積もりが
+  // 追いつかず、ラベルどうしが重なって見えてしまう。DrawingCanvas.tsx の
+  // uiScale と同じ考え方で、ここでも同じ係数を掛ける。
+  const PRINT_UI_SCALE = textScale
   // 通り寸法(曲がるまで一直線に続く区間の合計)。表示専用。
   const throughRuns = useMemo(
     () => (showThroughDim ? computeThroughRuns(segments, cutById) : []),
@@ -111,8 +126,16 @@ export function PrintIsometric({
         continue
       const mx = (s.start.x + s.end.x) / 2
       const my = (s.start.y + s.end.y) / 2
-      const w = estimateTextWidth(eff.size, 12) + 8
-      jobs.push({ key: `seg-${s.id}`, cx: mx, cy: my - 10, w, h: 18, pushX: 0, pushY: -1 })
+      const w = estimateTextWidth(eff.size, 12 * PRINT_UI_SCALE) + 8 * PRINT_UI_SCALE
+      jobs.push({
+        key: `seg-${s.id}`,
+        cx: mx,
+        cy: my - 10,
+        w,
+        h: 18 * PRINT_UI_SCALE,
+        pushX: 0,
+        pushY: -1,
+      })
     }
     // ISOGEN流(海外の配管業界で広く使われる自動アイソメ生成ソフトのスタイル)を
     // 参考に、パイプ本体から離した1本の寸法線の上に、芯々/芯先(1行目)と
@@ -146,32 +169,33 @@ export function PrintIsometric({
               ? `レジューサー H=${c.reducerH}（継手直結）`
               : 'パイプ0（継手直結）'
             : '継手不足'
-      const fs2 = s.isGenGou
-        ? 9.5
-        : c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe
-          ? 12.5
-          : 11
+      const fs2 =
+        (s.isGenGou
+          ? 9.5
+          : c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe
+            ? 12.5
+            : 11) * PRINT_UI_SCALE
       const markPos = nearestElbow45Mark(elbow45Marks, mx, my)
       const side = chooseDimSide(s.start, s.end, markPos ?? undefined)
       const geom = dimGeometry(
         s.start,
         s.end,
         side,
-        1,
+        PRINT_UI_SCALE,
         DIM_STANDOFF,
         s.dimAnchorAlong ?? 0.5,
         s.dimLineOffset ?? { x: 0, y: 0 },
       )
       dimArrowObstacles.push(
-        { cx: geom.line.x1, cy: geom.line.y1, w: 16, h: 16 },
-        { cx: geom.line.x2, cy: geom.line.y2, w: 16, h: 16 },
+        { cx: geom.line.x1, cy: geom.line.y1, w: 16 * PRINT_UI_SCALE, h: 16 * PRINT_UI_SCALE },
+        { cx: geom.line.x2, cy: geom.line.y2, w: 16 * PRINT_UI_SCALE, h: 16 * PRINT_UI_SCALE },
       )
-      const w1 = estimateTextWidth(line1, 10.5) + 6
-      const w2 = estimateTextWidth(line2, fs2) + 6
+      const w1 = estimateTextWidth(line1, 12.5 * PRINT_UI_SCALE) + 6 * PRINT_UI_SCALE
+      const w2 = estimateTextWidth(line2, fs2) + 6 * PRINT_UI_SCALE
       // 当たり判定の箱は、実際の回転角(±30°刻みのアイソメ角度に対応)に応じた
       // 軸並行(AABB)サイズで見積もる。
-      const box1 = rotatedBoxSize(w1, 16, geom.textRotateDeg)
-      const box2 = rotatedBoxSize(w2, 18, geom.textRotateDeg)
+      const box1 = rotatedBoxSize(w1, 16 * PRINT_UI_SCALE, geom.textRotateDeg)
+      const box2 = rotatedBoxSize(w2, 18 * PRINT_UI_SCALE, geom.textRotateDeg)
       // 1行目・2行目をまとめた1つの箱として登録する（理由はDrawingCanvas.tsxの
       // 同箇所のコメント参照。自分自身の2行を誤って重なっていると判定して
       // 無駄に引き離してしまう問題を避ける）。
@@ -209,8 +233,16 @@ export function PrintIsometric({
         }
         const cx = pt.x + ox * 20 + nx * 14
         const cy = pt.y + oy * 20 + ny * 14
-        const w = estimateTextWidth(eff.size, 13) + 14
-        jobs.push({ key: `term-${s.id}-${at}`, cx, cy, w, h: 26, pushX: nx, pushY: ny })
+        const w = estimateTextWidth(eff.size, 13 * PRINT_UI_SCALE) + 14 * PRINT_UI_SCALE
+        jobs.push({
+          key: `term-${s.id}-${at}`,
+          cx,
+          cy,
+          w,
+          h: 26 * PRINT_UI_SCALE,
+          pushX: nx,
+          pushY: ny,
+        })
       }
     }
     // 排水勾配の「勾配1/N」マーク（区間中点のやや下）。個別上書きが無い
@@ -221,8 +253,16 @@ export function PrintIsometric({
       if (denom == null) continue
       const mx = (s.start.x + s.end.x) / 2
       const my = (s.start.y + s.end.y) / 2
-      const w = estimateTextWidth(`勾配1/${denom}`, 11) + 6
-      jobs.push({ key: `slope-${s.id}`, cx: mx, cy: my + 16, w, h: 18, pushX: 0, pushY: 1 })
+      const w = estimateTextWidth(`勾配1/${denom}`, 11 * PRINT_UI_SCALE) + 6 * PRINT_UI_SCALE
+      jobs.push({
+        key: `slope-${s.id}`,
+        cx: mx,
+        cy: my + 16,
+        w,
+        h: 18 * PRINT_UI_SCALE,
+        pushX: 0,
+        pushY: 1,
+      })
     }
     // データ上つながっていない線どうしが視覚的に交差する箇所は、複数のラベルの
     // 既定位置（セグメント中点付近）が同じ場所に集まりやすく、重なって読めなく
@@ -235,8 +275,8 @@ export function PrintIsometric({
         crossObstacles.push({
           cx: s.start.x + (s.end.x - s.start.x) * t,
           cy: s.start.y + (s.end.y - s.start.y) * t,
-          w: 40,
-          h: 40,
+          w: 40 * PRINT_UI_SCALE,
+          h: 40 * PRINT_UI_SCALE,
         })
       }
     }
@@ -246,11 +286,11 @@ export function PrintIsometric({
     const elbow45Obstacles: LabelBox[] = markEnds.map((e) => ({
       cx: e.pos.x,
       cy: e.pos.y,
-      w: 34,
-      h: 22,
+      w: 34 * PRINT_UI_SCALE,
+      h: 22 * PRINT_UI_SCALE,
     }))
     return resolveOverlaps(jobs, [...crossObstacles, ...elbow45Obstacles, ...dimArrowObstacles])
-  }, [segments, cutById, effectiveById, crossoverGaps, baseSlopeDenom, markEnds])
+  }, [segments, cutById, effectiveById, crossoverGaps, baseSlopeDenom, markEnds, PRINT_UI_SCALE])
 
   const viewBox = useMemo(() => {
     if (segments.length === 0) return '0 0 200 200'
@@ -467,7 +507,12 @@ export function PrintIsometric({
   }
 
   return (
-    <svg className="print-iso-svg" viewBox={viewBox} preserveAspectRatio="xMidYMid meet">
+    <svg
+      className="print-iso-svg"
+      viewBox={viewBox}
+      preserveAspectRatio="xMidYMid meet"
+      style={{ '--ui-scale': textScale } as CSSProperties}
+    >
       {segments.map((s) => {
         const eff = effectiveById[s.id]
         const resolved = eff?.resolved ?? false
@@ -553,13 +598,21 @@ export function PrintIsometric({
                 s.start,
                 s.end,
                 side,
-                1,
+                PRINT_UI_SCALE,
                 DIM_STANDOFF,
                 s.dimAnchorAlong ?? 0.5,
                 s.dimLineOffset ?? { x: 0, y: 0 },
               )
-              const extStart = dimExtensionLine(s.start, { x: geom.line.x1, y: geom.line.y1 }, 1)
-              const extEnd = dimExtensionLine(s.end, { x: geom.line.x2, y: geom.line.y2 }, 1)
+              const extStart = dimExtensionLine(
+                s.start,
+                { x: geom.line.x1, y: geom.line.y1 },
+                PRINT_UI_SCALE,
+              )
+              const extEnd = dimExtensionLine(
+                s.end,
+                { x: geom.line.x2, y: geom.line.y2 },
+                PRINT_UI_SCALE,
+              )
               const groupResolved = resolvedLabels.get(`dim-group-${s.id}`)
               const origGroupCx = (geom.text1X + geom.text2X) / 2
               const origGroupCy = (geom.text1Y + geom.text2Y) / 2
@@ -736,9 +789,9 @@ export function PrintIsometric({
           (run.start.y + run.end.y) / 2,
         )
         const side = chooseDimSide(first.start, first.end, markPos ?? undefined)
-        const g = dimGeometry(run.start, run.end, side, 1, DIM_THROUGH_STANDOFF)
-        const e1 = dimExtensionLine(run.start, { x: g.line.x1, y: g.line.y1 }, 1)
-        const e2 = dimExtensionLine(run.end, { x: g.line.x2, y: g.line.y2 }, 1)
+        const g = dimGeometry(run.start, run.end, side, PRINT_UI_SCALE, DIM_THROUGH_STANDOFF)
+        const e1 = dimExtensionLine(run.start, { x: g.line.x1, y: g.line.y1 }, PRINT_UI_SCALE)
+        const e2 = dimExtensionLine(run.end, { x: g.line.x2, y: g.line.y2 }, PRINT_UI_SCALE)
         return (
           <g key={`through-${run.ids[0]}`} className="dim-group">
             <line className="dim-ext-line" x1={e1.x1} y1={e1.y1} x2={e1.x2} y2={e1.y2} />
