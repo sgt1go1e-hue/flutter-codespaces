@@ -181,7 +181,7 @@ export function PrintIsometric({
         s.start,
         s.end,
         side,
-        1,
+        PRINT_UI_SCALE,
         DIM_STANDOFF,
         s.dimAnchorAlong ?? 0.5,
         s.dimLineOffset ?? { x: 0, y: 0 },
@@ -190,7 +190,7 @@ export function PrintIsometric({
         { cx: geom.line.x1, cy: geom.line.y1, w: 16 * PRINT_UI_SCALE, h: 16 * PRINT_UI_SCALE },
         { cx: geom.line.x2, cy: geom.line.y2, w: 16 * PRINT_UI_SCALE, h: 16 * PRINT_UI_SCALE },
       )
-      const w1 = estimateTextWidth(line1, 10.5 * PRINT_UI_SCALE) + 6 * PRINT_UI_SCALE
+      const w1 = estimateTextWidth(line1, 12.5 * PRINT_UI_SCALE) + 6 * PRINT_UI_SCALE
       const w2 = estimateTextWidth(line2, fs2) + 6 * PRINT_UI_SCALE
       // 当たり判定の箱は、実際の回転角(±30°刻みのアイソメ角度に対応)に応じた
       // 軸並行(AABB)サイズで見積もる。
@@ -598,13 +598,21 @@ export function PrintIsometric({
                 s.start,
                 s.end,
                 side,
-                1,
+                PRINT_UI_SCALE,
                 DIM_STANDOFF,
                 s.dimAnchorAlong ?? 0.5,
                 s.dimLineOffset ?? { x: 0, y: 0 },
               )
-              const extStart = dimExtensionLine(s.start, { x: geom.line.x1, y: geom.line.y1 }, 1)
-              const extEnd = dimExtensionLine(s.end, { x: geom.line.x2, y: geom.line.y2 }, 1)
+              const extStart = dimExtensionLine(
+                s.start,
+                { x: geom.line.x1, y: geom.line.y1 },
+                PRINT_UI_SCALE,
+              )
+              const extEnd = dimExtensionLine(
+                s.end,
+                { x: geom.line.x2, y: geom.line.y2 },
+                PRINT_UI_SCALE,
+              )
               const groupResolved = resolvedLabels.get(`dim-group-${s.id}`)
               const origGroupCx = (geom.text1X + geom.text2X) / 2
               const origGroupCy = (geom.text1Y + geom.text2Y) / 2
@@ -781,9 +789,9 @@ export function PrintIsometric({
           (run.start.y + run.end.y) / 2,
         )
         const side = chooseDimSide(first.start, first.end, markPos ?? undefined)
-        const g = dimGeometry(run.start, run.end, side, 1, DIM_THROUGH_STANDOFF)
-        const e1 = dimExtensionLine(run.start, { x: g.line.x1, y: g.line.y1 }, 1)
-        const e2 = dimExtensionLine(run.end, { x: g.line.x2, y: g.line.y2 }, 1)
+        const g = dimGeometry(run.start, run.end, side, PRINT_UI_SCALE, DIM_THROUGH_STANDOFF)
+        const e1 = dimExtensionLine(run.start, { x: g.line.x1, y: g.line.y1 }, PRINT_UI_SCALE)
+        const e2 = dimExtensionLine(run.end, { x: g.line.x2, y: g.line.y2 }, PRINT_UI_SCALE)
         return (
           <g key={`through-${run.ids[0]}`} className="dim-group">
             <line className="dim-ext-line" x1={e1.x1} y1={e1.y1} x2={e1.x2} y2={e1.y2} />

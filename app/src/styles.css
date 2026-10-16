@@ -935,7 +935,10 @@ body {
    下線は廃止した。 */
 .dim-center {
   fill: var(--label-sub); /* 外側レーン: 芯々寸法（控えめ） */
-  font-size: calc(10.5px * var(--ui-scale, 1));
+  /* 以前は切り寸法(.dim-cut)より一回り小さくしていたが、印刷で文字を
+     大きくした際にこちらだけ小さいままで埋もれて読めなくなるという
+     指摘を受け、同じ大きさに揃えた(色・太さの違いで役割は区別できる)。 */
+  font-size: calc(12.5px * var(--ui-scale, 1));
   font-weight: 600;
   paint-order: stroke;
   stroke: var(--label-outline);

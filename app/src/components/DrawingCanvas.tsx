@@ -707,7 +707,7 @@ export function DrawingCanvas({
               ? `レジューサー H=${c.reducerH}（継手直結）`
               : 'パイプ0（継手直結）'
             : '継手不足'
-      const fs1 = 10.5 * uiScale
+      const fs1 = 12.5 * uiScale
       const fs2 =
         (c.status === 'ok' && !c.threadTooShortForPipe && !c.vpTsTooShortForPipe ? 12.5 : 11) *
         uiScale
