@@ -154,7 +154,12 @@ export function QuickCalc({ onClose }: Props) {
   const { tab, pipeType, size, connection, vpSeries, roundMode, rawMode, left, right } = prefs
 
   const [history, setHistory] = useLocalStorage<HistoryEntry[]>(HISTORY_KEY, [])
-  const [calcStraight, setCalcStraight] = useState<CalcState>(initialCalcState)
+  // 芯引きは a(全体芯々) と L(切り寸) のどちらからでも計算できる。入力中の方を field で持つ
+  const [straightField, setStraightField] = useState<'a' | 'L'>('a')
+  const [calcA, setCalcA] = useState<CalcState>(initialCalcState)
+  const [calcL, setCalcL] = useState<CalcState>(initialCalcState)
+  const calcStraight = straightField === 'a' ? calcA : calcL
+  const setCalcStraight = straightField === 'a' ? setCalcA : setCalcL
   const [calcOffset, setCalcOffset] = useState<CalcState>(initialCalcState)
   const [selectedEnd, setSelectedEnd] = useState<'left' | 'right'>('left')
   // 初めて開いたときは、管種・接続・サイズを選んでもらうためドラムを開いておく
@@ -171,14 +176,34 @@ export function QuickCalc({ onClose }: Props) {
       : (connectionMethods.find((c) => c.id === connection)?.name ?? '溶接')
 
   // ---- 芯引き ----
-  const overall = calcCurrentTotal(calcStraight)
-  const input: QuickCalcInput = useMemo(
-    () => ({ pipeType, size, connection, vpSeries, overall, roundMode, left, right }),
-    [pipeType, size, connection, vpSeries, overall, roundMode, left, right],
-  )
-  const result = useMemo(() => computeQuickCut(input), [input])
+  const base: QuickCalcInput = { pipeType, size, connection, vpSeries, overall: undefined, roundMode, left, right }
+  // 控え(s1/s2)は寸法と無関係に決まるので、先に求めておく(Lから逆算するときに使う)
+  const allows = computeQuickCut(base)
+  const givenA = calcCurrentTotal(calcA)
+  const givenL = calcCurrentTotal(calcL)
+  const overall =
+    straightField === 'a'
+      ? givenA
+      : givenL != null
+        ? Math.round((givenL + allows.startAllow + allows.endAllow) * 10) / 10
+        : undefined
+  const result = computeQuickCut({ ...base, overall })
   const straightCut =
-    result.status === 'ok' ? (rawMode && result.rawCut != null ? result.rawCut : result.cut) : undefined
+    straightField === 'L'
+      ? givenL
+      : result.status === 'ok'
+        ? rawMode && result.rawCut != null
+          ? result.rawCut
+          : result.cut
+        : undefined
+
+  function pickStraightField(f: 'a' | 'L') {
+    if (f === straightField) return
+    // 切り替えたら、今出ている値を入力の初期値にする(続けて足し引きできるように)
+    if (f === 'L' && straightCut != null) setCalcL(calcStateFromValue(straightCut))
+    if (f === 'a' && overall != null) setCalcA(calcStateFromValue(overall))
+    setStraightField(f)
+  }
 
   // ---- 45°振り ----
   const offsetValue = calcCurrentTotal(calcOffset)
@@ -242,7 +267,7 @@ export function QuickCalc({ onClose }: Props) {
     })
     if (straightCut != null) {
       const ends = `${END_KIND_OPTIONS.find((o) => o.value === left.kind)?.label}〜${END_KIND_OPTIONS.find((o) => o.value === right.kind)?.label}`
-      addHistory(`芯引き ${specText()} ${ends} a${fmt(overall)}`, straightCut)
+      addHistory(`芯引き ${specText()} ${ends} a${fmt(overall)}${straightField === 'L' ? '(Lから)' : ''}`, straightCut)
     }
   }
 
@@ -414,8 +439,10 @@ export function QuickCalc({ onClose }: Props) {
                 s2Text={fmt(result.endAllow)}
                 cutText={straightCut != null ? fmt(straightCut) : result.status === 'zero' ? '0' : '?'}
                 cutState={straightCut != null ? 'ok' : result.status === 'over' ? 'bad' : 'none'}
+                field={straightField}
+                onField={pickStraightField}
               />
-              <div className="qc-figure-hint">図の左右をタップして、端の継手を選びます</div>
+              <div className="qc-figure-hint">枠をタップで a・L を入力／左右をタップで継手を選ぶ</div>
             </div>
 
             <div className="qc-end-editor">
@@ -494,26 +521,41 @@ export function QuickCalc({ onClose }: Props) {
               </div>
             )}
 
-            <div className={`qc-answer${result.status === 'over' ? ' bad' : ''}`}>
-              {result.error && !(result.status === 'none' && overall == null && size) ? (
-                <div className="qc-answer-msg">{result.error}</div>
-              ) : result.status === 'zero' ? (
-                <div className="qc-answer-msg zero">管 0mm（継手どうし直結）</div>
+            <div className={`qc-answer${result.status === 'over' && straightField === 'a' ? ' bad' : ''}`}>
+              {straightField === 'L' ? (
+                <>
+                  <div className="qc-answer-row">
+                    <span className="qc-answer-label accent">全体 a</span>
+                    <span className="qc-answer-value accent">{overall != null ? fmt(overall) : '—'}</span>
+                    <span className="qc-answer-unit">mm</span>
+                  </div>
+                  <div className="qc-answer-formula">
+                    a = L {fmt(givenL)} ＋ s1 {fmt(result.startAllow)} ＋ s2 {fmt(result.endAllow)}
+                  </div>
+                </>
               ) : (
-                <div className="qc-answer-row">
-                  <span className="qc-answer-label">切り寸 L</span>
-                  <span className="qc-answer-value">{straightCut != null ? fmt(straightCut) : '—'}</span>
-                  <span className="qc-answer-unit">mm</span>
-                </div>
+                <>
+                  {result.error && !(result.status === 'none' && overall == null && size) ? (
+                    <div className="qc-answer-msg">{result.error}</div>
+                  ) : result.status === 'zero' ? (
+                    <div className="qc-answer-msg zero">管 0mm（継手どうし直結）</div>
+                  ) : (
+                    <div className="qc-answer-row">
+                      <span className="qc-answer-label">切り寸 L</span>
+                      <span className="qc-answer-value">{straightCut != null ? fmt(straightCut) : '—'}</span>
+                      <span className="qc-answer-unit">mm</span>
+                    </div>
+                  )}
+                  <div className="qc-answer-formula">
+                    L = a {fmt(overall)} − s1 {fmt(result.startAllow)} − s2 {fmt(result.endAllow)}
+                  </div>
+                  {roundToggle}
+                </>
               )}
-              <div className="qc-answer-formula">
-                L = a {fmt(overall)} − s1 {fmt(result.startAllow)} − s2 {fmt(result.endAllow)}
-              </div>
-              {roundToggle}
             </div>
 
             <div className="qc-overall">
-              <span className="qc-overall-tag">a</span>
+              <span className={`qc-overall-tag${straightField === 'L' ? ' cut' : ''}`}>{straightField}</span>
               <div className="qc-overall-display">{calcStraight.display || '0'}</div>
               {calcStraight.error && <span className="qc-calc-error">{calcStraight.error}</span>}
             </div>

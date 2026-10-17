@@ -3388,6 +3388,20 @@ fieldset.panel-grid:disabled {
   font-weight: 800;
 }
 
+.qd-field {
+  fill: none;
+  stroke: var(--hint);
+  stroke-width: 1;
+  stroke-dasharray: 3 3;
+}
+
+.qd-field.active {
+  fill: var(--panel);
+  stroke: var(--accent);
+  stroke-width: 2;
+  stroke-dasharray: none;
+}
+
 .qd-select-frame {
   fill: none;
   stroke: var(--accent);
@@ -3519,6 +3533,15 @@ fieldset.panel-grid:disabled {
   font-weight: 900;
   font-variant-numeric: tabular-nums;
   line-height: 1.1;
+}
+
+.qc-answer-label.accent,
+.qc-answer-value.accent {
+  color: var(--accent);
+}
+
+.qc-overall-tag.cut {
+  color: var(--label-cut);
 }
 
 .qc-answer-unit {

@@ -147,6 +147,23 @@ export interface StraightDiagramProps {
   s2Text: string
   cutText: string
   cutState: 'ok' | 'none' | 'bad'
+  /** テンキーで入力している寸法（a=全体芯々 / L=切り寸） */
+  field: 'a' | 'L'
+  onField: (f: 'a' | 'L') => void
+}
+
+/** 寸法の数字を「入力欄」に見せる枠。入力中は実線、そうでなければ点線 */
+function FieldBox({ cx, cy, active }: { cx: number; cy: number; active: boolean }) {
+  return (
+    <rect
+      x={cx - 82}
+      y={cy - 21}
+      width={164}
+      height={28}
+      rx={7}
+      className={active ? 'qd-field active' : 'qd-field'}
+    />
+  )
 }
 
 export function StraightDiagram(p: StraightDiagramProps) {
@@ -161,14 +178,15 @@ export function StraightDiagram(p: StraightDiagramProps) {
   const pipeR = XR - wR
   const aL = leftFace ? pipeL : XL
   const aR = rightFace ? pipeR : XR
-  const yA = 30
-  const yS = 72
+  const yA = 32
+  const yS = 76
   return (
     <svg className="qd-svg" viewBox="0 0 360 200" role="img" aria-label="芯引きの図">
       {/* 寸法 a（全体・芯々） */}
       <Ext x1={aL} y1={yA - 8} x2={aL} y2={CY - 14} />
       <Ext x1={aR} y1={yA - 8} x2={aR} y2={CY - 14} />
       <DimLine x1={aL} y1={yA} x2={aR} y2={yA} className="qd-dim strong" />
+      <FieldBox cx={(aL + aR) / 2} cy={yA - 8} active={p.field === 'a'} />
       <text x={(aL + aR) / 2} y={yA - 8} className="qd-label-a" textAnchor="middle">
         a　{p.overallText}
       </text>
@@ -179,6 +197,7 @@ export function StraightDiagram(p: StraightDiagramProps) {
       <DimLine x1={aL} y1={yS} x2={pipeL} y2={yS} />
       <DimLine x1={pipeL} y1={yS} x2={pipeR} y2={yS} className="qd-dim cut" />
       <DimLine x1={pipeR} y1={yS} x2={aR} y2={yS} />
+      <FieldBox cx={(pipeL + pipeR) / 2} cy={yS - 8} active={p.field === 'L'} />
       <text x={(pipeL + pipeR) / 2} y={yS - 8} className={`qd-label-cut ${p.cutState}`} textAnchor="middle">
         L　{p.cutText}
       </text>
@@ -216,6 +235,10 @@ export function StraightDiagram(p: StraightDiagramProps) {
       {/* 左右どちらかをタップして選ぶ */}
       <rect x={0} y={84} width={150} height={116} className="qd-hit" onPointerDown={() => p.onSelect('left')} />
       <rect x={210} y={84} width={150} height={116} className="qd-hit" onPointerDown={() => p.onSelect('right')} />
+
+      {/* 寸法の数字をタップして、a と L のどちらを入力するか選ぶ */}
+      <rect x={0} y={0} width={360} height={40} className="qd-hit" onPointerDown={() => p.onField('a')} />
+      <rect x={70} y={42} width={220} height={40} className="qd-hit" onPointerDown={() => p.onField('L')} />
     </svg>
   )
 }
