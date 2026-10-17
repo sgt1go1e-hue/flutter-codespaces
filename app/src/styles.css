@@ -4925,3 +4925,106 @@ fieldset.panel-grid:disabled {
   font-size: 16px;
   font-weight: 800;
 }
+
+/* --- クイック計算: 下からせり上がるテンキー --- */
+.qc-screen .qc-body.with-sheet {
+  /* テンキーに隠れる分、下まで読めるように余白をとる */
+  padding-bottom: 400px;
+}
+
+.qc-sheet {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 40;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background: var(--panel);
+  border-top: 1px solid var(--border);
+  border-radius: 18px 18px 0 0;
+  box-shadow: 0 -8px 24px var(--shadow);
+  padding: 10px 12px max(12px, env(safe-area-inset-bottom));
+  animation: qc-sheet-up 0.18s ease-out;
+}
+
+@media (min-width: 700px) {
+  .qc-sheet {
+    max-width: 640px;
+    margin: 0 auto;
+  }
+}
+
+@keyframes qc-sheet-up {
+  from {
+    transform: translateY(100%);
+  }
+  to {
+    transform: translateY(0);
+  }
+}
+
+.qc-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qc-sheet-display {
+  flex: 1;
+  min-width: 0;
+  text-align: right;
+  font-size: 28px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+.qc-sheet-close {
+  flex-shrink: 0;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 0 14px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.qc-sheet-answer {
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-end;
+  gap: 8px;
+  color: var(--hint);
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.qc-sheet-answer b {
+  font-size: 24px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-sheet-answer.cut b,
+.qc-sheet-answer.cut span:first-child {
+  color: var(--label-cut);
+}
+
+.qc-sheet-answer.accent b,
+.qc-sheet-answer.accent span:first-child {
+  color: var(--accent);
+}
+
+.qc-sheet .qc-keypad {
+  gap: 6px;
+}
+
+.qc-sheet .qc-key {
+  min-height: 46px;
+}

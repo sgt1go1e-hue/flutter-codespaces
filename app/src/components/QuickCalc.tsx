@@ -67,7 +67,7 @@ interface Prefs {
   rawMode: boolean
   left: QuickEndInput
   right: QuickEndInput
-  offsetGiven: 'offset' | 'travel'
+  offsetGiven: 'offset' | 'travel' | 'cut'
   tableGroup?: ConnectionKind
   tableFitting?: string
   tableKey?: string
@@ -162,6 +162,8 @@ export function QuickCalc({ onClose }: Props) {
   const setCalcStraight = straightField === 'a' ? setCalcA : setCalcL
   const [calcOffset, setCalcOffset] = useState<CalcState>(initialCalcState)
   const [selectedEnd, setSelectedEnd] = useState<'left' | 'right'>('left')
+  // テンキーは寸法の枠をタップしたときだけ下から出す
+  const [keypadOpen, setKeypadOpen] = useState(false)
   // 初めて開いたときは、管種・接続・サイズを選んでもらうためドラムを開いておく
   const [specOpen, setSpecOpen] = useState(!stored.size)
 
@@ -198,6 +200,8 @@ export function QuickCalc({ onClose }: Props) {
         : undefined
 
   function pickStraightField(f: 'a' | 'L') {
+    setKeypadOpen(true)
+    setSpecOpen(false)
     if (f === straightField) return
     // 切り替えたら、今出ている値を入力の初期値にする(続けて足し引きできるように)
     if (f === 'L' && straightCut != null) setCalcL(calcStateFromValue(straightCut))
@@ -226,6 +230,16 @@ export function QuickCalc({ onClose }: Props) {
         ? offsetResult.rawCut
         : offsetResult.cut
       : undefined
+
+  function pickOffsetField(g: 'offset' | 'travel' | 'cut') {
+    setKeypadOpen(true)
+    setSpecOpen(false)
+    if (g === prefs.offsetGiven) return
+    // 切り替えたら、今出ている値を入力の初期値にする
+    const cur = g === 'offset' ? offsetResult.offset : g === 'travel' ? offsetResult.travel : offsetCut
+    setCalcOffset(cur != null ? calcStateFromValue(cur) : initialCalcState)
+    setPrefs({ offsetGiven: g })
+  }
 
   const end = selectedEnd === 'left' ? left : right
   function updateEnd(patch: Partial<QuickEndInput>) {
@@ -279,7 +293,10 @@ export function QuickCalc({ onClose }: Props) {
       return calcStateFromValue(value)
     })
     if (offsetCut != null) {
-      addHistory(`45°振り ${specText()} b${fmt(offsetResult.offset)} c${fmt(offsetResult.travel)}`, offsetCut)
+      addHistory(
+        `45°振り ${specText()} b${fmt(offsetResult.offset)} c${fmt(offsetResult.travel)}${prefs.offsetGiven === 'cut' ? '(Lから)' : ''}`,
+        offsetCut,
+      )
     }
   }
 
@@ -358,14 +375,17 @@ export function QuickCalc({ onClose }: Props) {
             key={t.id}
             type="button"
             className={tab === t.id ? 'active' : ''}
-            onClick={() => setPrefs({ tab: t.id })}
+            onClick={() => {
+              setPrefs({ tab: t.id })
+              setKeypadOpen(false)
+            }}
           >
             {t.label}
           </button>
         ))}
       </nav>
 
-      <div className="qc-body">
+      <div className={`qc-body${keypadOpen && tab !== 'table' ? ' with-sheet' : ''}`}>
         {tab !== 'table' && (
           <div className="qc-spec">
             <button type="button" className="qc-spec-bar" onClick={() => setSpecOpen((o) => !o)}>
@@ -554,12 +574,6 @@ export function QuickCalc({ onClose }: Props) {
               )}
             </div>
 
-            <div className="qc-overall">
-              <span className={`qc-overall-tag${straightField === 'L' ? ' cut' : ''}`}>{straightField}</span>
-              <div className="qc-overall-display">{calcStraight.display || '0'}</div>
-              {calcStraight.error && <span className="qc-calc-error">{calcStraight.error}</span>}
-            </div>
-            <CalcKeypad onChange={setCalcStraight} onEqual={pressEqualStraight} />
             {historyBlock}
           </>
         )}
@@ -569,29 +583,14 @@ export function QuickCalc({ onClose }: Props) {
             <div className="qc-figure-card">
               <OffsetDiagram
                 given={prefs.offsetGiven}
-                onGiven={(g) => setPrefs({ offsetGiven: g })}
+                onGiven={pickOffsetField}
                 offsetText={fmt(offsetResult.offset) === '—' ? '?' : fmt(offsetResult.offset)}
                 travelText={fmt(offsetResult.travel) === '—' ? '?' : fmt(offsetResult.travel)}
                 sText={fmt(offsetResult.allow)}
                 cutText={offsetCut != null ? fmt(offsetCut) : offsetResult.status === 'zero' ? '0' : '?'}
                 cutState={offsetCut != null ? 'ok' : offsetResult.status === 'over' ? 'bad' : 'none'}
               />
-              <div className="qc-figure-hint">両端45°エルボ。斜めの芯々 c = オフセット b × 1.414</div>
-            </div>
-
-            <div className="qc-round qc-given">
-              <button
-                className={prefs.offsetGiven === 'offset' ? 'active' : ''}
-                onClick={() => setPrefs({ offsetGiven: 'offset' })}
-              >
-                オフセット b を入れる
-              </button>
-              <button
-                className={prefs.offsetGiven === 'travel' ? 'active' : ''}
-                onClick={() => setPrefs({ offsetGiven: 'travel' })}
-              >
-                斜めの芯々 c を入れる
-              </button>
+              <div className="qc-figure-hint">枠をタップで b・c・L を入力（c = b × 1.414）</div>
             </div>
 
             {offsetResult.missing && (
@@ -599,7 +598,13 @@ export function QuickCalc({ onClose }: Props) {
             )}
 
             <div className={`qc-answer${offsetResult.status === 'over' ? ' bad' : ''}`}>
-              {offsetResult.error && !(offsetResult.status === 'none' && offsetValue == null && size) ? (
+              {prefs.offsetGiven === 'cut' ? (
+                <div className="qc-answer-row">
+                  <span className="qc-answer-label accent">オフセット b</span>
+                  <span className="qc-answer-value accent">{fmt(offsetResult.offset)}</span>
+                  <span className="qc-answer-unit">mm</span>
+                </div>
+              ) : offsetResult.error && !(offsetResult.status === 'none' && offsetValue == null && size) ? (
                 <div className="qc-answer-msg">{offsetResult.error}</div>
               ) : offsetResult.status === 'zero' ? (
                 <div className="qc-answer-msg zero">管 0mm（エルボどうし直結）</div>
@@ -611,17 +616,13 @@ export function QuickCalc({ onClose }: Props) {
                 </div>
               )}
               <div className="qc-answer-formula">
-                L = c {fmt(offsetResult.travel)} − s1 {fmt(offsetResult.allow)} − s2 {fmt(offsetResult.allow)}
+                {prefs.offsetGiven === 'cut'
+                  ? `c = L ${fmt(offsetCut)} ＋ s1 ${fmt(offsetResult.allow)} ＋ s2 ${fmt(offsetResult.allow)} = ${fmt(offsetResult.travel)}`
+                  : `L = c ${fmt(offsetResult.travel)} − s1 ${fmt(offsetResult.allow)} − s2 ${fmt(offsetResult.allow)}`}
               </div>
-              {roundToggle}
+              {prefs.offsetGiven !== 'cut' && roundToggle}
             </div>
 
-            <div className="qc-overall">
-              <span className="qc-overall-tag">{prefs.offsetGiven === 'offset' ? 'b' : 'c'}</span>
-              <div className="qc-overall-display">{calcOffset.display || '0'}</div>
-              {calcOffset.error && <span className="qc-calc-error">{calcOffset.error}</span>}
-            </div>
-            <CalcKeypad onChange={setCalcOffset} onEqual={pressEqualOffset} />
             {historyBlock}
           </>
         )}
@@ -725,6 +726,77 @@ export function QuickCalc({ onClose }: Props) {
           </>
         )}
       </div>
+
+      {keypadOpen && tab === 'straight' && (
+        <KeypadSheet
+          tag={straightField}
+          tagClass={straightField === 'L' ? 'cut' : ''}
+          calc={calcStraight}
+          onChange={setCalcStraight}
+          onEqual={pressEqualStraight}
+          onClose={() => setKeypadOpen(false)}
+          answerLabel={straightField === 'a' ? 'L' : 'a'}
+          answerValue={straightField === 'a' ? straightCut : overall}
+          answerClass={straightField === 'a' ? 'cut' : 'accent'}
+        />
+      )}
+      {keypadOpen && tab === 'offset' && (
+        <KeypadSheet
+          tag={prefs.offsetGiven === 'offset' ? 'b' : prefs.offsetGiven === 'travel' ? 'c' : 'L'}
+          tagClass={prefs.offsetGiven === 'cut' ? 'cut' : ''}
+          calc={calcOffset}
+          onChange={setCalcOffset}
+          onEqual={pressEqualOffset}
+          onClose={() => setKeypadOpen(false)}
+          answerLabel={prefs.offsetGiven === 'cut' ? 'b' : 'L'}
+          answerValue={prefs.offsetGiven === 'cut' ? offsetResult.offset : offsetCut}
+          answerClass={prefs.offsetGiven === 'cut' ? 'accent' : 'cut'}
+        />
+      )}
+    </div>
+  )
+}
+
+/** 寸法の枠をタップしたときに下からせり上がるテンキー。閉じるボタンでしまう */
+function KeypadSheet({
+  tag,
+  tagClass,
+  calc,
+  onChange,
+  onEqual,
+  onClose,
+  answerLabel,
+  answerValue,
+  answerClass,
+}: {
+  tag: string
+  tagClass: string
+  calc: CalcState
+  onChange: (updater: CalcState | ((prev: CalcState) => CalcState)) => void
+  onEqual: () => void
+  onClose: () => void
+  answerLabel: string
+  answerValue: number | undefined
+  answerClass: string
+}) {
+  return (
+    <div className="qc-sheet" role="dialog" aria-label={`${tag} を入力`}>
+      <div className="qc-sheet-head">
+        <span className={`qc-overall-tag ${tagClass}`}>{tag}</span>
+        <div className="qc-sheet-display">
+          {calc.display || '0'}
+          {calc.error && <span className="qc-calc-error">{calc.error}</span>}
+        </div>
+        <button type="button" className="qc-sheet-close" onClick={onClose}>
+          閉じる
+        </button>
+      </div>
+      <div className={`qc-sheet-answer ${answerClass}`}>
+        <span>{answerLabel}</span>
+        <b>{answerValue != null ? fmt(answerValue) : '—'}</b>
+        <span>mm</span>
+      </div>
+      <CalcKeypad onChange={onChange} onEqual={onEqual} />
     </div>
   )
 }

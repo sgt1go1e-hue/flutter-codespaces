@@ -153,12 +153,26 @@ export interface StraightDiagramProps {
 }
 
 /** 寸法の数字を「入力欄」に見せる枠。入力中は実線、そうでなければ点線 */
-function FieldBox({ cx, cy, active }: { cx: number; cy: number; active: boolean }) {
+function FieldBox({
+  cx,
+  cy,
+  active,
+  w = 164,
+  rotate,
+}: {
+  cx: number
+  cy: number
+  active: boolean
+  w?: number
+  /** 文字と同じ角度に傾ける(度) */
+  rotate?: number
+}) {
   return (
     <rect
-      x={cx - 82}
+      transform={rotate ? `rotate(${rotate} ${cx} ${cy})` : undefined}
+      x={cx - w / 2}
       y={cy - 21}
-      width={164}
+      width={w}
       height={28}
       rx={7}
       className={active ? 'qd-field active' : 'qd-field'}
@@ -253,8 +267,8 @@ export interface OffsetDiagramProps {
   sText: string
   cutText: string
   cutState: 'ok' | 'none' | 'bad'
-  given: 'offset' | 'travel'
-  onGiven: (g: 'offset' | 'travel') => void
+  given: 'offset' | 'travel' | 'cut'
+  onGiven: (g: 'offset' | 'travel' | 'cut') => void
 }
 
 export function OffsetDiagram(p: OffsetDiagramProps) {
@@ -287,6 +301,7 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       <Ext x1={P1.x} y1={P1.y} x2={c1.x + nx * 6} y2={c1.y + ny * 6} />
       <Ext x1={P2.x} y1={P2.y} x2={c2.x + nx * 6} y2={c2.y + ny * 6} />
       <DimLine x1={c1.x} y1={c1.y} x2={c2.x} y2={c2.y} className={p.given === 'travel' ? 'qd-dim strong' : 'qd-dim'} />
+      <FieldBox cx={cm.x} cy={cm.y} w={136} rotate={-45} active={p.given === 'travel'} />
       <text
         x={cm.x}
         y={cm.y}
@@ -301,6 +316,7 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       <Ext x1={b1.x} y1={b1.y} x2={l1.x + nx * 4} y2={l1.y + ny * 4} />
       <Ext x1={a2.x} y1={a2.y} x2={l2.x + nx * 4} y2={l2.y + ny * 4} />
       <DimLine x1={l1.x} y1={l1.y} x2={l2.x} y2={l2.y} className="qd-dim cut" />
+      <FieldBox cx={lm.x} cy={lm.y} w={136} rotate={-45} active={p.given === 'cut'} />
       <text
         x={lm.x}
         y={lm.y}
@@ -329,11 +345,12 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       <Ext x1={P2.x + 4} y1={P2.y} x2={xB + 8} y2={P2.y} />
       <Ext x1={P1.x + 10} y1={P1.y} x2={xB + 8} y2={P1.y} />
       <DimLine x1={xB} y1={P2.y} x2={xB} y2={P1.y} className={p.given === 'offset' ? 'qd-dim strong' : 'qd-dim'} />
+      <FieldBox cx={xB - 56} cy={(P1.y + P2.y) / 2} w={104} active={p.given === 'offset'} />
       <text
-        x={xB - 8}
+        x={xB - 56}
         y={(P1.y + P2.y) / 2}
         className={p.given === 'offset' ? 'qd-label-a' : 'qd-label-s big'}
-        textAnchor="end"
+        textAnchor="middle"
       >
         b　{p.offsetText}
       </text>
@@ -344,9 +361,27 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
         a = b
       </text>
 
-      {/* 「どちらを入力するか」をタップで切り替え */}
-      <rect x={260} y={70} width={100} height={150} className="qd-hit" onPointerDown={() => p.onGiven('offset')} />
-      <rect x={20} y={20} width={180} height={150} className="qd-hit" onPointerDown={() => p.onGiven('travel')} />
+      {/* 寸法の数字をタップして、b / c / L のどれを入力するか選ぶ */}
+      <circle cx={xB - 56} cy={(P1.y + P2.y) / 2 - 8} r={44} className="qd-hit" onPointerDown={() => p.onGiven('offset')} />
+      {/* c と L は斜めに近接して並ぶので、枠と同じ傾いた帯だけを当たり判定にする */}
+      <rect
+        transform={`rotate(-45 ${cm.x} ${cm.y})`}
+        x={cm.x - 68}
+        y={cm.y - 22}
+        width={136}
+        height={28}
+        className="qd-hit"
+        onPointerDown={() => p.onGiven('travel')}
+      />
+      <rect
+        transform={`rotate(-45 ${lm.x} ${lm.y})`}
+        x={lm.x - 68}
+        y={lm.y - 22}
+        width={136}
+        height={28}
+        className="qd-hit"
+        onPointerDown={() => p.onGiven('cut')}
+      />
     </svg>
   )
 }

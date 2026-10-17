@@ -205,8 +205,8 @@ export interface Offset45Input {
   size?: string
   connection?: string
   vpSeries?: 'dv' | 'ts'
-  /** 入力した値がオフセット量(a=b)か斜辺の芯々(c)か */
-  given: 'offset' | 'travel'
+  /** 入力した値がオフセット量(a=b)か斜辺の芯々(c)か、切り寸(L)か */
+  given: 'offset' | 'travel' | 'cut'
   value?: number
   roundMode: RoundMode
 }
@@ -231,13 +231,23 @@ export function computeOffset45(input: Offset45Input): Offset45Result {
   if (!input.size) return { ...base, status: 'none', error: 'サイズを選択してください' }
   const v = input.value
   if (v == null || Number.isNaN(v)) {
-    return { ...base, status: 'none', error: input.given === 'offset' ? 'オフセット寸法を入力してください' : '芯々寸法を入力してください' }
+    const what = input.given === 'offset' ? 'オフセット寸法' : input.given === 'travel' ? '芯々寸法' : '切り寸'
+    return { ...base, status: 'none', error: `${what}を入力してください` }
   }
   if (v < 0) return { ...base, status: 'none', error: '0以上で入力してください' }
   if (v > MAX_DIGITS_VALUE) return { ...base, status: 'none', error: '5桁を超えました' }
 
-  const offset = input.given === 'offset' ? v : Math.round((v / OFFSET_45_FACTOR) * 10) / 10
-  const travel = input.given === 'travel' ? v : Math.round(v * OFFSET_45_FACTOR * 10) / 10
+  // 切り寸(L)から逆算するときは、L に両端の控えを足して斜めの芯々(c)にする
+  const travel =
+    input.given === 'travel'
+      ? v
+      : input.given === 'cut'
+        ? Math.round((v + allow * 2) * 10) / 10
+        : Math.round(v * OFFSET_45_FACTOR * 10) / 10
+  const offset = input.given === 'offset' ? v : Math.round((travel / OFFSET_45_FACTOR) * 10) / 10
+  if (input.given === 'cut') {
+    return { ...base, offset, travel, rawCut: v, cut: v, status: v <= 0.5 ? 'zero' : 'ok' }
+  }
   if (allow * 2 > travel) {
     return { ...base, offset, travel, status: 'over', error: '寸法が45°エルボの控え寸法より短いです' }
   }
