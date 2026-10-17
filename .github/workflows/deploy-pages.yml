@@ -3,11 +3,21 @@ name: Deploy app to GitHub Pages
 # 配管アイソメ図アプリ(app/)をビルドして GitHub Pages に公開する。
 # iPad の Safari から普通の https URL で開けるようにするため（Codespaces のポート
 # 転送を経由しない）。作業ブランチへの push で自動更新。手動実行も可。
+#
+# 公開版(/)は必ずアプリのブランチ(PROD_BRANCH)から作る。
+# 試作中の画面は PREVIEW_BRANCH から作り、/preview/ に置く（公開版とは別のURL）。
+# どちらのブランチに push しても、両方を作り直して一緒に公開する。
+# ※ push されたコミットに入っているこのファイルが使われるため、
+#   PREVIEW_BRANCH 側にも同じ内容のこのファイルが必要。
 
 on:
   push:
-    branches: ['claude/piping-isometric-pwa-jg1fi4']
+    branches: ['claude/piping-isometric-pwa-jg1fi4', 'claude/awesome-ritchie-ai3lux']
   workflow_dispatch:
+
+env:
+  PROD_BRANCH: claude/piping-isometric-pwa-jg1fi4
+  PREVIEW_BRANCH: claude/awesome-ritchie-ai3lux
 
 permissions:
   contents: read
@@ -24,6 +34,12 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PROD_BRANCH }}
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.PREVIEW_BRANCH }}
+          path: preview-src
       - uses: actions/setup-node@v4
         with:
           node-version: 20
@@ -44,6 +60,17 @@ jobs:
         run: |
           mkdir -p app/dist/beta
           cp -r app/dist-beta/. app/dist/beta/
+      # 試作版(テスト用URL)。公開版と同じビルド方法で、置き場所だけ /preview/ にする。
+      - name: Build (preview)
+        working-directory: preview-src/app
+        run: |
+          npm ci
+          npx tsc --noEmit
+          npx vite build --base /flutter-codespaces/preview/ --outDir dist-preview
+      - name: Merge preview build into preview/ subpath
+        run: |
+          mkdir -p app/dist/preview
+          cp -r preview-src/app/dist-preview/. app/dist/preview/
       - uses: actions/upload-pages-artifact@v3
         with:
           path: app/dist
