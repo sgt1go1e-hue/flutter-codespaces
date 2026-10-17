@@ -30,6 +30,7 @@ import {
 import type { ConnectionKind } from '../lib/takeout'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { CalcKeypad } from './CalcKeypad'
+import { DrumWheel } from './DrumWheel'
 import { StraightDiagram, OffsetDiagram, FittingFigure } from './QuickCalcDiagrams'
 
 interface Props {
@@ -74,6 +75,9 @@ interface Prefs {
 
 const DEFAULT_PREFS: Prefs = {
   tab: 'straight',
+  pipeType: 'sgp',
+  connection: 'weld',
+  size: '25A',
   roundMode: 'round',
   rawMode: false,
   left: { kind: 'elbow90_long', basis: 'center' },
@@ -153,7 +157,8 @@ export function QuickCalc({ onClose }: Props) {
   const [calcStraight, setCalcStraight] = useState<CalcState>(initialCalcState)
   const [calcOffset, setCalcOffset] = useState<CalcState>(initialCalcState)
   const [selectedEnd, setSelectedEnd] = useState<'left' | 'right'>('left')
-  const [specOpen, setSpecOpen] = useState(!prefs.size)
+  // 初めて開いたときは、管種・接続・サイズを選んでもらうためドラムを開いておく
+  const [specOpen, setSpecOpen] = useState(!stored.size)
 
   const sizes = sizesForPipeType(pipeType)
   const od = getSizeInfo(size)?.od
@@ -203,6 +208,18 @@ export function QuickCalc({ onClose }: Props) {
     setStored((prev) => {
       const cur = { ...DEFAULT_PREFS, ...prev }[key]
       return { ...prev, [key]: { ...cur, ...patch } }
+    })
+  }
+
+  // 管種を変えたら、同じ呼び径(25A→VP25など)があればそれに合わせ、無ければ先頭にする
+  function changePipeType(v: string) {
+    const list = sizesForPipeType(v)
+    const n = nominalOf(size)
+    const same = list.find((x) => x.code === size) ?? list.find((x) => nominalOf(x.code) === n)
+    setPrefs({
+      pipeType: v,
+      size: (same ?? list[0])?.code,
+      ...(v === 'vp' ? {} : { vpSeries: undefined }),
     })
   }
 
@@ -339,46 +356,44 @@ export function QuickCalc({ onClose }: Props) {
             </button>
             {specOpen && (
               <div className="qc-spec-panel">
-                <div className="field-label">管種</div>
-                <Chips
-                  options={pipeTypes.map((p) => ({ value: p.id, label: p.short }))}
-                  value={pipeType}
-                  onPick={(v) => {
-                    const keep = sizesForPipeType(v).some((s) => s.code === size)
-                    setPrefs({
-                      pipeType: v,
-                      size: keep ? size : undefined,
-                      vpSeries: v === 'vp' ? vpSeries : undefined,
-                    })
-                  }}
-                />
-                <div className="field-label">{pipeType === 'vp' ? '継手' : '接続'}</div>
-                {pipeType === 'vp' ? (
-                  <Chips
-                    options={[
-                      { value: 'dv', label: 'DV（排水）' },
-                      { value: 'ts', label: 'TS（給水）' },
-                    ]}
-                    value={vpSeries ?? 'dv'}
-                    onPick={(v) => setPrefs({ vpSeries: v as 'dv' | 'ts' })}
+                <div className="qc-drums">
+                  <DrumWheel
+                    label="管種"
+                    items={pipeTypes.map((p) => ({ value: p.id, label: p.short }))}
+                    value={pipeType}
+                    onChange={changePipeType}
                   />
-                ) : (
-                  <Chips
-                    options={connectionMethods.map((c) => ({ value: c.id, label: c.name.replace('（ソケット）', '') }))}
-                    value={connection ?? 'weld'}
-                    onPick={(v) => setPrefs({ connection: v })}
+                  {pipeType === 'vp' ? (
+                    <DrumWheel
+                      label="継手"
+                      items={[
+                        { value: 'dv', label: 'DV 排水' },
+                        { value: 'ts', label: 'TS 給水' },
+                      ]}
+                      value={vpSeries ?? 'dv'}
+                      onChange={(v) => setPrefs({ vpSeries: v as 'dv' | 'ts' })}
+                    />
+                  ) : (
+                    <DrumWheel
+                      label="接続"
+                      items={connectionMethods.map((c) => ({
+                        value: c.id,
+                        label: c.name.replace('（ソケット）', '').replace('フランジ接合', 'フランジ'),
+                      }))}
+                      value={connection ?? 'weld'}
+                      onChange={(v) => setPrefs({ connection: v })}
+                    />
+                  )}
+                  <DrumWheel
+                    label="サイズ"
+                    items={sizes.map((s) => ({ value: s.code, label: s.label }))}
+                    value={size}
+                    onChange={(v) => setPrefs({ size: v })}
                   />
-                )}
-                <div className="field-label">サイズ</div>
-                <Chips
-                  className="qc-chips-size"
-                  options={sizes.map((s) => ({ value: s.code, label: s.label }))}
-                  value={size}
-                  onPick={(v) => {
-                    setPrefs({ size: v })
-                    setSpecOpen(false)
-                  }}
-                />
+                </div>
+                <button type="button" className="qc-spec-done" onClick={() => setSpecOpen(false)}>
+                  決定
+                </button>
               </div>
             )}
           </div>

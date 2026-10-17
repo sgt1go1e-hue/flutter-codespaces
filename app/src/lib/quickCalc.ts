@@ -119,16 +119,8 @@ export function computeQuickCut(input: QuickCalcInput): QuickCalcResult {
   if (!input.size) {
     return { startAllow: 0, endAllow: 0, status: 'none', error: 'サイズを選択してください' }
   }
-  if (input.overall == null || Number.isNaN(input.overall)) {
-    return { startAllow: 0, endAllow: 0, status: 'none', error: '全体寸法を入力してください' }
-  }
-  if (input.overall < 0) {
-    return { startAllow: 0, endAllow: 0, status: 'none', error: '全体寸法は0以上で入力してください' }
-  }
-  if (Math.abs(input.overall) > MAX_DIGITS_VALUE) {
-    return { startAllow: 0, endAllow: 0, status: 'none', error: '5桁を超えました' }
-  }
 
+  // 控え寸法は全体寸法の入力前から図に出せるよう、先に求めておく
   const leftBasis = input.left.kind === 'free' ? 'face' : input.left.basis
   const rightBasis = input.right.kind === 'free' ? 'face' : input.right.basis
   const left = quickEndAllowance(
@@ -147,6 +139,24 @@ export function computeQuickCut(input: QuickCalcInput): QuickCalcResult {
   )
   const startMissing = isMissing(left)
   const endMissing = isMissing(right)
+  const allows = {
+    startAllow: left.mm,
+    endAllow: right.mm,
+    startFittingId: left.fittingId,
+    endFittingId: right.fittingId,
+    startMissing,
+    endMissing,
+  }
+
+  if (input.overall == null || Number.isNaN(input.overall)) {
+    return { ...allows, status: 'none', error: '全体寸法を入力してください' }
+  }
+  if (input.overall < 0) {
+    return { ...allows, status: 'none', error: '全体寸法は0以上で入力してください' }
+  }
+  if (Math.abs(input.overall) > MAX_DIGITS_VALUE) {
+    return { ...allows, status: 'none', error: '5桁を超えました' }
+  }
 
   if (left.mm + right.mm > input.overall) {
     return {

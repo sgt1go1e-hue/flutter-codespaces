@@ -4815,3 +4815,90 @@ fieldset.panel-grid:disabled {
   font-weight: 700;
   box-shadow: 0 8px 24px var(--shadow);
 }
+
+/* --- ドラムロール式の選択（クイック計算の管種・接続・サイズ） --- */
+.qc-drums {
+  display: grid;
+  grid-template-columns: 1fr 1.2fr 1fr;
+  gap: 6px;
+}
+
+.drum {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.drum-label {
+  text-align: center;
+  color: var(--hint);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+
+.drum-window {
+  position: relative;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  overflow: hidden;
+  perspective: 600px;
+}
+
+.drum-band {
+  position: absolute;
+  left: 4px;
+  right: 4px;
+  border-radius: 8px;
+  background: var(--panel-2);
+  border: 1px solid var(--accent);
+  pointer-events: none;
+}
+
+.drum-scroll {
+  position: relative;
+  height: 100%;
+  overflow-y: auto;
+  scroll-snap-type: y mandatory;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: none;
+  /* 上下を薄くぼかして、奥へ回り込んでいるように見せる */
+  -webkit-mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+  mask-image: linear-gradient(to bottom, transparent, #000 30%, #000 70%, transparent);
+}
+
+.drum-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.drum-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  scroll-snap-align: center;
+  color: var(--hint);
+  font-size: 17px;
+  font-weight: 700;
+  white-space: nowrap;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.drum-item.center {
+  color: var(--text);
+  font-size: 20px;
+  font-weight: 900;
+}
+
+.qc-spec-done {
+  margin-top: 8px;
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 10px;
+  min-height: 44px;
+  font-size: 16px;
+  font-weight: 800;
+}
