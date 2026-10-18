@@ -3,7 +3,8 @@ import { useState } from 'react'
 // クイック計算の記録（履歴）と現場ファイル。
 // ＝を押した計算を、選んでいる保存先に記録する。保存先を選ばないときは
 // 「メモ」(最大30件)、現場ファイルは1つにつき最大200件まで残す。
-// 職長プラン(または無料期間中)の機能。そうでないときは案内だけ出す。
+// 無料版はメモの新しい5件だけ見られ、現場ファイルは使えない(職長プランの案内を出す)。
+// 保存は無料版でも30件まで残すので、職長プランにすると前の記録もそのまま見られる。
 
 export interface QcRecord {
   id: string
@@ -24,6 +25,8 @@ export interface QcFile {
 
 export const MEMO_MAX = 30
 export const FILE_MAX = 200
+/** 無料版で見られるメモの件数 */
+export const FREE_MEMO_SHOWN = 5
 
 /** 記録を1件足す。保存先ごとの上限を超えた古いものから消す */
 export function addRecord(list: QcRecord[], rec: QcRecord): QcRecord[] {
@@ -68,22 +71,10 @@ export function QuickCalcRecords({
   const [nameDraft, setNameDraft] = useState('')
   const [openId, setOpenId] = useState<string | null>(null)
 
-  if (locked) {
-    return (
-      <div className="qc-history qc-records-locked">
-        <div className="field-label">記録・現場ファイル</div>
-        <p className="qc-records-lock-text">
-          計算の記録を残して、現場ごとのファイルにまとめられます（職長プランの機能です）。
-        </p>
-        <button type="button" className="qc-jump" onClick={onUnlock}>
-          職長プランについて
-        </button>
-      </div>
-    )
-  }
-
-  const current = files.find((f) => f.id === currentFileId)
-  const shown = records.filter((r) => r.fileId === current?.id)
+  // 無料版はメモだけ(現場ファイルは選べない)
+  const current = locked ? undefined : files.find((f) => f.id === currentFileId)
+  const all = records.filter((r) => r.fileId === current?.id)
+  const shown = locked ? all.slice(0, FREE_MEMO_SHOWN) : all
   const countOf = (id?: string) => records.filter((r) => r.fileId === id).length
 
   function startNaming(kind: 'new' | 'rename') {
@@ -127,9 +118,13 @@ export function QuickCalcRecords({
     <div className="qc-history">
       <div className="qc-records-head">
         <span className="field-label">保存先</span>
-        <button type="button" className="qc-records-file" onClick={() => setPickerOpen((o) => !o)}>
+        <button
+          type="button"
+          className="qc-records-file"
+          onClick={() => (locked ? onUnlock() : setPickerOpen((o) => !o))}
+        >
           📁 {current ? current.name : 'メモ（ファイルなし）'}
-          <span className="qc-spec-caret">{pickerOpen ? '▲' : '▼'}</span>
+          <span className="qc-spec-caret">{locked ? '🔒 現場ファイル' : pickerOpen ? '▲' : '▼'}</span>
         </button>
       </div>
 
@@ -244,13 +239,23 @@ export function QuickCalcRecords({
           ))}
           <div className="qc-records-foot">
             <span>
-              {shown.length}件（最大{current ? FILE_MAX : MEMO_MAX}件）
+              {locked
+                ? `${shown.length}件（無料版は${FREE_MEMO_SHOWN}件まで）`
+                : `${shown.length}件（最大${current ? FILE_MAX : MEMO_MAX}件）`}
             </span>
             <button type="button" className="qc-history-clear" onClick={clearShown}>
               すべて消す
             </button>
           </div>
         </>
+      )}
+      {locked && (
+        <div className="qc-records-upsell">
+          <span>職長プランなら メモ{MEMO_MAX}件・現場ファイル（1つ{FILE_MAX}件）</span>
+          <button type="button" className="qc-records-ok" onClick={onUnlock}>
+            職長プランについて
+          </button>
+        </div>
       )}
     </div>
   )

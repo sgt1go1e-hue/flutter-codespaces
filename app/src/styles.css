@@ -5164,8 +5164,7 @@ button.qc-history-row {
   color: var(--label-over);
 }
 
-.qc-records-empty,
-.qc-records-lock-text {
+.qc-records-empty {
   color: var(--hint);
   font-size: 13px;
   margin: 4px 0;
@@ -5179,4 +5178,15 @@ button.qc-history-row {
   color: var(--accent);
   font-weight: 800;
   margin-right: 6px;
+}
+
+.qc-records-upsell {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  color: var(--hint);
+  font-size: 12.5px;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 8px;
 }

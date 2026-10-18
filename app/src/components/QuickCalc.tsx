@@ -149,9 +149,10 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
 
   const [records, setRecords] = useLocalStorage<QcRecord[]>(HISTORY_KEY, [])
   const [files, setFiles] = useLocalStorage<QcFile[]>(FILES_KEY, [])
-  // 記録・現場ファイルは職長プラン(無料期間中を含む)の機能
+  // 記録は無料版でもメモ5件まで。メモ30件・現場ファイルは職長プラン(無料期間中を含む)
   const recordsUnlocked = hasFullAccess()
-  const currentFileId = files.some((f) => f.id === prefs.currentFileId) ? prefs.currentFileId : undefined
+  const currentFileId =
+    recordsUnlocked && files.some((f) => f.id === prefs.currentFileId) ? prefs.currentFileId : undefined
   // 芯引きは a(全体芯々) と L(切り寸) のどちらからでも計算できる。入力中の方を field で持つ
   const [straightField, setStraightField] = useState<'a' | 'L'>('a')
   const [calcA, setCalcA] = useState<CalcState>(initialCalcState)
@@ -261,7 +262,6 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
   }
 
   function addHistory(summary: string, cut: number) {
-    if (!recordsUnlocked) return
     setRecords((list) =>
       addRecord(list, { id: `${Date.now()}`, at: Date.now(), summary, cut, fileId: currentFileId }),
     )
