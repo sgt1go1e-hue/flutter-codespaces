@@ -5249,3 +5249,30 @@ button.qc-history-row {
   background: var(--border);
   margin-top: -2px;
 }
+
+/* 引しろ表のドラム: 1段目=種類・継手 / 2段目=サイズ(径違いはメイン・枝の2本) */
+.qc-drums.qc-drums-table {
+  grid-template-columns: 1fr 2fr;
+}
+
+.qc-drums.qc-drums-pair {
+  grid-template-columns: 1fr 1fr;
+}
+
+.qc-drums.qc-drums-one {
+  grid-template-columns: 1fr;
+}
+
+.drum-wide .drum-item {
+  font-size: 15px;
+}
+
+.drum-wide .drum-item.center {
+  font-size: 16px;
+}
+
+.drum-item {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  padding: 0 6px;
+}

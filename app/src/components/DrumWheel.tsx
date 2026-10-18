@@ -5,8 +5,7 @@ import { useEffect, useRef, useState } from 'react'
 // 行を直接タップしても、その行まで回して選べる。
 
 const ITEM = 40 // 1行の高さ(px)
-const VISIBLE = 5 // 見えている行数（奇数。真ん中が選択行）
-const PAD = ((VISIBLE - 1) / 2) * ITEM
+const VISIBLE = 5 // 見えている行数の既定（奇数。真ん中が選択行）
 
 export interface DrumItem<T extends string> {
   value: T
@@ -18,12 +17,18 @@ export function DrumWheel<T extends string>({
   value,
   onChange,
   label,
+  rows = VISIBLE,
+  className,
 }: {
   items: DrumItem<T>[]
   value: T | undefined
   onChange: (v: T) => void
   label: string
+  /** 見えている行数（奇数）。場所をとりたくない所は3にする */
+  rows?: number
+  className?: string
 }) {
+  const PAD = ((rows - 1) / 2) * ITEM
   const ref = useRef<HTMLDivElement>(null)
   const settleTimer = useRef<number | undefined>(undefined)
   const [scrollTop, setScrollTop] = useState(0)
@@ -62,9 +67,9 @@ export function DrumWheel<T extends string>({
   }
 
   return (
-    <div className="drum">
+    <div className={`drum${className ? ` ${className}` : ''}`}>
       <div className="drum-label">{label}</div>
-      <div className="drum-window" style={{ height: ITEM * VISIBLE }}>
+      <div className="drum-window" style={{ height: ITEM * rows }}>
         <div className="drum-band" style={{ top: PAD, height: ITEM }} />
         <div
           ref={ref}

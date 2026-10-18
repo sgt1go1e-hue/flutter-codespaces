@@ -533,19 +533,13 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                 </div>
               )}
               {needsCounterpart(end.kind) && (
-                <label className="qc-inline-field">
-                  <span>{end.kind === 'tee' ? '枝のサイズ' : 'メインのサイズ'}</span>
-                  <select
-                    value={end.counterpartSize ?? size ?? ''}
-                    onChange={(e) => updateEnd({ counterpartSize: e.target.value || undefined })}
-                  >
-                    {sizes.map((s) => (
-                      <option key={s.code} value={s.code}>
-                        {s.label}
-                      </option>
-                    ))}
-                  </select>
-                </label>
+                <DrumWheel
+                  label={end.kind === 'tee' ? '枝のサイズ' : 'メインのサイズ'}
+                  rows={3}
+                  items={sizes.map((x) => ({ value: x.code, label: x.label }))}
+                  value={end.counterpartSize ?? size}
+                  onChange={(v) => updateEnd({ counterpartSize: v })}
+                />
               )}
               {end.kind === 'flange' && (
                 <label className="qc-inline-field">
@@ -669,45 +663,51 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
 
         {tab === 'table' && (
           <>
-            <Chips
-              scroll
-              options={FITTING_GROUPS.map((g) => ({ value: g.kind, label: g.label }))}
-              value={tableGroup}
-              onPick={(v) => setPrefs({ tableGroup: v, tableFitting: undefined, tableKey: undefined })}
-            />
-            <Chips
-              scroll
-              className="qc-chips-fitting"
-              options={groupFittings.map((f) => ({ value: f.id, label: fittingChipLabel(f) }))}
-              value={tableFitting?.id}
-              onPick={(v) => setPrefs({ tableFitting: v, tableKey: undefined })}
-            />
-            {isPair ? (
-              <>
-                <Chips
-                  scroll
-                  className="qc-chips-size"
-                  options={pairFirsts.map((n) => ({ value: n, label: nominalLabel(n, tableGroup) }))}
-                  value={pairFirst}
-                  onPick={(n) => setPrefs({ tableKey: tableKeys.find((k) => k.split('_')[0] === n) })}
-                />
-                <Chips
-                  scroll
-                  className="qc-chips-size"
-                  options={pairSeconds.map((k) => ({ value: k, label: `×${nominalLabel(k.split('_')[1], tableGroup)}` }))}
-                  value={tableKey}
-                  onPick={(v) => setPrefs({ tableKey: v })}
-                />
-              </>
-            ) : (
-              <Chips
-                scroll
-                className="qc-chips-size"
-                options={tableKeys.map((k) => ({ value: k, label: dimKeyLabel(k, tableGroup) }))}
-                value={tableKey}
-                onPick={(v) => setPrefs({ tableKey: v })}
+            <div className="qc-drums qc-drums-table">
+              <DrumWheel
+                label="種類"
+                rows={3}
+                items={FITTING_GROUPS.map((g) => ({ value: g.kind, label: g.label }))}
+                value={tableGroup}
+                onChange={(v) => setPrefs({ tableGroup: v, tableFitting: undefined, tableKey: undefined })}
               />
-            )}
+              <DrumWheel
+                label="継手"
+                rows={3}
+                className="drum-wide"
+                items={groupFittings.map((f) => ({ value: f.id, label: fittingChipLabel(f) }))}
+                value={tableFitting?.id}
+                onChange={(v) => setPrefs({ tableFitting: v, tableKey: undefined })}
+              />
+            </div>
+            <div className={`qc-drums ${isPair ? 'qc-drums-pair' : 'qc-drums-one'}`}>
+              {isPair ? (
+                <>
+                  <DrumWheel
+                    label="メイン（大）"
+                    rows={3}
+                    items={pairFirsts.map((n) => ({ value: n, label: nominalLabel(n, tableGroup) }))}
+                    value={pairFirst}
+                    onChange={(n) => setPrefs({ tableKey: tableKeys.find((k) => k.split('_')[0] === n) })}
+                  />
+                  <DrumWheel
+                    label="枝・小径"
+                    rows={3}
+                    items={pairSeconds.map((k) => ({ value: k, label: nominalLabel(k.split('_')[1], tableGroup) }))}
+                    value={tableKey}
+                    onChange={(v) => setPrefs({ tableKey: v })}
+                  />
+                </>
+              ) : (
+                <DrumWheel
+                  label="サイズ"
+                  rows={3}
+                  items={tableKeys.map((k) => ({ value: k, label: dimKeyLabel(k, tableGroup) }))}
+                  value={tableKey}
+                  onChange={(v) => setPrefs({ tableKey: v })}
+                />
+              )}
+            </div>
 
             {tableFitting && tableKey && (
               <div className="qc-figure-card">
