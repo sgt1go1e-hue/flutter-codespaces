@@ -51,7 +51,7 @@ const END_KIND_OPTIONS: { value: QuickFittingKind; label: string }[] = [
   { value: 'elbow90_long', label: '90°L' },
   { value: 'elbow90_short', label: '90°S' },
   { value: 'elbow45', label: '45°' },
-  { value: 'tee', label: 'T ラン' },
+  { value: 'tee', label: 'T メイン' },
   { value: 'tee_branch', label: 'T 枝' },
   { value: 'flange', label: 'フランジ' },
 ]
@@ -522,9 +522,25 @@ export function QuickCalc({ onClose }: Props) {
                   </button>
                 </div>
               )}
+              {end.kind === 'tee' && pipeType === 'vp' && (vpSeries ?? 'dv') === 'dv' && end.basis === 'center' && (
+                <div className="qc-round qc-basis">
+                  <button
+                    className={end.dvMainSide !== 'far' ? 'active' : ''}
+                    onClick={() => updateEnd({ dvMainSide: 'near' })}
+                  >
+                    DT 下流側（Z1）
+                  </button>
+                  <button
+                    className={end.dvMainSide === 'far' ? 'active' : ''}
+                    onClick={() => updateEnd({ dvMainSide: 'far' })}
+                  >
+                    DT 上流側（Z2）
+                  </button>
+                </div>
+              )}
               {needsCounterpart(end.kind) && (
                 <label className="qc-inline-field">
-                  <span>{end.kind === 'tee' ? '枝のサイズ' : 'ランのサイズ'}</span>
+                  <span>{end.kind === 'tee' ? '枝のサイズ' : 'メインのサイズ'}</span>
                   <select
                     value={end.counterpartSize ?? size ?? ''}
                     onChange={(e) => updateEnd({ counterpartSize: e.target.value || undefined })}
@@ -859,7 +875,7 @@ function planJump(
       ? 'elbow90_long'
       : fittingId.startsWith('elbow45')
         ? 'elbow45'
-        : fittingId.startsWith('tee')
+        : fittingId.startsWith('tee') || fittingId === 'y90dt_vp_dv'
           ? 'tee'
           : undefined
   if (!kind) return undefined

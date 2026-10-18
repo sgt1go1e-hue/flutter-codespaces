@@ -48,6 +48,7 @@ export function fittingsOfGroup(kind: ConnectionKind): Fitting[] {
 export function fittingChipLabel(f: Fitting): string {
   return f.name.replace(/（([^）]*)）/g, (_m, inner: string) => {
     if (/^(ロング|ショート)$/.test(inner)) return `（${inner}）`
+    if (inner.startsWith('90°Y')) return ''
     if (inner.includes('同径')) return '（同径）'
     if (inner.includes('径違い')) return '（径違い）'
     if (inner.startsWith('LL')) return ''
@@ -129,7 +130,7 @@ export function dimRows(f: Fitting, value: DimValue | undefined): DimRow[] {
   }
   if ('run' in value) {
     return [
-      { label: 'ラン', value: fmt(value.run) },
+      { label: 'メイン', value: fmt(value.run) },
       { label: '枝', value: fmt(value.branch) },
     ]
   }

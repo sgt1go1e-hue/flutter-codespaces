@@ -5,6 +5,7 @@
 import type { RoundMode } from './cutlength'
 import { computeCutFromAllowances } from './cutlength'
 import { elbowTakeoutById, teeTakeout, OFFSET_45_FACTOR, type ConnectionKind } from './takeout'
+import { getFitting, nominalOf } from '../data/masters'
 
 export type QuickFittingKind =
   | 'free'
@@ -19,6 +20,11 @@ export interface QuickEndInput {
   kind: QuickFittingKind
   /** チーズで必要な相手径（メイン側/枝側の呼び径コード） */
   counterpartSize?: string
+  /**
+   * 塩ビDVのT(DTチーズ)のメイン側で、管がつながる側。DTはメインの上下で
+   * 控えが違う(Z1=下流側 / Z2=上流側)ため選んでもらう。既定は下流側。
+   */
+  dvMainSide?: 'near' | 'far'
   /** フランジの引きしろ(mm)。フランジ選択時のみ使用（既存の作図画面と同じ手入力値） */
   flangeAllow?: number
   /**
@@ -98,12 +104,13 @@ export function quickEndAllowance(
       const id = elbowFittingId(end.kind, ck)
       return { mm: elbowTakeoutById(id, size), fittingId: id }
     }
-    case 'tee': {
-      const t = teeTakeout(size, end.counterpartSize ?? size, true, ck)
-      return { mm: t.mm, fittingId: t.id }
-    }
+    case 'tee':
     case 'tee_branch': {
-      const t = teeTakeout(end.counterpartSize ?? size, size, false, ck)
+      if (ck === 'vp_dv') return dvTeeAllowance(end, size)
+      const t =
+        end.kind === 'tee'
+          ? teeTakeout(size, end.counterpartSize ?? size, true, ck)
+          : teeTakeout(end.counterpartSize ?? size, size, false, ck)
       return { mm: t.mm, fittingId: t.id }
     }
     case 'flange':
@@ -111,6 +118,19 @@ export function quickEndAllowance(
     default:
       return { mm: 0 }
   }
+}
+
+// 塩ビDVのTはDTチーズ(同径のみ登録)。径違いはデータが無いので0を返し、UIで注意を出す
+const DV_TEE_ID = 'y90dt_vp_dv'
+function dvTeeAllowance(end: QuickEndInput, size: string | undefined): { mm: number; fittingId: string } {
+  const own = nominalOf(size)
+  const other = nominalOf(end.counterpartSize ?? size)
+  const dim = getFitting(DV_TEE_ID)?.dims[String(own ?? '')]
+  if (own == null || own !== other || dim == null || typeof dim !== 'object' || !('near' in dim)) {
+    return { mm: 0, fittingId: DV_TEE_ID }
+  }
+  const mm = end.kind === 'tee_branch' ? dim.branch : end.dvMainSide === 'far' ? dim.far : dim.near
+  return { mm, fittingId: DV_TEE_ID }
 }
 
 const MAX_DIGITS_VALUE = 99999

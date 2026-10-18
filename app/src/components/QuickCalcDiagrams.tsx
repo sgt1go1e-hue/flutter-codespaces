@@ -468,7 +468,7 @@ export function FittingFigure({ shape, values }: FittingFigureProps) {
           <Ext x1={O.x} y1={O.y - 24} x2={O.x} y2={14} />
           <Ext x1={O.x + A} y1={O.y - 20} x2={O.x + A} y2={14} />
           <DimLine x1={O.x} y1={22} x2={O.x + A} y2={22} className="qd-dim strong" />
-          <FigText x={O.x + A / 2} y={16}>ラン {v(0)}</FigText>
+          <FigText x={O.x + A / 2} y={16}>メイン {v(0)}</FigText>
           <Ext x1={O.x + 20} y1={O.y + A} x2={O.x + 74} y2={O.y + A} />
           <Ext x1={O.x + 10} y1={O.y} x2={O.x + 74} y2={O.y} />
           <DimLine x1={O.x + 66} y1={O.y} x2={O.x + 66} y2={O.y + A} className="qd-dim strong" />
