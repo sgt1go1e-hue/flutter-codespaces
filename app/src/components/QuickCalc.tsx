@@ -5,6 +5,7 @@ import {
   computeQuickCut,
   computeOffset45,
   connectionKindOf,
+  quickEndAllowance,
   type QuickCalcInput,
   type QuickEndInput,
   type QuickFittingKind,
@@ -321,6 +322,24 @@ export function QuickCalc({ onClose }: Props) {
   const tableRows = tableFitting && tableKey ? dimRows(tableFitting, tableFitting.dims[tableKey]) : []
   const groupInfo = FITTING_GROUPS.find((g) => g.kind === tableGroup)
   const tableInch = tableKey && !tableKey.includes('_') ? inchLabel(tableKey, tableGroup) : ''
+  const jump = tableFitting && tableKey ? planJump(tableFitting.id, tableKey, tableGroup, pipeType) : undefined
+
+  // 引しろ表で見ている継手・サイズを、芯引きの左端にそのまま入れて計算を始める
+  function jumpToStraight() {
+    if (!jump) return
+    setPrefs({
+      tab: 'straight',
+      pipeType: jump.pipeType,
+      connection: jump.connection ?? connection,
+      vpSeries: jump.vpSeries,
+      size: jump.size,
+      left: { ...left, ...jump.end },
+    })
+    setSelectedEnd('left')
+    setSpecOpen(false)
+    setStraightField('a')
+    setKeypadOpen(true)
+  }
 
   const roundToggle = (
     <div className="qc-round">
@@ -689,6 +708,11 @@ export function QuickCalc({ onClose }: Props) {
                     </div>
                   ))}
                 </div>
+                {jump && (
+                  <button type="button" className="qc-jump" onClick={jumpToStraight}>
+                    この継手で芯引きする →
+                  </button>
+                )}
                 <div className="qc-fig-note">
                   {groupInfo?.maker}。芯（中心）から差込み底・端面までの寸法です。現物・カタログと照合してお使いください。
                 </div>
@@ -801,3 +825,50 @@ function KeypadSheet({
   )
 }
 
+
+interface JumpPlan {
+  pipeType: string
+  connection?: string
+  vpSeries?: 'dv' | 'ts'
+  size: string
+  end: QuickEndInput
+}
+
+// 引しろ表の継手(id)とサイズキー("40" / "40_25")から、芯引きの設定を組み立てる。
+// 芯引きの端で選べる継手(エルボ・T)に限り、設定した結果が同じ継手マスタを
+// 参照することを確かめてから返す(レジューサー・キャップ・Y継手などは対象外)。
+function planJump(
+  fittingId: string,
+  key: string,
+  group: ConnectionKind,
+  currentPipe?: string,
+): JumpPlan | undefined {
+  const [n1, n2] = key.split('_')
+  const isVp = group === 'vp_dv' || group === 'vp_ts'
+  const pipeType = isVp ? 'vp' : currentPipe && currentPipe !== 'vp' ? currentPipe : 'sgp'
+  const code = (n: string) => (isVp ? `VP${n}` : `${n}A`)
+  const connection =
+    group === 'thread' ? 'thread' : group === 'socket' ? 'socket' : isVp ? undefined : 'weld'
+  const vpSeries = group === 'vp_dv' ? 'dv' : group === 'vp_ts' ? 'ts' : undefined
+  const size = code(n1)
+  if (!sizesForPipeType(pipeType).some((x) => x.code === size)) return undefined
+
+  const kind: QuickFittingKind | undefined = fittingId.startsWith('elbow90_short')
+    ? 'elbow90_short'
+    : fittingId.startsWith('elbow90') && !fittingId.includes('_ll_')
+      ? 'elbow90_long'
+      : fittingId.startsWith('elbow45')
+        ? 'elbow45'
+        : fittingId.startsWith('tee')
+          ? 'tee'
+          : undefined
+  if (!kind) return undefined
+  const end: QuickEndInput = {
+    kind,
+    basis: 'center',
+    ...(kind === 'tee' ? { counterpartSize: code(n2 ?? n1) } : {}),
+  }
+  const resolved = quickEndAllowance(end, size, pipeType, vpSeries, connection)
+  if (resolved.fittingId !== fittingId) return undefined
+  return { pipeType, connection, vpSeries, size, end }
+}

@@ -5028,3 +5028,16 @@ fieldset.panel-grid:disabled {
 .qc-sheet .qc-key {
   min-height: 46px;
 }
+
+.qc-jump {
+  display: block;
+  margin: 4px auto 8px;
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 999px;
+  min-height: 42px;
+  padding: 0 20px;
+  font-size: 15px;
+  font-weight: 800;
+}
