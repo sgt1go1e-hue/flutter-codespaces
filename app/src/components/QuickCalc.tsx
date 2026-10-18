@@ -293,7 +293,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
     })
     if (offsetCut != null) {
       addHistory(
-        `45°振り ${specText()} b${fmt(offsetResult.offset)} c${fmt(offsetResult.travel)}${prefs.offsetGiven === 'cut' ? '(Lから)' : ''}`,
+        `45°振り ${specText()} b${fmt(offsetResult.offset)} c${fmt(offsetResult.travel)} ツラ${fmt(offsetResult.faceToFace)}${prefs.offsetGiven === 'cut' ? '(Lから)' : ''}`,
         offsetCut,
       )
     }
@@ -617,6 +617,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                 sText={fmt(offsetResult.allow)}
                 cutText={offsetCut != null ? fmt(offsetCut) : offsetResult.status === 'zero' ? '0' : '?'}
                 cutState={offsetCut != null ? 'ok' : offsetResult.status === 'over' ? 'bad' : 'none'}
+                faceText={offsetResult.faceToFace != null ? fmt(offsetResult.faceToFace) : '?'}
               />
               <div className="qc-figure-hint">枠をタップで b・c・L を入力（c = b × 1.414）</div>
             </div>
@@ -648,6 +649,16 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                   ? `c = L ${fmt(offsetCut)} ＋ s1 ${fmt(offsetResult.allow)} ＋ s2 ${fmt(offsetResult.allow)} = ${fmt(offsetResult.travel)}`
                   : `L = c ${fmt(offsetResult.travel)} − s1 ${fmt(offsetResult.allow)} − s2 ${fmt(offsetResult.allow)}`}
               </div>
+              {offsetResult.faceToFace != null && (
+                <div className="qc-answer-face">
+                  <span>ツラ〜ツラ（水平）</span>
+                  <b>{fmt(offsetResult.faceToFace)}</b>
+                  <span>mm</span>
+                  <small>
+                    = b {fmt(offsetResult.offset)} ＋ s1 {fmt(offsetResult.allow)} ＋ s2 {fmt(offsetResult.allow)}
+                  </small>
+                </div>
+              )}
               {prefs.offsetGiven !== 'cut' && roundToggle}
             </div>
 

@@ -240,6 +240,11 @@ export interface Offset45Input {
 export interface Offset45Result {
   offset?: number
   travel?: number
+  /**
+   * 両端の45°エルボの、外側のツラ(水平の管がつながる端面)からツラまでの水平の長さ。
+   * オフセット(45°なので水平の振り幅も同じ)に、両端エルボの控えを足したもの。
+   */
+  faceToFace?: number
   allow: number
   fittingId?: string
   missing?: boolean
@@ -271,12 +276,13 @@ export function computeOffset45(input: Offset45Input): Offset45Result {
         ? Math.round((v + allow * 2) * 10) / 10
         : Math.round(v * OFFSET_45_FACTOR * 10) / 10
   const offset = input.given === 'offset' ? v : Math.round((travel / OFFSET_45_FACTOR) * 10) / 10
+  const faceToFace = Math.round((offset + allow * 2) * 10) / 10
   if (input.given === 'cut') {
-    return { ...base, offset, travel, rawCut: v, cut: v, status: v <= 0.5 ? 'zero' : 'ok' }
+    return { ...base, offset, travel, faceToFace, rawCut: v, cut: v, status: v <= 0.5 ? 'zero' : 'ok' }
   }
   if (allow * 2 > travel) {
-    return { ...base, offset, travel, status: 'over', error: '寸法が45°エルボの控え寸法より短いです' }
+    return { ...base, offset, travel, faceToFace, status: 'over', error: '寸法が45°エルボの控え寸法より短いです' }
   }
   const { rawCut, cut, status } = computeCutFromAllowances(travel, allow, allow, input.roundMode)
-  return { ...base, offset, travel, rawCut, cut, status }
+  return { ...base, offset, travel, faceToFace, rawCut, cut, status }
 }

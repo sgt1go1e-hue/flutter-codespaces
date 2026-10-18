@@ -5190,3 +5190,44 @@ button.qc-history-row {
   border-top: 1px solid var(--border-soft);
   padding-top: 8px;
 }
+
+/* 45°振りのツラ〜ツラ（引き忘れやすい寸法なので色を分けて目立たせる） */
+.qd-dim.face {
+  stroke: var(--label-zero);
+  stroke-width: 1.4;
+}
+
+.qd-arrow.face {
+  fill: var(--label-zero);
+}
+
+.qd-label-face {
+  fill: var(--label-zero);
+  font-size: 16px;
+  font-weight: 900;
+}
+
+.qc-answer-face {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 8px;
+  color: var(--label-zero);
+  font-size: 13px;
+  font-weight: 800;
+  border-top: 1px solid var(--border-soft);
+  padding-top: 6px;
+}
+
+.qc-answer-face b {
+  font-size: 24px;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+
+.qc-answer-face small {
+  width: 100%;
+  color: var(--hint);
+  font-size: 12px;
+  font-weight: 600;
+}

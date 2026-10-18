@@ -267,6 +267,8 @@ export interface OffsetDiagramProps {
   sText: string
   cutText: string
   cutState: 'ok' | 'none' | 'bad'
+  /** 両端45°エルボのツラ〜ツラ(水平) */
+  faceText: string
   given: 'offset' | 'travel' | 'cut'
   onGiven: (g: 'offset' | 'travel' | 'cut') => void
 }
@@ -294,9 +296,10 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
   const cm = off(mid(c1, c2), 10)
   const lm = off(mid(l1, l2), 10)
   const xB = 328
-  const yA = 246
+  const yA = 244
+  const yF = 276
   return (
-    <svg className="qd-svg" viewBox="0 0 360 262" role="img" aria-label="45°振りの図">
+    <svg className="qd-svg" viewBox="0 0 360 292" role="img" aria-label="45°振りの図">
       {/* 斜辺 c（芯々） */}
       <Ext x1={P1.x} y1={P1.y} x2={c1.x + nx * 6} y2={c1.y + ny * 6} />
       <Ext x1={P2.x} y1={P2.y} x2={c2.x + nx * 6} y2={c2.y + ny * 6} />
@@ -359,6 +362,14 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       <DimLine x1={P1.x} y1={yA} x2={P2.x} y2={yA} className={p.given === 'offset' ? 'qd-dim strong' : 'qd-dim'} />
       <text x={(P1.x + P2.x) / 2} y={yA - 6} className="qd-label-s" textAnchor="middle">
         a = b
+      </text>
+
+      {/* 両端エルボのツラ〜ツラ（水平の管がつながる端面どうし） */}
+      <Ext x1={a1.x} y1={a1.y + 12} x2={a1.x} y2={yF + 8} />
+      <Ext x1={b2.x} y1={b2.y + 12} x2={b2.x} y2={yF + 8} />
+      <DimLine x1={a1.x} y1={yF} x2={b2.x} y2={yF} className="qd-dim face" />
+      <text x={(a1.x + b2.x) / 2} y={yF - 6} className="qd-label-face" textAnchor="middle">
+        ツラ〜ツラ　{p.faceText}
       </text>
 
       {/* 寸法の数字をタップして、b / c / L のどれを入力するか選ぶ */}
