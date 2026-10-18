@@ -5041,3 +5041,142 @@ fieldset.panel-grid:disabled {
   font-size: 15px;
   font-weight: 800;
 }
+
+/* --- クイック計算: 記録・現場ファイル --- */
+button.qc-history-row {
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 8px 0;
+  text-align: left;
+  border-top: 1px solid var(--border-soft);
+}
+
+.qc-records-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.qc-records-file {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  min-height: 42px;
+  padding: 0 12px;
+  font-size: 15px;
+  font-weight: 800;
+  text-align: left;
+}
+
+.qc-records-picker {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  background: var(--field-bg);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+}
+
+.qc-records-option {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background: none;
+  color: var(--text);
+  border: 1px solid transparent;
+  border-radius: 8px;
+  min-height: 42px;
+  padding: 0 10px;
+  font-size: 15px;
+  font-weight: 700;
+  text-align: left;
+}
+
+.qc-records-option.active {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+
+.qc-records-count {
+  color: var(--hint);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.qc-records-add {
+  background: none;
+  color: var(--accent);
+  border: 1px dashed var(--accent);
+  border-radius: 8px;
+  min-height: 42px;
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.qc-records-name,
+.qc-record-edit {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qc-records-name input,
+.qc-record-edit input {
+  flex: 1;
+  min-width: 0;
+  background: var(--field-bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 10px;
+  font-size: 16px;
+  min-height: 40px;
+}
+
+.qc-records-ok {
+  background: var(--accent-strong);
+  color: var(--accent-on);
+  border: none;
+  border-radius: 10px;
+  min-height: 40px;
+  padding: 0 14px;
+  font-weight: 800;
+}
+
+.qc-records-actions,
+.qc-records-foot {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: var(--hint);
+  font-size: 12.5px;
+}
+
+.qc-history-clear.danger {
+  color: var(--label-over);
+}
+
+.qc-records-empty,
+.qc-records-lock-text {
+  color: var(--hint);
+  font-size: 13px;
+  margin: 4px 0;
+}
+
+.qc-record-edit {
+  padding-bottom: 8px;
+}
+
+.qc-record-note {
+  color: var(--accent);
+  font-weight: 800;
+  margin-right: 6px;
+}

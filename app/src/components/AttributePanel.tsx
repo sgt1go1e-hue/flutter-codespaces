@@ -423,7 +423,7 @@ export function SegmentPanel({
   const visibleFittings = fittings.filter((f) => {
     if (f.id === 'none') return true
     // DTチーズはクイック計算・引しろ表用。作図の計算(takeout.ts)は未対応のため選択肢に出さない
-    if (f.id === 'y90dt_vp_dv') return false
+    if (f.id === 'y90dt_vp_dv' || f.id === 'y90dt_reducing_vp_dv') return false
     const isVpDvFitting = f.id.endsWith('_vp_dv')
     const isVpTsFitting = f.id.endsWith('_vp_ts')
     if (effective?.pipeType === 'vp') {

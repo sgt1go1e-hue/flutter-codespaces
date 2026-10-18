@@ -1732,7 +1732,7 @@ export default function App() {
         />
       )}
 
-      {screen === 'quickcalc' && <QuickCalc onClose={closeQuickCalc} />}
+      {screen === 'quickcalc' && <QuickCalc onClose={closeQuickCalc} onRequirePaid={requirePaid} />}
 
       {screen === 'nitrogen' && <NitrogenCalc onClose={closeNitrogenCalc} />}
 

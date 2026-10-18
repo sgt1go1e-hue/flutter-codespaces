@@ -120,17 +120,23 @@ export function quickEndAllowance(
   }
 }
 
-// 塩ビDVのTはDTチーズ(同径のみ登録)。径違いはデータが無いので0を返し、UIで注意を出す
+// 塩ビDVのTはDTチーズ。同径は y90dt_vp_dv、径違いは y90dt_reducing_vp_dv(キー"メイン_枝")。
+// 表に無い組み合わせは0を返し、UIで注意を出す
 const DV_TEE_ID = 'y90dt_vp_dv'
+const DV_TEE_REDUCING_ID = 'y90dt_reducing_vp_dv'
 function dvTeeAllowance(end: QuickEndInput, size: string | undefined): { mm: number; fittingId: string } {
   const own = nominalOf(size)
   const other = nominalOf(end.counterpartSize ?? size)
-  const dim = getFitting(DV_TEE_ID)?.dims[String(own ?? '')]
-  if (own == null || own !== other || dim == null || typeof dim !== 'object' || !('near' in dim)) {
-    return { mm: 0, fittingId: DV_TEE_ID }
-  }
-  const mm = end.kind === 'tee_branch' ? dim.branch : end.dvMainSide === 'far' ? dim.far : dim.near
-  return { mm, fittingId: DV_TEE_ID }
+  const isBranch = end.kind === 'tee_branch'
+  const main = isBranch ? other : own
+  const branch = isBranch ? own : other
+  const reducing = main !== branch
+  const id = reducing ? DV_TEE_REDUCING_ID : DV_TEE_ID
+  const key = reducing ? `${main}_${branch}` : String(main)
+  const dim = main != null && branch != null ? getFitting(id)?.dims[key] : undefined
+  if (dim == null || typeof dim !== 'object' || !('near' in dim)) return { mm: 0, fittingId: id }
+  const mm = isBranch ? dim.branch : end.dvMainSide === 'far' ? dim.far : dim.near
+  return { mm, fittingId: id }
 }
 
 const MAX_DIGITS_VALUE = 99999

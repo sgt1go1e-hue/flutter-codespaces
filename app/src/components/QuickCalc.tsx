@@ -32,10 +32,14 @@ import type { ConnectionKind } from '../lib/takeout'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { CalcKeypad } from './CalcKeypad'
 import { DrumWheel } from './DrumWheel'
+import { QuickCalcRecords, addRecord, type QcRecord, type QcFile } from './QuickCalcRecords'
+import { hasFullAccess } from '../lib/subscription'
 import { StraightDiagram, OffsetDiagram, FittingFigure } from './QuickCalcDiagrams'
 
 interface Props {
   onClose: () => void
+  /** 職長プランの機能を使おうとしたとき、購入案内を出す（App.tsx の requirePaid） */
+  onRequirePaid: (action: () => void) => void
 }
 
 type Tab = 'straight' | 'offset' | 'table'
@@ -72,6 +76,8 @@ interface Prefs {
   tableGroup?: ConnectionKind
   tableFitting?: string
   tableKey?: string
+  /** 記録の保存先(現場ファイルのid)。無ければメモ */
+  currentFileId?: string
 }
 
 const DEFAULT_PREFS: Prefs = {
@@ -88,24 +94,11 @@ const DEFAULT_PREFS: Prefs = {
 
 // 前回の管種・サイズ・継手を覚えておき、開いたらすぐ寸法を打てるようにする
 const PREFS_KEY = 'quickcalc.prefs.v1'
+// 記録(旧「履歴」)。キーは以前のままにして、これまでの履歴をそのまま引き継ぐ
 const HISTORY_KEY = 'quickcalc.history.v1'
-const HISTORY_MAX = 30
-
-interface HistoryEntry {
-  id: string
-  at: number
-  summary: string
-  cut: number
-}
+const FILES_KEY = 'quickcalc.files.v1'
 
 const fmt = (n: number | undefined) => (n == null ? '—' : String(Math.round(n * 10) / 10))
-
-function timeLabel(at: number): string {
-  const d = new Date(at)
-  const now = new Date()
-  const hm = `${d.getHours()}:${String(d.getMinutes()).padStart(2, '0')}`
-  return d.toDateString() === now.toDateString() ? hm : `${d.getMonth() + 1}/${d.getDate()} ${hm}`
-}
 
 function Chips<T extends string>({
   options,
@@ -148,13 +141,17 @@ function Chips<T extends string>({
   )
 }
 
-export function QuickCalc({ onClose }: Props) {
+export function QuickCalc({ onClose, onRequirePaid }: Props) {
   const [stored, setStored] = useLocalStorage<Partial<Prefs>>(PREFS_KEY, {})
   const prefs: Prefs = { ...DEFAULT_PREFS, ...stored }
   const setPrefs = (patch: Partial<Prefs>) => setStored((prev) => ({ ...prev, ...patch }))
   const { tab, pipeType, size, connection, vpSeries, roundMode, rawMode, left, right } = prefs
 
-  const [history, setHistory] = useLocalStorage<HistoryEntry[]>(HISTORY_KEY, [])
+  const [records, setRecords] = useLocalStorage<QcRecord[]>(HISTORY_KEY, [])
+  const [files, setFiles] = useLocalStorage<QcFile[]>(FILES_KEY, [])
+  // 記録・現場ファイルは職長プラン(無料期間中を含む)の機能
+  const recordsUnlocked = hasFullAccess()
+  const currentFileId = files.some((f) => f.id === prefs.currentFileId) ? prefs.currentFileId : undefined
   // 芯引きは a(全体芯々) と L(切り寸) のどちらからでも計算できる。入力中の方を field で持つ
   const [straightField, setStraightField] = useState<'a' | 'L'>('a')
   const [calcA, setCalcA] = useState<CalcState>(initialCalcState)
@@ -264,8 +261,9 @@ export function QuickCalc({ onClose }: Props) {
   }
 
   function addHistory(summary: string, cut: number) {
-    setHistory((h) =>
-      [{ id: `${Date.now()}`, at: Date.now(), summary, cut }, ...h].slice(0, HISTORY_MAX),
+    if (!recordsUnlocked) return
+    setRecords((list) =>
+      addRecord(list, { id: `${Date.now()}`, at: Date.now(), summary, cut, fileId: currentFileId }),
     )
   }
 
@@ -361,22 +359,17 @@ export function QuickCalc({ onClose }: Props) {
     </div>
   )
 
-  const historyBlock = history.length > 0 && (
-    <div className="qc-history">
-      <div className="qc-history-head">
-        <span className="field-label">履歴</span>
-        <button type="button" className="qc-history-clear" onClick={() => setHistory([])}>
-          消す
-        </button>
-      </div>
-      {history.map((h) => (
-        <div key={h.id} className="qc-history-row">
-          <span className="qc-history-time">{timeLabel(h.at)}</span>
-          <span className="qc-history-sum">{h.summary}</span>
-          <b>L {h.cut}</b>
-        </div>
-      ))}
-    </div>
+  const historyBlock = (
+    <QuickCalcRecords
+      locked={!recordsUnlocked}
+      onUnlock={() => onRequirePaid(() => {})}
+      records={records}
+      setRecords={setRecords}
+      files={files}
+      setFiles={setFiles}
+      currentFileId={currentFileId}
+      setCurrentFileId={(id) => setStored((prev) => ({ ...prev, currentFileId: id }))}
+    />
   )
 
   return (
@@ -875,7 +868,7 @@ function planJump(
       ? 'elbow90_long'
       : fittingId.startsWith('elbow45')
         ? 'elbow45'
-        : fittingId.startsWith('tee') || fittingId === 'y90dt_vp_dv'
+        : fittingId.startsWith('tee') || fittingId.startsWith('y90dt')
           ? 'tee'
           : undefined
   if (!kind) return undefined

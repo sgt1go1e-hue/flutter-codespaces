@@ -40,8 +40,10 @@ React + Vite + TypeScript のアプリ（`app/`）を、Capacitor で iOS / Andr
 ## 有料機能と無料期間（`app/src/lib/subscription.ts`）
 - 初回起動から14日間は全機能を解放（`startTrialIfNeeded` / `hasFullAccess`）。開始日は localStorage（再インストールでリセット）。
 - 無料版で使えるのは「アイソメを描く」と「クイック計算」だけ。
-- 有料: パーツ配置、材料拾い出し(BOM)、窒素計算、サポート架台図面、PDF/CSV出力、発注書・見積依頼書。
+- 有料: パーツ配置、材料拾い出し(BOM)、窒素計算、サポート架台図面、PDF/CSV出力、発注書・見積依頼書、
+  クイック計算の記録(履歴)・現場ファイル（計算そのもの・引しろ表は無料）。
   判定は `App.tsx` の `requirePaid` と `BomModal.tsx` の `requireSubscription`。新しい有料の入口を足したら必ず通す。
+  クイック計算の記録は `QuickCalc.tsx` の `recordsUnlocked`(hasFullAccess) で判定し、案内は `onRequirePaid`(=requirePaid)。
 - 購入画面(`PaywallModal.tsx`)には、プラン名・期間・価格・利用規約/プライバシーポリシーのリンクを必ず出す（Apple 3.1.2(c)）。
   App Store の説明文には、標準Apple EULAへのリンクを入れてある。
 - パーツ等のタップで購入画面を開くと、指を離した直後のクリックで即閉じる問題があった。
