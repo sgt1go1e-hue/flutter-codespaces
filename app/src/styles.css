@@ -5231,3 +5231,21 @@ button.qc-history-row {
   font-size: 12px;
   font-weight: 600;
 }
+
+/* テンキー上部のつかむ所。縦スクロールにとられず指に追従させる */
+.qc-sheet-grab {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  touch-action: none;
+  cursor: grab;
+}
+
+.qc-sheet-handle {
+  align-self: center;
+  width: 44px;
+  height: 5px;
+  border-radius: 3px;
+  background: var(--border);
+  margin-top: -2px;
+}

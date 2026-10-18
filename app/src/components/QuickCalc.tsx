@@ -30,6 +30,7 @@ import {
 } from '../lib/fittingTable'
 import type { ConnectionKind } from '../lib/takeout'
 import { useLocalStorage } from '../hooks/useLocalStorage'
+import { useSwipeDismiss } from '../hooks/useSwipeDismiss'
 import { CalcKeypad } from './CalcKeypad'
 import { DrumWheel } from './DrumWheel'
 import { QuickCalcRecords, addRecord, type QcRecord, type QcFile } from './QuickCalcRecords'
@@ -823,24 +824,42 @@ function KeypadSheet({
   answerValue: number | undefined
   answerClass: string
 }) {
+  // 下へスライド・＝・閉じるボタンのどれでも、同じように下がって閉じる
+  const { dragProps, style, dismiss } = useSwipeDismiss(onClose)
   return (
-    <div className="qc-sheet" role="dialog" aria-label={`${tag} を入力`}>
-      <div className="qc-sheet-head">
-        <span className={`qc-overall-tag ${tagClass}`}>{tag}</span>
-        <div className="qc-sheet-display">
-          {calc.display || '0'}
-          {calc.error && <span className="qc-calc-error">{calc.error}</span>}
+    <div className="qc-sheet" role="dialog" aria-label={`${tag} を入力`} style={style}>
+      {/* 数字キー以外の上の部分をつかんで下へスライドすると閉じる */}
+      <div className="qc-sheet-grab" {...dragProps}>
+        <div className="qc-sheet-handle" />
+        <div className="qc-sheet-head">
+          <span className={`qc-overall-tag ${tagClass}`}>{tag}</span>
+          <div className="qc-sheet-display">
+            {calc.display || '0'}
+            {calc.error && <span className="qc-calc-error">{calc.error}</span>}
+          </div>
+          <button
+            type="button"
+            className="qc-sheet-close"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={dismiss}
+          >
+            閉じる
+          </button>
         </div>
-        <button type="button" className="qc-sheet-close" onClick={onClose}>
-          閉じる
-        </button>
+        <div className={`qc-sheet-answer ${answerClass}`}>
+          <span>{answerLabel}</span>
+          <b>{answerValue != null ? fmt(answerValue) : '—'}</b>
+          <span>mm</span>
+        </div>
       </div>
-      <div className={`qc-sheet-answer ${answerClass}`}>
-        <span>{answerLabel}</span>
-        <b>{answerValue != null ? fmt(answerValue) : '—'}</b>
-        <span>mm</span>
-      </div>
-      <CalcKeypad onChange={onChange} onEqual={onEqual} />
+      <CalcKeypad
+        onChange={onChange}
+        onEqual={() => {
+          // ＝は入力完了の合図。計算を確定して、テンキーを下げる
+          onEqual()
+          dismiss()
+        }}
+      />
     </div>
   )
 }

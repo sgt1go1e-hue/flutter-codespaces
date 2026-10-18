@@ -49,6 +49,13 @@ React + Vite + TypeScript のアプリ（`app/`）を、Capacitor で iOS / Andr
 - パーツ等のタップで購入画面を開くと、指を離した直後のクリックで即閉じる問題があった。
   購入画面は開いてから0.5秒は背景タップを無視している（消さない）。
 
+## 操作の方針（ユーザーの希望）
+- スマホで感覚的に素早く使えることを優先する。タップだけでなく、スライド・フリックでも操作できるようにする。
+- 下から出る面(テンキー等)は「閉じる」ボタンに加えて、下へスライドでも閉じる（`app/src/hooks/useSwipeDismiss.ts` を使う）。
+- テンキーの＝は入力完了の合図。押したら確定してテンキーを下げる。
+- 図に寸法を描き、数字の枠をタップして入力する形にする（数字だけ並べない）。
+- Tの呼び方は「メイン」と「枝」（「ラン」は使わない）。
+
 ## Android エミュレーターでの確認
 - `cd app && npm run sync:mobile` → `cd app/android && ./gradlew installDebug`
 - 画面の中身は `adb forward tcp:9222 localabstract:webview_devtools_remote_<アプリのpid>` で WebView に接続して確認できる。
