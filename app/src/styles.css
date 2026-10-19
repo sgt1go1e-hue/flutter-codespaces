@@ -5298,3 +5298,18 @@ button.qc-history-row {
   fill: var(--bg);
   stroke: none;
 }
+
+/* 45°振りの両端の継手（45°エルボ／立て管の90°エルボ） */
+.qc-offset-end {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.qc-offset-end-label {
+  flex-shrink: 0;
+  width: 44px;
+  color: var(--hint);
+  font-size: 13px;
+  font-weight: 800;
+}

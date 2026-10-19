@@ -4,6 +4,8 @@ import type { RoundMode } from '../lib/cutlength'
 import {
   computeQuickCut,
   computeOffset45,
+  isRiserEnd,
+  type OffsetEnd,
   connectionKindOf,
   quickEndAllowance,
   type QuickCalcInput,
@@ -74,6 +76,9 @@ interface Prefs {
   left: QuickEndInput
   right: QuickEndInput
   offsetGiven: 'offset' | 'travel' | 'cut'
+  /** 45°振りの下側(s1)・上側(s2)の継手。立て管から振るときは90°エルボ */
+  offsetEnd1?: OffsetEnd
+  offsetEnd2?: OffsetEnd
   tableGroup?: ConnectionKind
   tableFitting?: string
   tableKey?: string
@@ -221,9 +226,15 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
         given: prefs.offsetGiven,
         value: offsetValue,
         roundMode,
+        end1: prefs.offsetEnd1,
+        end2: prefs.offsetEnd2,
       }),
-    [pipeType, size, connection, vpSeries, prefs.offsetGiven, offsetValue, roundMode],
+    [pipeType, size, connection, vpSeries, prefs.offsetGiven, offsetValue, roundMode, prefs.offsetEnd1, prefs.offsetEnd2],
   )
+  const riser1 = isRiserEnd(prefs.offsetEnd1)
+  const riser2 = isRiserEnd(prefs.offsetEnd2)
+  // 水平の長さの呼び方: 45°エルボの端はツラ、立て管の端は芯
+  const faceLabel = riser1 && riser2 ? '芯〜芯' : riser1 || riser2 ? '芯〜ツラ' : 'ツラ〜ツラ'
   const offsetCut =
     offsetResult.status === 'ok'
       ? rawMode && offsetResult.rawCut != null
@@ -301,7 +312,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
     })
     if (offsetCut != null) {
       addHistory(
-        `45°振り ${specText()} b${fmt(offsetResult.offset)} c${fmt(offsetResult.travel)} ツラ${fmt(offsetResult.faceToFace)}${prefs.offsetGiven === 'cut' ? '(Lから)' : ''}`,
+        `45°振り ${specText()} b${fmt(offsetResult.offset)} c${fmt(offsetResult.travel)} ${faceLabel}${fmt(offsetResult.faceToFace)}${riser1 || riser2 ? ' 立て' : ''}${prefs.offsetGiven === 'cut' ? '(Lから)' : ''}`,
         offsetCut,
       )
     }
@@ -616,21 +627,51 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
             <div className="qc-figure-card">
               <OffsetDiagram
                 joint={connectionKindOf(pipeType, vpSeries, connection)}
-                real={od != null && offsetResult.allow > 0 ? { a: offsetResult.allow, od } : undefined}
+                real1={od != null && offsetResult.allow1 > 0 ? { a: offsetResult.allow1, od } : undefined}
+                real2={od != null && offsetResult.allow2 > 0 ? { a: offsetResult.allow2, od } : undefined}
+                riser1={isRiserEnd(prefs.offsetEnd1)}
+                riser2={isRiserEnd(prefs.offsetEnd2)}
+                onEnd={(n) => {
+                  // 継手をタップするたびに 45°エルボ → 立て90°エルボ → 45°エルボ … と切り替える
+                  const key = n === 1 ? 'offsetEnd1' : 'offsetEnd2'
+                  const cur = prefs[key]
+                  setPrefs({ [key]: isRiserEnd(cur) ? 'elbow45' : 'elbow90_long' })
+                }}
                 given={prefs.offsetGiven}
                 onGiven={pickOffsetField}
                 offsetText={fmt(offsetResult.offset) === '—' ? '?' : fmt(offsetResult.offset)}
                 travelText={fmt(offsetResult.travel) === '—' ? '?' : fmt(offsetResult.travel)}
-                sText={fmt(offsetResult.allow)}
+                s1Text={fmt(offsetResult.allow1)}
+                s2Text={fmt(offsetResult.allow2)}
                 cutText={offsetCut != null ? fmt(offsetCut) : offsetResult.status === 'zero' ? '0' : '?'}
                 cutState={offsetCut != null ? 'ok' : offsetResult.status === 'over' ? 'bad' : 'none'}
                 faceText={offsetResult.faceToFace != null ? fmt(offsetResult.faceToFace) : '?'}
               />
-              <div className="qc-figure-hint">枠をタップで b・c・L を入力（c = b × 1.414）</div>
+              <div className="qc-figure-hint">枠で b・c・L を入力／継手タップで 45°⇔立て90°</div>
             </div>
 
-            {offsetResult.missing && (
-              <div className="qc-warn">45°エルボは、このサイズの寸法データがありません（控え0で計算しています）</div>
+            <div className="qc-end-editor qc-offset-ends">
+              {([1, 2] as const).map((n) => {
+                const key = n === 1 ? 'offsetEnd1' : 'offsetEnd2'
+                const opts: { value: OffsetEnd; label: string }[] = [
+                  { value: 'elbow45', label: '45°エルボ' },
+                  { value: 'elbow90_long', label: specKind === 'buttweld' ? '立て90°L' : '立て90°' },
+                  ...(specKind === 'buttweld' ? [{ value: 'elbow90_short' as OffsetEnd, label: '立て90°S' }] : []),
+                ]
+                return (
+                  <div key={n} className="qc-offset-end">
+                    <span className="qc-offset-end-label">{n === 1 ? '下 s1' : '上 s2'}</span>
+                    <Chips options={opts} value={prefs[key] ?? 'elbow45'} onPick={(v) => setPrefs({ [key]: v })} />
+                  </div>
+                )
+              })}
+            </div>
+
+            {(offsetResult.missing1 || offsetResult.missing2) && (
+              <div className="qc-warn">
+                {offsetResult.missing1 && offsetResult.missing2 ? '両端' : offsetResult.missing1 ? '下側' : '上側'}
+                の継手は、このサイズの寸法データがありません（控え0で計算しています）
+              </div>
             )}
 
             <div className={`qc-answer${offsetResult.status === 'over' ? ' bad' : ''}`}>
@@ -653,16 +694,18 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
               )}
               <div className="qc-answer-formula">
                 {prefs.offsetGiven === 'cut'
-                  ? `c = L ${fmt(offsetCut)} ＋ s1 ${fmt(offsetResult.allow)} ＋ s2 ${fmt(offsetResult.allow)} = ${fmt(offsetResult.travel)}`
-                  : `L = c ${fmt(offsetResult.travel)} − s1 ${fmt(offsetResult.allow)} − s2 ${fmt(offsetResult.allow)}`}
+                  ? `c = L ${fmt(offsetCut)} ＋ s1 ${fmt(offsetResult.allow1)} ＋ s2 ${fmt(offsetResult.allow2)} = ${fmt(offsetResult.travel)}`
+                  : `L = c ${fmt(offsetResult.travel)} − s1 ${fmt(offsetResult.allow1)} − s2 ${fmt(offsetResult.allow2)}`}
               </div>
               {offsetResult.faceToFace != null && (
                 <div className="qc-answer-face">
-                  <span>ツラ〜ツラ（水平）</span>
+                  <span>{faceLabel}（水平）</span>
                   <b>{fmt(offsetResult.faceToFace)}</b>
                   <span>mm</span>
                   <small>
-                    = b {fmt(offsetResult.offset)} ＋ s1 {fmt(offsetResult.allow)} ＋ s2 {fmt(offsetResult.allow)}
+                    = b {fmt(offsetResult.offset)}
+                    {riser1 ? '（下は立て管の芯）' : ` ＋ s1 ${fmt(offsetResult.allow1)}`}
+                    {riser2 ? '（上は立て管の芯）' : ` ＋ s2 ${fmt(offsetResult.allow2)}`}
                   </small>
                 </div>
               )}

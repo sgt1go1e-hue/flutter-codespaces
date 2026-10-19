@@ -226,6 +226,12 @@ function isMissing(end: { mm: number; fittingId?: string }): boolean {
 // 両端45°エルボのオフセット配管。作図画面と同じ「オフセット量×1.414」で
 // 斜辺(芯々)を出し、両端の45°エルボの控えを引いて切り寸法を求める。
 
+/**
+ * 45°振りの両端の継手。ふつうは45°エルボ。立て管から振るときは、立て管の上(下)の
+ * 90°エルボを斜め45°に向けて使うので、その端だけ90°エルボにできる。
+ */
+export type OffsetEnd = 'elbow45' | 'elbow90_long' | 'elbow90_short'
+
 export interface Offset45Input {
   pipeType?: string
   size?: string
@@ -235,30 +241,54 @@ export interface Offset45Input {
   given: 'offset' | 'travel' | 'cut'
   value?: number
   roundMode: RoundMode
+  /** 下側(s1)・上側(s2)の継手。省略時は45°エルボ */
+  end1?: OffsetEnd
+  end2?: OffsetEnd
 }
 
 export interface Offset45Result {
   offset?: number
   travel?: number
   /**
-   * 両端の45°エルボの、外側のツラ(水平の管がつながる端面)からツラまでの水平の長さ。
-   * オフセット(45°なので水平の振り幅も同じ)に、両端エルボの控えを足したもの。
+   * 水平方向の長さ。45°エルボの端は外側のツラ(水平の管がつながる端面)まで、
+   * 90°エルボ(立て管)の端は立て管の芯まで。オフセットに45°エルボの控えを足したもの。
    */
   faceToFace?: number
-  allow: number
-  fittingId?: string
-  missing?: boolean
+  /** 下側(s1)・上側(s2)の継手の控え */
+  allow1: number
+  allow2: number
+  fittingId1?: string
+  fittingId2?: string
+  /** 継手を選んでいるのに、そのサイズの寸法が継手マスタに無い端 */
+  missing1?: boolean
+  missing2?: boolean
   rawCut?: number
   cut?: number
   status: 'none' | 'ok' | 'zero' | 'over'
   error?: string
 }
 
+export const isRiserEnd = (e?: OffsetEnd) => e === 'elbow90_long' || e === 'elbow90_short'
+
 export function computeOffset45(input: Offset45Input): Offset45Result {
   const ck = connectionKindOf(input.pipeType, input.vpSeries, input.connection)
-  const fittingId = elbowFittingId('elbow45', ck)
-  const allow = input.size ? elbowTakeoutById(fittingId, input.size) : 0
-  const base = { allow, fittingId, missing: !!input.size && allow === 0 }
+  const endOf = (e: OffsetEnd = 'elbow45') => {
+    const id = elbowFittingId(e, ck)
+    const mm = input.size ? elbowTakeoutById(id, input.size) : 0
+    return { id, mm, missing: !!input.size && mm === 0 }
+  }
+  const e1 = endOf(input.end1)
+  const e2 = endOf(input.end2)
+  const allow1 = e1.mm
+  const allow2 = e2.mm
+  const base = {
+    allow1,
+    allow2,
+    fittingId1: e1.id,
+    fittingId2: e2.id,
+    missing1: e1.missing,
+    missing2: e2.missing,
+  }
   if (!input.size) return { ...base, status: 'none', error: 'サイズを選択してください' }
   const v = input.value
   if (v == null || Number.isNaN(v)) {
@@ -268,21 +298,25 @@ export function computeOffset45(input: Offset45Input): Offset45Result {
   if (v < 0) return { ...base, status: 'none', error: '0以上で入力してください' }
   if (v > MAX_DIGITS_VALUE) return { ...base, status: 'none', error: '5桁を超えました' }
 
+  const r1 = (x: number) => Math.round(x * 10) / 10
   // 切り寸(L)から逆算するときは、L に両端の控えを足して斜めの芯々(c)にする
   const travel =
     input.given === 'travel'
       ? v
       : input.given === 'cut'
-        ? Math.round((v + allow * 2) * 10) / 10
-        : Math.round(v * OFFSET_45_FACTOR * 10) / 10
-  const offset = input.given === 'offset' ? v : Math.round((travel / OFFSET_45_FACTOR) * 10) / 10
-  const faceToFace = Math.round((offset + allow * 2) * 10) / 10
+        ? r1(v + allow1 + allow2)
+        : r1(v * OFFSET_45_FACTOR)
+  const offset = input.given === 'offset' ? v : r1(travel / OFFSET_45_FACTOR)
+  // 水平の長さ: 45°エルボの端は外側のツラまで(控えを足す)、立て管の端は芯まで
+  const faceToFace = r1(
+    offset + (isRiserEnd(input.end1) ? 0 : allow1) + (isRiserEnd(input.end2) ? 0 : allow2),
+  )
   if (input.given === 'cut') {
     return { ...base, offset, travel, faceToFace, rawCut: v, cut: v, status: v <= 0.5 ? 'zero' : 'ok' }
   }
-  if (allow * 2 > travel) {
-    return { ...base, offset, travel, faceToFace, status: 'over', error: '寸法が45°エルボの控え寸法より短いです' }
+  if (allow1 + allow2 > travel) {
+    return { ...base, offset, travel, faceToFace, status: 'over', error: '寸法が両端の継手の控え寸法より短いです' }
   }
-  const { rawCut, cut, status } = computeCutFromAllowances(travel, allow, allow, input.roundMode)
+  const { rawCut, cut, status } = computeCutFromAllowances(travel, allow1, allow2, input.roundMode)
   return { ...base, offset, travel, faceToFace, rawCut, cut, status }
 }

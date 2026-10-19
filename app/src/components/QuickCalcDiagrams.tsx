@@ -311,30 +311,66 @@ export function StraightDiagram(p: StraightDiagramProps) {
 export interface OffsetDiagramProps {
   offsetText: string
   travelText: string
-  sText: string
+  /** 下側(s1)・上側(s2)の継手の控え */
+  s1Text: string
+  s2Text: string
   cutText: string
   cutState: 'ok' | 'none' | 'bad'
-  /** 両端45°エルボのツラ〜ツラ(水平) */
+  /** 水平の長さ(45°エルボの端はツラ、立て管の端は芯まで) */
   faceText: string
   /** 接続方式(継手の絵の描き分けに使う) */
   joint?: Joint
-  /** 45°エルボの実寸(引しろ・管の外径 mm)。絵の太さの比に使う */
-  real?: { a: number; od: number }
+  /** 下側・上側の継手の実寸(引しろ・管の外径 mm)。絵の太さの比に使う */
+  real1?: { a: number; od: number }
+  real2?: { a: number; od: number }
+  /** 下側・上側が立て管の90°エルボか（平面で見て、立て管を丸で描く） */
+  riser1: boolean
+  riser2: boolean
+  /** 継手をタップしたとき(45°エルボ⇔90°エルボの切り替えに使う) */
+  onEnd?: (end: 1 | 2) => void
   given: 'offset' | 'travel' | 'cut'
   onGiven: (g: 'offset' | 'travel' | 'cut') => void
+}
+
+/**
+ * 立て管の90°エルボを真上(真下)から見た形。立て管は丸、エルボの横の脚は斜め45°。
+ * 外形は部品を重ねて太線→塗りの順で描き、外周の線だけを残す。
+ */
+function RiserElbow({ C, u, leg, ro }: { C: { x: number; y: number }; u: { x: number; y: number }; leg: number; ro: number }) {
+  const h = ro * 1.3
+  const n = { x: -u.y, y: u.x }
+  const q = (r: number, w: number) => `${C.x + u.x * r + n.x * w},${C.y + u.y * r + n.y * w}`
+  const rect = `M${q(0, -h)} L${q(leg, -h)} L${q(leg, h)} L${q(0, h)}Z`
+  const circ = `M${C.x - h},${C.y} A${h},${h} 0 1 0 ${C.x + h},${C.y} A${h},${h} 0 1 0 ${C.x - h},${C.y}Z`
+  return (
+    <g>
+      <path d={rect} className="fa-line accent fa-fillline accent" strokeWidth={3.2} />
+      <path d={circ} className="fa-line accent fa-fillline accent" strokeWidth={3.2} />
+      <path d={rect} className="fa-fill" />
+      <path d={circ} className="fa-fill" />
+      {/* 立て管(上下へ抜ける管)の内側 */}
+      <circle cx={C.x} cy={C.y} r={ro * 0.75} className="fa-line accent" fill="none" strokeWidth={1} strokeDasharray="3 2" />
+      <path d={`M${C.x - 4},${C.y - 4} L${C.x + 4},${C.y + 4} M${C.x - 4},${C.y + 4} L${C.x + 4},${C.y - 4}`} className="fa-line accent" strokeWidth={1} />
+    </g>
+  )
 }
 
 export function OffsetDiagram(p: OffsetDiagramProps) {
   const P1 = { x: 96, y: 214 }
   const P2 = { x: 256, y: 54 }
-  const leg = p.joint ? artLeg(p.real, 30, 12, 34) : 30
-  const r = leg / Math.tan(Math.PI / 8)
-  // 下のエルボ: 水平の脚 → 斜めの脚
-  const a1 = { x: P1.x - leg, y: P1.y }
-  const b1 = { x: P1.x + leg * S45, y: P1.y - leg * S45 }
-  // 上のエルボ: 斜めの脚 → 水平の脚
-  const a2 = { x: P2.x - leg * S45, y: P2.y + leg * S45 }
-  const b2 = { x: P2.x + leg, y: P2.y }
+  const legOf = (real?: { a: number; od: number }) => (p.joint ? artLeg(real, 30, 12, 34) : 30)
+  const leg1 = legOf(p.real1)
+  const leg2 = legOf(p.real2)
+  // 下の継手: 水平の脚(立て管なら無し) → 斜めの脚
+  const a1 = { x: P1.x - leg1, y: P1.y }
+  const b1 = { x: P1.x + leg1 * S45, y: P1.y - leg1 * S45 }
+  // 上の継手: 斜めの脚 → 水平の脚(立て管なら無し)
+  const a2 = { x: P2.x - leg2 * S45, y: P2.y + leg2 * S45 }
+  const b2 = { x: P2.x + leg2, y: P2.y }
+  // 水平の長さの端: 45°エルボはツラ、立て管は芯
+  const f1 = p.riser1 ? P1.x : a1.x
+  const f2 = p.riser2 ? P2.x : b2.x
+  const faceLabel = p.riser1 && p.riser2 ? '芯〜芯' : p.riser1 || p.riser2 ? '芯〜ツラ' : 'ツラ〜ツラ'
   // 斜辺に直交する(左上向きの)ずらし
   const nx = -S45
   const ny = -S45
@@ -349,6 +385,10 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
   const xB = 328
   const yA = 244
   const yF = 276
+  const elbow45 = (C: { x: number; y: number }, legs: { x: number; y: number }[], leg: number) =>
+    p.joint ? (
+      <FittingArt joint={p.joint} C={C} legs={legs} A={leg} ro={END_RO} sw={1.6} accent />
+    ) : null
   return (
     <svg className="qd-svg" viewBox="0 0 360 292" role="img" aria-label="45°振りの図">
       {/* 斜辺 c（芯々） */}
@@ -381,27 +421,32 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
         L　{p.cutText}
       </text>
 
-      {/* 管・エルボ */}
-      <CenterLine d={`M 14 ${P1.y} L ${P1.x} ${P1.y} L ${P2.x} ${P2.y} L 346 ${P2.y}`} />
-      <Tube d={`M 14 ${P1.y} L ${a1.x} ${a1.y}`} />
+      {/* 管・継手 */}
+      <CenterLine
+        d={`M ${p.riser1 ? P1.x : 14} ${P1.y} L ${P1.x} ${P1.y} L ${P2.x} ${P2.y} L ${p.riser2 ? P2.x : 346} ${P2.y}`}
+      />
+      {!p.riser1 && <Tube d={`M 14 ${P1.y} L ${a1.x} ${a1.y}`} />}
       <Tube d={`M ${b1.x} ${b1.y} L ${a2.x} ${a2.y}`} />
-      <Tube d={`M ${b2.x} ${b2.y} L 346 ${P2.y}`} />
-      {p.joint ? (
-        <>
-          <FittingArt joint={p.joint} C={P1} legs={[{ x: -1, y: 0 }, { x: S45, y: -S45 }]} A={leg} ro={END_RO} sw={1.6} accent />
-          <FittingArt joint={p.joint} C={P2} legs={[{ x: -S45, y: S45 }, { x: 1, y: 0 }]} A={leg} ro={END_RO} sw={1.6} accent />
-        </>
+      {!p.riser2 && <Tube d={`M ${b2.x} ${b2.y} L 346 ${P2.y}`} />}
+      {p.riser1 ? (
+        <RiserElbow C={P1} u={{ x: S45, y: -S45 }} leg={leg1} ro={END_RO} />
+      ) : p.joint ? (
+        elbow45(P1, [{ x: -1, y: 0 }, { x: S45, y: -S45 }], leg1)
       ) : (
-        <>
-          <Tube d={`M ${a1.x} ${a1.y} A ${r} ${r} 0 0 0 ${b1.x} ${b1.y}`} accent />
-          <Tube d={`M ${a2.x} ${a2.y} A ${r} ${r} 0 0 1 ${b2.x} ${b2.y}`} accent />
-        </>
+        <Tube d={`M ${a1.x} ${a1.y} A ${leg1 / Math.tan(Math.PI / 8)} ${leg1 / Math.tan(Math.PI / 8)} 0 0 0 ${b1.x} ${b1.y}`} accent />
+      )}
+      {p.riser2 ? (
+        <RiserElbow C={P2} u={{ x: -S45, y: S45 }} leg={leg2} ro={END_RO} />
+      ) : p.joint ? (
+        elbow45(P2, [{ x: -S45, y: S45 }, { x: 1, y: 0 }], leg2)
+      ) : (
+        <Tube d={`M ${a2.x} ${a2.y} A ${leg2 / Math.tan(Math.PI / 8)} ${leg2 / Math.tan(Math.PI / 8)} 0 0 1 ${b2.x} ${b2.y}`} accent />
       )}
       <text x={P1.x + 22} y={P1.y + 4} className="qd-label-s" textAnchor="start" dominantBaseline="hanging">
-        45° s1 {p.sText}
+        {p.riser1 ? '立て90°' : '45°'} s1 {p.s1Text}
       </text>
       <text x={P2.x + 8} y={P2.y + 32} className="qd-label-s" textAnchor="start">
-        s2 {p.sText}
+        {p.riser2 ? '立て90° ' : ''}s2 {p.s2Text}
       </text>
 
       {/* オフセット a・b（45°なので同じ値） */}
@@ -424,13 +469,21 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
         a = b
       </text>
 
-      {/* 両端エルボのツラ〜ツラ（水平の管がつながる端面どうし） */}
-      <Ext x1={a1.x} y1={a1.y + 12} x2={a1.x} y2={yF + 8} />
-      <Ext x1={b2.x} y1={b2.y + 12} x2={b2.x} y2={yF + 8} />
-      <DimLine x1={a1.x} y1={yF} x2={b2.x} y2={yF} className="qd-dim face" />
-      <text x={(a1.x + b2.x) / 2} y={yF - 6} className="qd-label-face" textAnchor="middle">
-        ツラ〜ツラ　{p.faceText}
+      {/* 水平の長さ（45°エルボはツラ、立て管は芯まで） */}
+      <Ext x1={f1} y1={P1.y + 12} x2={f1} y2={yF + 8} />
+      <Ext x1={f2} y1={P2.y + 12} x2={f2} y2={yF + 8} />
+      <DimLine x1={f1} y1={yF} x2={f2} y2={yF} className="qd-dim face" />
+      <text x={(f1 + f2) / 2} y={yF - 6} className="qd-label-face" textAnchor="middle">
+        {faceLabel}　{p.faceText}
       </text>
+
+      {/* 継手をタップして 45°エルボ ⇔ 立て管の90°エルボ を切り替える */}
+      {p.onEnd && (
+        <>
+          <circle cx={P1.x} cy={P1.y} r={26} className="qd-hit" onPointerDown={() => p.onEnd?.(1)} />
+          <circle cx={P2.x} cy={P2.y} r={26} className="qd-hit" onPointerDown={() => p.onEnd?.(2)} />
+        </>
+      )}
 
       {/* 寸法の数字をタップして、b / c / L のどれを入力するか選ぶ */}
       <circle cx={xB - 56} cy={(P1.y + P2.y) / 2 - 8} r={44} className="qd-hit" onPointerDown={() => p.onGiven('offset')} />
