@@ -997,7 +997,7 @@ export function SegmentPanel({
           {cut?.socketWeldGapWarning && (
             <div className="socket-gap-warn">
               <p>
-                差込（ソケット）溶接の継手同士が近いようです（継手のツラ〜ツラ 約
+                差込溶接の継手同士が近いようです（継手のツラ〜ツラ 約
                 {cut.socketWeldFaceGap}mm）。
                 溶接代の一般的な目安は50mm以上です（現場慣習に基づく参考値・推奨です）。
               </p>

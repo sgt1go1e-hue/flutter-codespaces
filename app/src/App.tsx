@@ -163,7 +163,8 @@ function splitForDoubleFlange(
     angle: target.angle,
     parentId: target.id,
     startFlange: 'double',
-    connection: 'flange',
+    // 接続方法は元の区間のまま(フランジを入れても接続方法は変えない)
+    connection: target.connection,
     fieldWeldMarks: marks.b,
     // 系統色(colorId)は継承の仕組み(Effective)を持たない直接指定の属性なので、
     // ここで明示的にコピーしないと分割後のB側だけ色が消える（実機で
@@ -176,7 +177,7 @@ function splitForDoubleFlange(
     flangeSpanLength: target.centerLength,
     // pipeType/size/fitting は持たせない → A から継承・自動
   }
-  A.connection = target.connection ?? 'flange'
+  A.connection = target.connection
 
   const result: Segment[] = []
   for (const s of segments) {
@@ -299,7 +300,7 @@ function markSingleFlange(
   const at = t < 0.5 ? 'startFlange' : 'endFlange'
   return segments.map((s) =>
     s.id === targetId
-      ? { ...s, [at]: 'single', connection: s.connection ?? 'flange' }
+      ? { ...s, [at]: 'single' }
       : s,
   )
 }

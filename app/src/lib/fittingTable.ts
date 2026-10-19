@@ -12,9 +12,9 @@ export interface FittingGroup {
 }
 
 export const FITTING_GROUPS: FittingGroup[] = [
-  { kind: 'buttweld', label: '溶接', maker: 'イノック SUS304 突合せ溶接' },
+  { kind: 'buttweld', label: '突合せ溶接', maker: 'イノック SUS304 突合せ溶接' },
+  { kind: 'socket', label: '差込溶接', maker: '日本ジョイント 差込溶接 SCH80' },
   { kind: 'thread', label: 'ねじ込み', maker: 'JIS B2301 ねじ込み式（桑名・リケン）' },
-  { kind: 'socket', label: '差込', maker: '日本ジョイント 差込溶接 SCH80' },
   { kind: 'vp_dv', label: '塩ビDV', maker: '積水 エスロン DV継手' },
   { kind: 'vp_ts', label: '塩ビTS', maker: 'クボタケミックス TS継手' },
 ]

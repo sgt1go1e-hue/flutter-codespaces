@@ -175,7 +175,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
       ? vpSeries === 'ts'
         ? 'TS継手'
         : 'DV継手'
-      : (connectionMethods.find((c) => c.id === connection)?.name ?? '溶接')
+      : (connectionMethods.find((c) => c.id === connection)?.name ?? '突合せ溶接')
 
   // ---- 芯引き ----
   const base: QuickCalcInput = { pipeType, size, connection, vpSeries, overall: undefined, roundMode, left, right }
@@ -443,7 +443,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                       label="接続"
                       items={connectionMethods.map((c) => ({
                         value: c.id,
-                        label: c.name.replace('（ソケット）', '').replace('フランジ接合', 'フランジ'),
+                        label: c.name,
                       }))}
                       value={connection ?? 'weld'}
                       onChange={(v) => setPrefs({ connection: v })}

@@ -63,11 +63,13 @@ export interface ConnectionMethod {
   name: string
 }
 
+// 選べるのは突合せ溶接・差込溶接・ねじ込みの3つ。以前あった「フランジ接合」(id 'flange')は
+// 選択肢から外した。古い図面に残っている 'flange' は計算上は突合せ溶接と同じ扱い
+// (差込・ねじ込みでないもの)で、ルートギャップだけは付かない(cutlength.ts)。
 export const connectionMethods: ConnectionMethod[] = [
-  { id: 'weld', name: '溶接' },
+  { id: 'weld', name: '突合せ溶接' },
+  { id: 'socket', name: '差込溶接' },
   { id: 'thread', name: 'ねじ込み' },
-  { id: 'socket', name: '差込（ソケット）' },
-  { id: 'flange', name: 'フランジ接合' },
 ]
 
 export function getConnectionMethod(id?: string): ConnectionMethod | undefined {
@@ -77,10 +79,10 @@ export function getConnectionMethod(id?: string): ConnectionMethod | undefined {
 /** 継手マスタの source(例: "inoc_SUS304_buttweld")から接続方法(溶接/ねじ込み等)を推定する */
 export function connectionLabelForSource(source?: string | null): string {
   if (!source) return '—'
-  if (source.includes('buttweld')) return '溶接'
+  if (source.includes('buttweld')) return '突合せ溶接'
   if (source.includes('thread')) return 'ねじ込み'
   if (source.includes('vp')) return '接着（差込）'
-  if (source.includes('socket')) return '差込（ソケット）'
+  if (source.includes('socket')) return '差込溶接'
   return '—'
 }
 
