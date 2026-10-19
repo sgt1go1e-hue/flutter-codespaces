@@ -565,11 +565,22 @@ function ReducerFigure({
   const top = y - h * k - 16
   const eccentric = kind === 'eccentric'
   const y2 = eccentric ? y + (R1 - R2) * k : y
+  // 偏心の芯ズレ = (大径の外径 − 小径の外径) ÷ 2
+  const shift = mm.bod != null ? Math.round(((mm.od - mm.bod) / 2) * 100) / 100 : undefined
+  const xs = x0 + H * k * 0.5
   return (
     <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label="レジューサー">
       <ReducerArt kind={kind} x0={x0} y={y} H={H * k} R1={R1 * k} R2={R2 * k} />
       <CenterLine d={`M ${x0 - d1 * k - 10} ${y} L ${eccentric ? x0 + H * k * 0.6 : x0 + (H + d2) * k + 10} ${y}`} />
       {eccentric && <CenterLine d={`M ${x0 + H * k * 0.4} ${y2} L ${x0 + H * k + 10} ${y2}`} />}
+      {eccentric && shift != null && (
+        <>
+          <DimLine x1={xs} y1={y} x2={xs} y2={y2} className="qd-dim face" />
+          <text x={xs + 8} y={(y + y2) / 2 + 6} className="qd-label-face" textAnchor="start">
+            芯ズレ {shift}
+          </text>
+        </>
+      )}
       <Ext x1={x0} y1={y - R1 * k} x2={x0} y2={top - 6} />
       <Ext x1={x0 + H * k} y1={y2 - R2 * k} x2={x0 + H * k} y2={top - 6} />
       <DimLine x1={x0} y1={top} x2={x0 + H * k} y2={top} className="qd-dim strong" />
@@ -579,7 +590,7 @@ function ReducerFigure({
       </text>
       {eccentric && (
         <text x={180} y={226} className="qd-label-s" textAnchor="middle">
-          偏心（下面がそろう）
+          偏心（下面がそろう）芯ズレ = ({mm.od} − {mm.bod}) ÷ 2 = {shift}
         </text>
       )}
     </svg>
