@@ -124,12 +124,14 @@ export interface FittingArtProps {
   branchA?: number
   /** 枝だけ別の太さにする(径違いT)。省略時はro */
   branchRo?: number
+  /** 脚ごとに引しろを変える(Y継手の上流・下流・枝など)。指定した脚はA/branchAより優先 */
+  legA?: number[]
 }
 
-export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA, branchRo }: FittingArtProps) {
+export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA, branchRo, legA }: FittingArtProps) {
   const isTee = legs.length === 3
   const P = proportions(joint, A, ro)
-  const Aof = (i: number) => (isTee && i === 2 && branchA != null ? branchA : A)
+  const Aof = (i: number) => legA?.[i] ?? (isTee && i === 2 && branchA != null ? branchA : A)
   const roOf = (i: number) => (isTee && i === 2 && branchRo != null ? branchRo : ro)
   const Pof = (i: number) => (isTee && i === 2 ? proportions(joint, Aof(i), roOf(i)) : P)
   const Fof = (i: number) => Aof(i) + Pof(i).depth
@@ -234,11 +236,11 @@ export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA, bra
       const nb = perp(m1)
       const side = Math.sign(dot(nb, br)) || 1 // 枝のある側
       const at = (u: V, r: number, w: number) => add(add(C, mul(u, r)), mul(nb, w))
-      const farA = at(m1, A, -side * P.bore)
-      const farB = at(m2, A, -side * P.bore)
+      const farA = at(m1, Aof(0), -side * P.bore)
+      const farB = at(m2, Aof(1), -side * P.bore)
       det.push(line(`M${pt(farA)} L${pt(farB)}`, 'tf'))
-      const nearA = at(m1, A, side * P.bore)
-      const nearB = at(m2, A, side * P.bore)
+      const nearA = at(m1, Aof(0), side * P.bore)
+      const nearB = at(m2, Aof(1), side * P.bore)
       const brA = Aof(2)
       const brBore = Pof(2).bore
       const pb = perp(br)
@@ -265,6 +267,138 @@ export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA, bra
         <path key={`f${k}`} d={d} className="fa-fill" />
       ))}
       {det}
+    </g>
+  )
+}
+
+// ---------------------------------------------------------------
+// レジューサー・キャップ（まっすぐな継手）
+// ---------------------------------------------------------------
+
+export type ReducerKind = 'concentric' | 'eccentric' | 'socket' | 'thread' | 'bushing'
+
+/** レジューサーの受口の深さ(芯〜端面ではなく、端面〜差込み底)。突合せ溶接は0 */
+export function reducerDepth(kind: ReducerKind, ro: number): number {
+  if (kind === 'socket') return ro * 0.8
+  if (kind === 'thread') return ro * 0.9
+  if (kind === 'bushing') return ro * 1.1
+  return 0
+}
+
+/**
+ * レジューサーを横向き(左が大径・右が小径)に描く。x0=大径側の差込み底(突合せは端面)、
+ * y=大径側の芯。H=面間(差込み底どうし)。偏心は下面をそろえ、小径側の芯が下がる。
+ */
+export function ReducerArt({
+  kind,
+  x0,
+  y,
+  H,
+  R1,
+  R2,
+  sw = 2,
+}: {
+  kind: ReducerKind
+  x0: number
+  y: number
+  H: number
+  R1: number
+  R2: number
+  sw?: number
+}) {
+  const thin = sw * 0.6
+  const body: string[] = []
+  const det: string[] = []
+  const P = (x: number, yy: number) => `${f(x)},${f(yy)}`
+  if (kind === 'concentric' || kind === 'eccentric') {
+    const e = H * 0.2
+    const y2 = kind === 'eccentric' ? y + (R1 - R2) : y // 小径側の芯
+    body.push(
+      `M${P(x0, y - R1)} L${P(x0 + e, y - R1)} L${P(x0 + H - e, y2 - R2)} L${P(x0 + H, y2 - R2)} L${P(x0 + H, y2 + R2)} L${P(x0 + H - e, y2 + R2)} L${P(x0 + e, y + R1)} L${P(x0, y + R1)}Z`,
+    )
+    // 両端の開先(面取り)
+    for (const [x, yc, r, dir] of [
+      [x0, y, R1, 1],
+      [x0 + H, y2, R2, -1],
+    ] as const) {
+      const c = r * 0.22
+      det.push(`M${P(x + dir * c, yc - r)} L${P(x + dir * c, yc + r)}`)
+      det.push(`M${P(x + dir * c, yc - r)} L${P(x, yc - r + c)} M${P(x + dir * c, yc + r)} L${P(x, yc + r - c)}`)
+    }
+  } else if (kind === 'bushing') {
+    // ブッシング: 左に六角の頭、右へ大径のおねじ。内側に小径のめねじ
+    const head = R1 * 0.55
+    const hx = R1 * 1.25
+    const d2 = reducerDepth(kind, R2)
+    body.push(`M${P(x0 - head, y - hx)} L${P(x0, y - hx)} L${P(x0, y + hx)} L${P(x0 - head, y + hx)}Z`)
+    body.push(`M${P(x0, y - R1)} L${P(x0 + H + d2, y - R1 * 0.92)} L${P(x0 + H + d2, y + R1 * 0.92)} L${P(x0, y + R1)}Z`)
+    // 六角の稜線
+    det.push(`M${P(x0 - head, y - hx * 0.5)} L${P(x0, y - hx * 0.5)} M${P(x0 - head, y + hx * 0.5)} L${P(x0, y + hx * 0.5)}`)
+    // おねじの山
+    for (let j = 1; j < 5; j++) {
+      const x = x0 + ((H + d2) * j) / 5
+      det.push(`M${P(x, y - R1 * 0.95)} l${f(-R1 * 0.12)},${f(R1 * 0.1)} M${P(x, y + R1 * 0.95)} l${f(-R1 * 0.12)},${f(-R1 * 0.1)}`)
+    }
+    // めねじ(頭の面から奥へ)と流路
+    det.push(`M${P(x0 - head, y - R2)} L${P(x0 - head + d2, y - R2 * 0.86)} L${P(x0 - head + d2, y - R2 * 0.7)} L${P(x0 + H + d2, y - R2 * 0.7)}`)
+    det.push(`M${P(x0 - head, y + R2)} L${P(x0 - head + d2, y + R2 * 0.86)} L${P(x0 - head + d2, y + R2 * 0.7)} L${P(x0 + H + d2, y + R2 * 0.7)}`)
+  } else {
+    // 差込・ねじ込みの径違いソケット: 大径の受口と小径の受口を段付きの胴でつなぐ
+    const d1 = reducerDepth(kind, R1)
+    const d2 = reducerDepth(kind, R2)
+    const h1 = kind === 'socket' ? R1 * 1.45 : R1 * 1.25
+    const h2 = kind === 'socket' ? R2 * 1.45 : R2 * 1.25
+    const xa = x0 - d1
+    const xb = x0 + H + d2
+    const mid1 = x0 + H * 0.25
+    const mid2 = x0 + H * 0.75
+    body.push(
+      `M${P(xa, y - h1)} L${P(mid1, y - h1)} L${P(mid2, y - h2)} L${P(xb, y - h2)} L${P(xb, y + h2)} L${P(mid2, y + h2)} L${P(mid1, y + h1)} L${P(xa, y + h1)}Z`,
+    )
+    if (kind === 'thread') {
+      // 口元の帯
+      body.push(`M${P(xa, y - h1 - R1 * 0.16)} L${P(xa + R1 * 0.42, y - h1 - R1 * 0.16)} L${P(xa + R1 * 0.42, y + h1 + R1 * 0.16)} L${P(xa, y + h1 + R1 * 0.16)}Z`)
+      body.push(`M${P(xb - R2 * 0.42, y - h2 - R2 * 0.16)} L${P(xb, y - h2 - R2 * 0.16)} L${P(xb, y + h2 + R2 * 0.16)} L${P(xb - R2 * 0.42, y + h2 + R2 * 0.16)}Z`)
+    }
+    const in1 = kind === 'thread' ? R1 * 0.86 : R1
+    const in2 = kind === 'thread' ? R2 * 0.86 : R2
+    const bore = R2 * 0.72
+    for (const s of [-1, 1]) {
+      det.push(`M${P(xa, y + s * R1)} L${P(x0, y + s * in1)} L${P(x0, y + s * bore)} L${P(x0 + H, y + s * bore)} L${P(x0 + H, y + s * in2)} L${P(xb, y + s * R2)}`)
+    }
+  }
+  return (
+    <g>
+      {body.map((d, k) => (
+        <path key={`s${k}`} d={d} strokeWidth={sw * 2} strokeLinejoin="round" className="fa-line fa-fillline" />
+      ))}
+      {body.map((d, k) => (
+        <path key={`f${k}`} d={d} className="fa-fill" />
+      ))}
+      {det.map((d, k) => (
+        <path key={`d${k}`} d={d} className="fa-line" strokeWidth={thin} fill="none" />
+      ))}
+    </g>
+  )
+}
+
+/** キャップ(突合せ溶接)。x0=開口の端面、y=芯、D=深さ(端面〜頂点)、R=外径の半分 */
+export function CapArt({ x0, y, D, R, sw = 2 }: { x0: number; y: number; D: number; R: number; sw?: number }) {
+  const e = Math.max(0, D - R * 0.9) // まっすぐな胴の長さ
+  const rx = D - e
+  const d = `M${f(x0)},${f(y - R)} L${f(x0 + e)},${f(y - R)} A${f(rx)},${f(R)} 0 0 1 ${f(x0 + e)},${f(y + R)} L${f(x0)},${f(y + R)}Z`
+  const c = R * 0.22
+  const thin = sw * 0.6
+  return (
+    <g>
+      <path d={d} strokeWidth={sw * 2} strokeLinejoin="round" className="fa-line fa-fillline" />
+      <path d={d} className="fa-fill" />
+      <path
+        d={`M${f(x0 + c)},${f(y - R)} L${f(x0 + c)},${f(y + R)} M${f(x0 + c)},${f(y - R)} L${f(x0)},${f(y - R + c)} M${f(x0 + c)},${f(y + R)} L${f(x0)},${f(y + R - c)}`}
+        className="fa-line"
+        strokeWidth={thin}
+        fill="none"
+      />
     </g>
   )
 }

@@ -779,6 +779,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                   values={tableRows.map((r) => r.value)}
                   joint={tableGroup}
                   mm={figureMm(tableFitting.dims[tableKey], tableKey, tableGroup)}
+                  fittingId={tableFitting.id}
                 />
                 <div className="qc-fig-values">
                   {tableRows.map((r) => (
@@ -972,12 +973,12 @@ function planJump(
   return { pipeType, connection, vpSeries, size, end }
 }
 
-// 引しろ表の図を実物の太さの比で描くための寸法(mm)。引しろと管の外径(メイン/枝)
+// 引しろ表の図を実物の太さの比で描くための寸法(mm)。引しろ・面間と管の外径
 function figureMm(
   dim: DimValue | undefined,
   key: string,
   group: ConnectionKind,
-): { a: number; b?: number; od: number; bod?: number } | undefined {
+): { a: number; b?: number; c?: number; od: number; bod?: number } | undefined {
   const isVp = group === 'vp_dv' || group === 'vp_ts'
   const [n1, n2] = key.split('_')
   const odOf = (n?: string) => (n ? getSizeInfo(isVp ? `VP${n}` : `${n}A`)?.od : undefined)
@@ -985,5 +986,6 @@ function figureMm(
   if (dim == null || od == null) return undefined
   if (typeof dim === 'number') return { a: dim, od }
   if ('run' in dim) return { a: dim.run, b: dim.branch, od, bod: odOf(n2) ?? od }
-  return undefined
+  if ('near' in dim) return { a: dim.near, b: dim.far, c: dim.branch, od, bod: odOf(n2) ?? od }
+  return { a: dim.H, od: dim.od1 ?? od, bod: dim.od2 ?? odOf(n2) }
 }

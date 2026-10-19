@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react'
 import type { QuickFittingKind } from '../lib/quickCalc'
 import type { FittingShape } from '../lib/fittingTable'
-import { FittingArt, artExtent, type Joint } from './FittingArt'
+import { FittingArt, artExtent, ReducerArt, CapArt, reducerDepth, type Joint, type ReducerKind } from './FittingArt'
 
 const TUBE = 16 // 管の太さ(px)
 const LEG = 36 // 継手の脚の長さ(px)
@@ -520,8 +520,160 @@ export interface FittingFigureProps {
   values: string[]
   /** 接続方式。エルボ・Tはこれでカタログ風の線画を描き分ける */
   joint?: Joint
-  /** 実寸(mm)。引しろ(メイン/枝)と管の外径(メイン/枝)。あれば実物の太さの比で描く */
-  mm?: { a: number; b?: number; od: number; bod?: number }
+  /**
+   * 実寸(mm)。あれば実物の太さの比で描く。
+   * エルボ・T: a=引しろ(メイン) b=枝の引しろ / Y: a=下流 b=上流 c=枝 /
+   * レジューサー: a=面間H / キャップ: a=高さ。od=管の外径(大径・メイン)、bod=小径・枝の外径
+   */
+  mm?: { a: number; b?: number; c?: number; od: number; bod?: number }
+  /** 継手のid(偏心レジューサー・ブッシングなど形の描き分けに使う) */
+  fittingId?: string
+}
+
+function ReducerFigure({
+  joint,
+  mm,
+  v,
+  fittingId,
+}: {
+  joint: Joint
+  mm: { a: number; od: number; bod?: number }
+  v: (i: number) => string
+  fittingId?: string
+}) {
+  const kind: ReducerKind =
+    fittingId === 'reducer_eccentric'
+      ? 'eccentric'
+      : fittingId === 'bushing_thread'
+        ? 'bushing'
+        : joint === 'socket'
+          ? 'socket'
+          : joint === 'thread'
+            ? 'thread'
+            : 'concentric'
+  const R1 = mm.od / 2
+  const R2 = (mm.bod ?? mm.od * 0.8) / 2
+  const H = mm.a
+  const d1 = kind === 'bushing' ? R1 * 0.55 : reducerDepth(kind, R1)
+  const d2 = reducerDepth(kind, R2)
+  const h = kind === 'socket' ? R1 * 1.45 : kind === 'thread' ? R1 * 1.45 : kind === 'bushing' ? R1 * 1.25 : R1
+  // ブッシングのHは小さい(数mm)ので、形が分かるよう長さに下限を設ける
+  const len = d1 + Math.max(H, kind === 'bushing' ? R1 * 1.2 : 0) + d2
+  const k = Math.min(260 / len, 120 / (2 * h))
+  const x0 = 180 - (len * k) / 2 + d1 * k
+  const y = 112
+  const top = y - h * k - 16
+  const eccentric = kind === 'eccentric'
+  const y2 = eccentric ? y + (R1 - R2) * k : y
+  return (
+    <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label="レジューサー">
+      <ReducerArt kind={kind} x0={x0} y={y} H={H * k} R1={R1 * k} R2={R2 * k} />
+      <CenterLine d={`M ${x0 - d1 * k - 10} ${y} L ${eccentric ? x0 + H * k * 0.6 : x0 + (H + d2) * k + 10} ${y}`} />
+      {eccentric && <CenterLine d={`M ${x0 + H * k * 0.4} ${y2} L ${x0 + H * k + 10} ${y2}`} />}
+      <Ext x1={x0} y1={y - R1 * k} x2={x0} y2={top - 6} />
+      <Ext x1={x0 + H * k} y1={y2 - R2 * k} x2={x0 + H * k} y2={top - 6} />
+      <DimLine x1={x0} y1={top} x2={x0 + H * k} y2={top} className="qd-dim strong" />
+      <FigText x={x0 + (H * k) / 2} y={top - 7}>H {v(0)}</FigText>
+      <text x={180} y={208} className="qd-label-s" textAnchor="middle">
+        大径 φ{mm.od} → 小径 φ{mm.bod ?? '—'}
+      </text>
+      {eccentric && (
+        <text x={180} y={226} className="qd-label-s" textAnchor="middle">
+          偏心（下面がそろう）
+        </text>
+      )}
+    </svg>
+  )
+}
+
+function CapFigure({ mm, v }: { mm: { a: number; od: number }; v: (i: number) => string }) {
+  const R = mm.od / 2
+  const D = mm.a
+  const k = Math.min(220 / D, 130 / (2 * R))
+  const x0 = 180 - (D * k) / 2
+  const y = 120
+  const top = y - R * k - 16
+  return (
+    <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label="キャップ">
+      <CapArt x0={x0} y={y} D={D * k} R={R * k} />
+      <CenterLine d={`M ${x0 - 16} ${y} L ${x0 + D * k + 14} ${y}`} />
+      <Ext x1={x0} y1={y - R * k} x2={x0} y2={top - 6} />
+      <Ext x1={x0 + D * k} y1={y} x2={x0 + D * k} y2={top - 6} />
+      <DimLine x1={x0} y1={top} x2={x0 + D * k} y2={top} className="qd-dim strong" />
+      <FigText x={x0 + (D * k) / 2} y={top - 7}>{v(0)}</FigText>
+    </svg>
+  )
+}
+
+/** Y継手(45°Y・大曲りY・DT)。メインは横(左=上流・右=下流)、枝は45°Yなら左上、それ以外は上 */
+function WyeFigure({
+  shape,
+  joint,
+  mm,
+  v,
+}: {
+  shape: 'wye45' | 'wye90'
+  joint: Joint
+  mm: { a: number; b?: number; c?: number; od: number; bod?: number }
+  v: (i: number) => string
+}) {
+  const ro = mm.od / 2
+  const bro = (mm.bod ?? mm.od) / 2
+  const near = mm.a
+  const far = mm.b ?? mm.a
+  const br = mm.c ?? mm.a
+  const u = shape === 'wye45' ? { x: -S45, y: -S45 } : { x: 0, y: -1 }
+  const e = artExtent(joint, 1, ro) // hub と depth(=face-1)
+  const be = artExtent(joint, 1, bro)
+  const depth = e.face - 1
+  const bdepth = be.face - 1
+  // 図の外枠(芯からの広がり, mm)
+  const left = Math.max(far + depth, -u.x * (br + bdepth) + be.hub * Math.abs(u.y))
+  const right = near + depth
+  const up = Math.max(e.hub, -u.y * (br + bdepth) + be.hub * Math.abs(u.x))
+  const down = e.hub
+  const k = Math.min(300 / (left + right), 150 / (up + down))
+  const O = { x: 30 + left * k + (300 - (left + right) * k) / 2, y: 18 + up * k }
+  const nr = { x: -u.y, y: u.x } // 枝の右側
+  const nSide = nr.x >= 0 ? nr : { x: -nr.x, y: -nr.y }
+  const off = be.hub * k + 14
+  const B = { x: O.x + u.x * br * k, y: O.y + u.y * br * k }
+  const below = O.y + e.hub * k + 16
+  return (
+    <svg className="qd-svg qd-fig" viewBox="0 0 360 236" role="img" aria-label="Y継手">
+      <FittingArt
+        joint={joint}
+        C={O}
+        legs={[{ x: -1, y: 0 }, { x: 1, y: 0 }, u]}
+        A={near * k}
+        legA={[far * k, near * k, br * k]}
+        ro={ro * k}
+        branchRo={bro * k}
+      />
+      <CenterLine d={`M ${O.x - (far + depth) * k - 8} ${O.y} L ${O.x + (near + depth) * k + 8} ${O.y} M ${O.x} ${O.y} L ${O.x + u.x * (br + bdepth) * k + u.x * 8} ${O.y + u.y * (br + bdepth) * k + u.y * 8}`} />
+      <Ext x1={O.x - far * k} y1={O.y} x2={O.x - far * k} y2={below + 6} />
+      <Ext x1={O.x} y1={O.y} x2={O.x} y2={below + 6} />
+      <Ext x1={O.x + near * k} y1={O.y} x2={O.x + near * k} y2={below + 6} />
+      <DimLine x1={O.x - far * k} y1={below} x2={O.x} y2={below} className="qd-dim strong" />
+      <DimLine x1={O.x} y1={below} x2={O.x + near * k} y2={below} className="qd-dim strong" />
+      {/* 上流・下流の長さが短くても重ならないよう、芯をはさんで左右に寄せる */}
+      <FigText x={O.x - 6} y={below + 24} anchor="end">上流 {v(1)}</FigText>
+      <FigText x={O.x + 6} y={below + 24} anchor="start">下流 {v(0)}</FigText>
+      <DimLine
+        x1={O.x + nSide.x * off}
+        y1={O.y + nSide.y * off}
+        x2={B.x + nSide.x * off}
+        y2={B.y + nSide.y * off}
+        className="qd-dim strong"
+      />
+      <FigText x={(O.x + B.x) / 2 + nSide.x * (off + 10)} y={(O.y + B.y) / 2 + nSide.y * (off + 10) + 8} anchor="start">
+        枝 {v(2)}
+      </FigText>
+      <text x={346} y={O.y - 6} className="qd-label-s" textAnchor="end">
+        流れ →
+      </text>
+    </svg>
+  )
 }
 
 /**
@@ -643,10 +795,15 @@ function FigText({ x, y, children, anchor = 'middle' }: { x: number; y: number; 
   )
 }
 
-export function FittingFigure({ shape, values, joint, mm }: FittingFigureProps) {
+export function FittingFigure({ shape, values, joint, mm, fittingId }: FittingFigureProps) {
   const v = (i: number) => values[i] ?? '—'
-  if (joint && mm && mm.a > 0 && mm.od > 0 && (shape === 'elbow90' || shape === 'elbow45' || shape === 'tee')) {
-    return <ArtFigure shape={shape} joint={joint} mm={mm} v={v} />
+  if (joint && mm && mm.a > 0 && mm.od > 0) {
+    if (shape === 'elbow90' || shape === 'elbow45' || shape === 'tee') {
+      return <ArtFigure shape={shape} joint={joint} mm={mm} v={v} />
+    }
+    if (shape === 'reducer') return <ReducerFigure joint={joint} mm={mm} v={v} fittingId={fittingId} />
+    if (shape === 'cap') return <CapFigure mm={mm} v={v} />
+    if (shape === 'wye45' || shape === 'wye90') return <WyeFigure shape={shape} joint={joint} mm={mm} v={v} />
   }
   const T = 30 // 図の管の太さ
   const tube = (d: string, key?: string) => (
