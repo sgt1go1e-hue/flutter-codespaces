@@ -4,7 +4,7 @@
 import type { ReactNode } from 'react'
 import type { QuickFittingKind } from '../lib/quickCalc'
 import type { FittingShape } from '../lib/fittingTable'
-import { FittingArt, type Joint } from './FittingArt'
+import { FittingArt, artExtent, type Joint } from './FittingArt'
 
 const TUBE = 16 // 管の太さ(px)
 const LEG = 36 // 継手の脚の長さ(px)
@@ -88,7 +88,26 @@ function legOf(kind: QuickFittingKind): number {
  */
 const END_RO = 8 // 芯引きの図の管の外径の半分(px)
 
-function EndFitting({ kind, accent, joint }: { kind: QuickFittingKind; accent: boolean; joint?: Joint }) {
+/**
+ * 図の継手の脚の長さ(px)。実物の「引しろ:管の外径」の比にして、太く短い実物らしい形にする。
+ * 寸法が分からないときは従来の長さ。小さすぎ・大きすぎは図が読めないので範囲に収める。
+ */
+export function artLeg(real: { a: number; od: number } | undefined, fallback: number, min = 12, max = 40): number {
+  if (!real || real.a <= 0 || real.od <= 0) return fallback
+  return Math.min(max, Math.max(min, END_RO * (real.a / (real.od / 2))))
+}
+
+function EndFitting({
+  kind,
+  accent,
+  joint,
+  leg = LEG,
+}: {
+  kind: QuickFittingKind
+  accent: boolean
+  joint?: Joint
+  leg?: number
+}) {
   // 接続方式が分かっていれば、エルボ・Tはカタログ風の線画で描く
   if (joint && kind !== 'free' && kind !== 'flange') {
     const legs =
@@ -101,8 +120,8 @@ function EndFitting({ kind, accent, joint }: { kind: QuickFittingKind; accent: b
             : [{ x: 1, y: 0 }, { x: 0, y: 1 }]
     return (
       <g>
-        <FittingArt joint={joint} C={{ x: 0, y: 0 }} legs={legs} A={LEG} ro={END_RO} sw={1.6} accent={accent} />
-        <CenterLine d={kind === 'elbow45' ? `M -14 0 L ${LEG} 0 M 10 -10 L ${-LEG * S45 - 10} ${LEG * S45 + 10}` : kind === 'tee_branch' ? `M 0 ${-LEG - 8} L 0 ${LEG + 8} M -14 0 L ${LEG} 0` : `M 0 -14 L 0 ${LEG + 20} M ${kind === 'tee' ? -LEG - 8 : -14} 0 L ${LEG} 0`} />
+        <FittingArt joint={joint} C={{ x: 0, y: 0 }} legs={legs} A={leg} ro={END_RO} sw={1.6} accent={accent} />
+        <CenterLine d={kind === 'elbow45' ? `M -14 0 L ${leg} 0 M 10 -10 L ${-leg * S45 - 18} ${leg * S45 + 18}` : kind === 'tee_branch' ? `M 0 ${-leg - 18} L 0 ${leg + 18} M -14 0 L ${leg} 0` : `M 0 -14 L 0 ${leg + 26} M ${kind === 'tee' ? -leg - 18 : -14} 0 L ${leg} 0`} />
       </g>
     )
   }
@@ -161,6 +180,9 @@ export interface StraightDiagramProps {
   leftFace: boolean
   /** 接続方式(継手の絵の描き分けに使う) */
   joint?: Joint
+  /** 左右の継手の実寸(引しろ・管の外径 mm)。絵の太さの比に使う */
+  leftReal?: { a: number; od: number }
+  rightReal?: { a: number; od: number }
   rightFace: boolean
   selected: 'left' | 'right'
   onSelect: (end: 'left' | 'right') => void
@@ -206,8 +228,11 @@ export function StraightDiagram(p: StraightDiagramProps) {
   const CY = 124
   const XL = 50
   const XR = 310
-  const wL = legOf(p.leftKind)
-  const wR = legOf(p.rightKind)
+  const artOn = (k: QuickFittingKind) => !!p.joint && k !== 'free' && k !== 'flange'
+  const legL = artOn(p.leftKind) ? artLeg(p.leftReal, LEG) : LEG
+  const legR = artOn(p.rightKind) ? artLeg(p.rightReal, LEG) : LEG
+  const wL = artOn(p.leftKind) ? legL : legOf(p.leftKind)
+  const wR = artOn(p.rightKind) ? legR : legOf(p.rightKind)
   const leftFace = p.leftKind === 'free' || p.leftFace
   const rightFace = p.rightKind === 'free' || p.rightFace
   const pipeL = XL + wL
@@ -252,10 +277,10 @@ export function StraightDiagram(p: StraightDiagramProps) {
 
       {/* 継手 */}
       <g transform={`translate(${XL} ${CY})`}>
-        <EndFitting kind={p.leftKind} accent={p.selected === 'left'} joint={p.joint} />
+        <EndFitting kind={p.leftKind} accent={p.selected === 'left'} joint={p.joint} leg={legL} />
       </g>
       <g transform={`translate(${XR} ${CY}) scale(-1 1)`}>
-        <EndFitting kind={p.rightKind} accent={p.selected === 'right'} joint={p.joint} />
+        <EndFitting kind={p.rightKind} accent={p.selected === 'right'} joint={p.joint} leg={legR} />
       </g>
 
       {/* 選択中の端の目印 */}
@@ -293,6 +318,8 @@ export interface OffsetDiagramProps {
   faceText: string
   /** 接続方式(継手の絵の描き分けに使う) */
   joint?: Joint
+  /** 45°エルボの実寸(引しろ・管の外径 mm)。絵の太さの比に使う */
+  real?: { a: number; od: number }
   given: 'offset' | 'travel' | 'cut'
   onGiven: (g: 'offset' | 'travel' | 'cut') => void
 }
@@ -300,7 +327,7 @@ export interface OffsetDiagramProps {
 export function OffsetDiagram(p: OffsetDiagramProps) {
   const P1 = { x: 96, y: 214 }
   const P2 = { x: 256, y: 54 }
-  const leg = 30
+  const leg = p.joint ? artLeg(p.real, 30, 12, 34) : 30
   const r = leg / Math.tan(Math.PI / 8)
   // 下のエルボ: 水平の脚 → 斜めの脚
   const a1 = { x: P1.x - leg, y: P1.y }
@@ -440,6 +467,114 @@ export interface FittingFigureProps {
   values: string[]
   /** 接続方式。エルボ・Tはこれでカタログ風の線画を描き分ける */
   joint?: Joint
+  /** 実寸(mm)。引しろ(メイン/枝)と管の外径(メイン/枝)。あれば実物の太さの比で描く */
+  mm?: { a: number; b?: number; od: number; bod?: number }
+}
+
+/**
+ * エルボ・Tを、実物の「太さ:引しろ」の比のまま図の枠に収めて描く。
+ * 寸法線は継手の外形のすぐ外に置く。
+ */
+function ArtFigure({
+  shape,
+  joint,
+  mm,
+  v,
+}: {
+  shape: 'elbow90' | 'elbow45' | 'tee'
+  joint: Joint
+  mm: { a: number; b?: number; od: number; bod?: number }
+  v: (i: number) => string
+}) {
+  const ro = mm.od / 2
+  const ext = artExtent(joint, mm.a, ro)
+  const label = shape === 'tee' ? 'チーズ' : shape === 'elbow45' ? '45°エルボ' : '90°エルボ'
+  if (shape === 'elbow90') {
+    // 脚は下と右。左に縦の寸法、上に横の寸法の余白をとる
+    const box = { x: 78, y: 48, w: 250, h: 172 }
+    const span = ext.face + ext.hub
+    const k = Math.min(box.w / span, box.h / span)
+    const O = { x: box.x + ext.hub * k + (box.w - span * k) / 2, y: box.y + ext.hub * k }
+    const A = mm.a * k
+    const top = O.y - ext.hub * k - 12
+    const left = O.x - ext.hub * k - 12
+    return (
+      <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
+        <FittingArt joint={joint} C={O} legs={[{ x: 0, y: 1 }, { x: 1, y: 0 }]} A={A} ro={ro * k} />
+        <CenterLine d={`M ${O.x} ${O.y - ext.hub * k - 4} L ${O.x} ${O.y + ext.face * k + 8} M ${O.x - ext.hub * k - 4} ${O.y} L ${O.x + ext.face * k + 8} ${O.y}`} />
+        <Ext x1={O.x} y1={O.y} x2={O.x} y2={top - 6} />
+        <Ext x1={O.x + A} y1={O.y} x2={O.x + A} y2={top - 6} />
+        <DimLine x1={O.x} y1={top} x2={O.x + A} y2={top} className="qd-dim strong" />
+        <FigText x={O.x + A / 2} y={top - 7}>{v(0)}</FigText>
+        <Ext x1={O.x} y1={O.y} x2={left - 6} y2={O.y} />
+        <Ext x1={O.x} y1={O.y + A} x2={left - 6} y2={O.y + A} />
+        <DimLine x1={left} y1={O.y} x2={left} y2={O.y + A} className="qd-dim strong" />
+        <FigText x={left - 6} y={O.y + A / 2 + 8} anchor="end">{v(0)}</FigText>
+      </svg>
+    )
+  }
+  if (shape === 'elbow45') {
+    // 脚は左と右上(45°)。下に横の寸法、右下に斜めの寸法の余白をとる
+    const w = ext.face + ext.face * S45 + ext.hub * S45
+    const h = ext.face * S45 + ext.hub * S45 + ext.hub
+    const box = { x: 30, y: 24, w: 260, h: 150 }
+    const k = Math.min(box.w / w, box.h / h)
+    const O = { x: box.x + ext.face * k + (box.w - w * k) / 2, y: box.y + (ext.face * S45 + ext.hub * S45) * k }
+    const A = mm.a * k
+    const E1 = { x: O.x - A, y: O.y }
+    const E2 = { x: O.x + A * S45, y: O.y - A * S45 }
+    const below = O.y + ext.hub * k + 16
+    const off = ext.hub * k + 16
+    return (
+      <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
+        <FittingArt joint={joint} C={O} legs={[{ x: -1, y: 0 }, { x: S45, y: -S45 }]} A={A} ro={ro * k} />
+        <CenterLine d={`M ${O.x - ext.face * k - 8} ${O.y} L ${O.x + 20} ${O.y} M ${O.x - 16 * S45} ${O.y + 16 * S45} L ${O.x + (ext.face * k + 8) * S45} ${O.y - (ext.face * k + 8) * S45}`} />
+        <Ext x1={E1.x} y1={O.y} x2={E1.x} y2={below + 6} />
+        <Ext x1={O.x} y1={O.y} x2={O.x} y2={below + 6} />
+        <DimLine x1={E1.x} y1={below} x2={O.x} y2={below} className="qd-dim strong" />
+        <FigText x={(E1.x + O.x) / 2} y={below + 24}>{v(0)}</FigText>
+        <Ext x1={O.x} y1={O.y} x2={O.x + (off + 6) * S45} y2={O.y + (off + 6) * S45} />
+        <Ext x1={E2.x} y1={E2.y} x2={E2.x + (off + 6) * S45} y2={E2.y + (off + 6) * S45} />
+        <DimLine x1={O.x + off * S45} y1={O.y + off * S45} x2={E2.x + off * S45} y2={E2.y + off * S45} className="qd-dim strong" />
+        <FigText x={(O.x + E2.x) / 2 + (off + 12) * S45} y={(O.y + E2.y) / 2 + (off + 12) * S45 + 8} anchor="start">
+          {v(0)}
+        </FigText>
+      </svg>
+    )
+  }
+  // T: メインは左右、枝は下。上にメインの寸法、右に枝の寸法の余白をとる
+  const bro = (mm.bod ?? mm.od) / 2
+  const bext = artExtent(joint, mm.b ?? mm.a, bro)
+  const w = ext.face * 2
+  const h = ext.hub + bext.face
+  const box = { x: 20, y: 46, w: 320, h: 172 }
+  const k = Math.min(box.w / w, box.h / h)
+  const O = { x: 180, y: box.y + ext.hub * k }
+  const A = mm.a * k
+  const B = (mm.b ?? mm.a) * k
+  const top = O.y - ext.hub * k - 12
+  const right = O.x + bext.hub * k + 14
+  return (
+    <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
+      <FittingArt
+        joint={joint}
+        C={O}
+        legs={[{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }]}
+        A={A}
+        ro={ro * k}
+        branchA={B}
+        branchRo={bro * k}
+      />
+      <CenterLine d={`M ${O.x - ext.face * k - 8} ${O.y} L ${O.x + ext.face * k + 8} ${O.y} M ${O.x} ${O.y - ext.hub * k - 4} L ${O.x} ${O.y + bext.face * k + 8}`} />
+      <Ext x1={O.x} y1={O.y} x2={O.x} y2={top - 6} />
+      <Ext x1={O.x + A} y1={O.y} x2={O.x + A} y2={top - 6} />
+      <DimLine x1={O.x} y1={top} x2={O.x + A} y2={top} className="qd-dim strong" />
+      <FigText x={O.x + A / 2} y={top - 7}>メイン {v(0)}</FigText>
+      <Ext x1={O.x} y1={O.y + B} x2={right + 6} y2={O.y + B} />
+      <DimLine x1={right} y1={O.y} x2={right} y2={O.y + B} className="qd-dim strong" />
+      <FigText x={right + 6} y={O.y + B / 2 + 8} anchor="start">枝 {v(1)}</FigText>
+    </svg>
+  )
 }
 
 /** 引しろ表の図での管の外径の半分(px)。差込溶接は鍛造のかたまりらしく太めに */
@@ -455,8 +590,11 @@ function FigText({ x, y, children, anchor = 'middle' }: { x: number; y: number; 
   )
 }
 
-export function FittingFigure({ shape, values, joint }: FittingFigureProps) {
+export function FittingFigure({ shape, values, joint, mm }: FittingFigureProps) {
   const v = (i: number) => values[i] ?? '—'
+  if (joint && mm && mm.a > 0 && mm.od > 0 && (shape === 'elbow90' || shape === 'elbow45' || shape === 'tee')) {
+    return <ArtFigure shape={shape} joint={joint} mm={mm} v={v} />
+  }
   const T = 30 // 図の管の太さ
   const tube = (d: string, key?: string) => (
     <g key={key}>

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { pipeTypes, sizesForPipeType, getSizeInfo, connectionMethods, nominalOf } from '../data/masters'
+import { pipeTypes, sizesForPipeType, getSizeInfo, connectionMethods, nominalOf, type DimValue } from '../data/masters'
 import type { RoundMode } from '../lib/cutlength'
 import {
   computeQuickCut,
@@ -241,6 +241,13 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
     setPrefs({ offsetGiven: g })
   }
 
+  // 図の継手の太さの比に使う実寸。「管の端から測る」でも継手そのものの引しろで描く
+  function endReal(e: QuickEndInput): { a: number; od: number } | undefined {
+    if (od == null) return undefined
+    const mm = quickEndAllowance({ ...e, basis: 'center' }, size, pipeType, vpSeries, connection).mm
+    return mm > 0 ? { a: mm, od } : undefined
+  }
+
   const end = selectedEnd === 'left' ? left : right
   function updateEnd(patch: Partial<QuickEndInput>) {
     const key = selectedEnd
@@ -462,6 +469,8 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
             <div className="qc-figure-card">
               <StraightDiagram
                 joint={connectionKindOf(pipeType, vpSeries, connection)}
+                leftReal={endReal(left)}
+                rightReal={endReal(right)}
                 leftKind={left.kind}
                 rightKind={right.kind}
                 leftFace={left.basis === 'face'}
@@ -607,6 +616,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
             <div className="qc-figure-card">
               <OffsetDiagram
                 joint={connectionKindOf(pipeType, vpSeries, connection)}
+                real={od != null && offsetResult.allow > 0 ? { a: offsetResult.allow, od } : undefined}
                 given={prefs.offsetGiven}
                 onGiven={pickOffsetField}
                 offsetText={fmt(offsetResult.offset) === '—' ? '?' : fmt(offsetResult.offset)}
@@ -725,6 +735,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                   shape={shapeOf(tableFitting)}
                   values={tableRows.map((r) => r.value)}
                   joint={tableGroup}
+                  mm={figureMm(tableFitting.dims[tableKey], tableKey, tableGroup)}
                 />
                 <div className="qc-fig-values">
                   {tableRows.map((r) => (
@@ -916,4 +927,20 @@ function planJump(
   const resolved = quickEndAllowance(end, size, pipeType, vpSeries, connection)
   if (resolved.fittingId !== fittingId) return undefined
   return { pipeType, connection, vpSeries, size, end }
+}
+
+// 引しろ表の図を実物の太さの比で描くための寸法(mm)。引しろと管の外径(メイン/枝)
+function figureMm(
+  dim: DimValue | undefined,
+  key: string,
+  group: ConnectionKind,
+): { a: number; b?: number; od: number; bod?: number } | undefined {
+  const isVp = group === 'vp_dv' || group === 'vp_ts'
+  const [n1, n2] = key.split('_')
+  const odOf = (n?: string) => (n ? getSizeInfo(isVp ? `VP${n}` : `${n}A`)?.od : undefined)
+  const od = odOf(n1)
+  if (dim == null || od == null) return undefined
+  if (typeof dim === 'number') return { a: dim, od }
+  if ('run' in dim) return { a: dim.run, b: dim.branch, od, bod: odOf(n2) ?? od }
+  return undefined
 }

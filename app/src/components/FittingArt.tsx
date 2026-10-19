@@ -45,20 +45,29 @@ interface Proportions {
   tangent: number
 }
 
-function proportions(joint: Joint, A: number, ro: number, isTee: boolean): Proportions {
+// 太さの比率は実物のカタログ寸法から(管の外径の半分 ro に対する比)。
+// 差込・ねじ込み・塩ビは、受口どうしが芯で突き当たる「かたまり」に外側の角の丸みをつけた形。
+function proportions(joint: Joint, A: number, ro: number): Proportions {
   switch (joint) {
     case 'buttweld':
       return { depth: 0, hub: ro, bendHalf: ro, bore: ro * 0.86, tangent: A }
     case 'socket':
-      return { depth: ro * 1.2, hub: ro * 1.5, bendHalf: ro * 1.5, bore: ro * 0.62, tangent: 0 }
+      return { depth: ro * 0.8, hub: ro * 1.55, bendHalf: ro * 1.55, bore: ro * 0.7, tangent: 0 }
     case 'thread':
-      return { depth: ro * 1.1, hub: ro * 1.3, bendHalf: ro * 1.22, bore: ro * 0.8, tangent: isTee ? 0 : A * 0.62 }
+      return { depth: ro * 0.9, hub: ro * 1.28, bendHalf: ro * 1.28, bore: ro * 0.82, tangent: 0 }
     case 'vp_ts':
-      return { depth: ro * 1.7, hub: ro * 1.3, bendHalf: ro * 1.22, bore: ro * 0.82, tangent: isTee ? 0 : A * 0.55 }
+      return { depth: ro * 2.4, hub: ro * 1.25, bendHalf: ro * 1.25, bore: ro * 0.84, tangent: 0 }
     case 'vp_dv':
     default:
-      return { depth: ro * 1.9, hub: ro * 1.16, bendHalf: ro * 1.12, bore: ro * 0.9, tangent: isTee ? 0 : A * 0.8 }
+      return { depth: ro * 1.4, hub: ro * 1.12, bendHalf: ro * 1.12, bore: ro * 0.9, tangent: 0 }
   }
+}
+
+/** 芯〜端面の長さと、受口の外側の半幅（図の配置を決めるのに使う） */
+export function artExtent(joint: Joint, A: number, ro: number): { face: number; hub: number } {
+  const P = proportions(joint, A, ro)
+  const rim = joint === 'thread' ? ro * 0.18 : joint === 'vp_dv' ? ro * 0.1 : 0
+  return { face: A + P.depth, hub: P.hub + rim }
 }
 
 /** 脚の上の点: 芯Cから向きuへ距離r、横へw(左手側が正) */
@@ -113,13 +122,17 @@ export interface FittingArtProps {
   accent?: boolean
   /** 枝だけ別の引しろにする(T)。省略時はA */
   branchA?: number
+  /** 枝だけ別の太さにする(径違いT)。省略時はro */
+  branchRo?: number
 }
 
-export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA }: FittingArtProps) {
+export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA, branchRo }: FittingArtProps) {
   const isTee = legs.length === 3
-  const P = proportions(joint, A, ro, isTee)
+  const P = proportions(joint, A, ro)
   const Aof = (i: number) => (isTee && i === 2 && branchA != null ? branchA : A)
-  const Fof = (i: number) => Aof(i) + P.depth
+  const roOf = (i: number) => (isTee && i === 2 && branchRo != null ? branchRo : ro)
+  const Pof = (i: number) => (isTee && i === 2 ? proportions(joint, Aof(i), roOf(i)) : P)
+  const Fof = (i: number) => Aof(i) + Pof(i).depth
   const lineCls = accent ? 'fa-line accent' : 'fa-line'
 
   // ---- 外形の部品
@@ -135,7 +148,7 @@ export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA }: F
   legs.forEach((u, k) => {
     // 曲がりと少し重ねる(継ぎ目に細い線が出ないように)
     const from = P.tangent > 0 && !isTee ? Math.max(0, P.tangent - 2) : 0
-    if (Fof(k) > from) body.push(legRect(C, u, from, Fof(k), P.hub))
+    if (Fof(k) > from) body.push(legRect(C, u, from, Fof(k), Pof(k).hub))
   })
   if (isTee) {
     // Tの中心のかたまり。角を少し丸めた四角
@@ -148,8 +161,10 @@ export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA }: F
     body.push(`M${f(C.x - h)},${f(C.y)} A${f(h)},${f(h)} 0 1 0 ${f(C.x + h)},${f(C.y)} A${f(h)},${f(h)} 0 1 0 ${f(C.x - h)},${f(C.y)}Z`)
   }
   // 口元の帯（ねじ込みのビード／DVのつば）
-  if (joint === 'thread') legs.forEach((u, k) => body.push(legRect(C, u, Fof(k) - ro * 0.45, Fof(k), P.hub + ro * 0.18)))
-  if (joint === 'vp_dv') legs.forEach((u, k) => body.push(legRect(C, u, Fof(k) - ro * 0.22, Fof(k), P.hub + ro * 0.1)))
+  if (joint === 'thread')
+    legs.forEach((u, k) => body.push(legRect(C, u, Fof(k) - roOf(k) * 0.45, Fof(k), Pof(k).hub + roOf(k) * 0.18)))
+  if (joint === 'vp_dv')
+    legs.forEach((u, k) => body.push(legRect(C, u, Fof(k) - roOf(k) * 0.22, Fof(k), Pof(k).hub + roOf(k) * 0.1)))
 
   // ---- 内側・端の線
   const det: ReactNode[] = []
@@ -162,6 +177,7 @@ export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA }: F
     // 開先: 端面の手前に1本と、角の面取り
     legs.forEach((u, k) => {
       const F = Fof(k)
+      const ro = roOf(k)
       const c = ro * 0.22
       det.push(line(`M${pt(legPt(C, u, F - c, -ro))} L${pt(legPt(C, u, F, -ro + c))} L${pt(legPt(C, u, F, ro - c))} L${pt(legPt(C, u, F - c, ro))}`, `bv${k}`))
       det.push(line(`M${pt(legPt(C, u, F - c, -ro))} L${pt(legPt(C, u, F - c, ro))}`, `bl${k}`, thin * 0.8))
@@ -171,10 +187,12 @@ export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA }: F
     legs.forEach((u, k) => {
       const F = Fof(k)
       const a = Aof(k)
+      const ro = roOf(k)
+      const bore = Pof(k).bore
       const inMouth = joint === 'thread' ? ro * 1.0 : ro
       const inBottom = joint === 'thread' ? ro * 0.86 : ro
       for (const s of [-1, 1]) {
-        det.push(line(`M${pt(legPt(C, u, F, s * inMouth))} L${pt(legPt(C, u, a, s * inBottom))} L${pt(legPt(C, u, a, s * P.bore))}`, `so${k}${s}`))
+        det.push(line(`M${pt(legPt(C, u, F, s * inMouth))} L${pt(legPt(C, u, a, s * inBottom))} L${pt(legPt(C, u, a, s * bore))}`, `so${k}${s}`))
       }
       if (joint === 'thread') {
         // ねじ山を細い線で数本
@@ -222,11 +240,12 @@ export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA }: F
       const nearA = at(m1, A, side * P.bore)
       const nearB = at(m2, A, side * P.bore)
       const brA = Aof(2)
+      const brBore = Pof(2).bore
       const pb = perp(br)
       // 枝の左右の線のうち、メイン1(m1)側にある方
       const s1 = Math.sign(dot(pb, m1)) || 1
-      const brM1 = add(add(C, mul(br, brA)), mul(pb, s1 * P.bore))
-      const brM2 = add(add(C, mul(br, brA)), mul(pb, -s1 * P.bore))
+      const brM1 = add(add(C, mul(br, brA)), mul(pb, s1 * brBore))
+      const brM2 = add(add(C, mul(br, brA)), mul(pb, -s1 * brBore))
       const xM1 = intersect(brM1, br, nearA, m1)
       const xM2 = intersect(brM2, br, nearA, m1)
       det.push(line(`M${pt(nearA)} L${pt(xM1)} L${pt(brM1)}`, 'tn1'))
