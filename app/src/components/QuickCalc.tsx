@@ -461,6 +461,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
           <>
             <div className="qc-figure-card">
               <StraightDiagram
+                joint={connectionKindOf(pipeType, vpSeries, connection)}
                 leftKind={left.kind}
                 rightKind={right.kind}
                 leftFace={left.basis === 'face'}
@@ -605,6 +606,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
           <>
             <div className="qc-figure-card">
               <OffsetDiagram
+                joint={connectionKindOf(pipeType, vpSeries, connection)}
                 given={prefs.offsetGiven}
                 onGiven={pickOffsetField}
                 offsetText={fmt(offsetResult.offset) === '—' ? '?' : fmt(offsetResult.offset)}
@@ -719,7 +721,11 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                   <span>{fittingChipLabel(tableFitting)}</span>
                   <span>{tableFitting.drawingNo ?? ''}</span>
                 </div>
-                <FittingFigure shape={shapeOf(tableFitting)} values={tableRows.map((r) => r.value)} />
+                <FittingFigure
+                  shape={shapeOf(tableFitting)}
+                  values={tableRows.map((r) => r.value)}
+                  joint={tableGroup}
+                />
                 <div className="qc-fig-values">
                   {tableRows.map((r) => (
                     <div key={r.label} className="qc-fig-value">

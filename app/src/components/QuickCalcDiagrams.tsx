@@ -4,6 +4,7 @@
 import type { ReactNode } from 'react'
 import type { QuickFittingKind } from '../lib/quickCalc'
 import type { FittingShape } from '../lib/fittingTable'
+import { FittingArt, type Joint } from './FittingArt'
 
 const TUBE = 16 // 管の太さ(px)
 const LEG = 36 // 継手の脚の長さ(px)
@@ -85,7 +86,26 @@ function legOf(kind: QuickFittingKind): number {
  * 1端分の継手を、継手の芯を原点・管が+x方向に伸びる向きで描く。
  * 右端は呼び出し側で左右反転して使う。
  */
-function EndFitting({ kind, accent }: { kind: QuickFittingKind; accent: boolean }) {
+const END_RO = 8 // 芯引きの図の管の外径の半分(px)
+
+function EndFitting({ kind, accent, joint }: { kind: QuickFittingKind; accent: boolean; joint?: Joint }) {
+  // 接続方式が分かっていれば、エルボ・Tはカタログ風の線画で描く
+  if (joint && kind !== 'free' && kind !== 'flange') {
+    const legs =
+      kind === 'elbow45'
+        ? [{ x: 1, y: 0 }, { x: -S45, y: S45 }]
+        : kind === 'tee'
+          ? [{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }]
+          : kind === 'tee_branch'
+            ? [{ x: 0, y: -1 }, { x: 0, y: 1 }, { x: 1, y: 0 }]
+            : [{ x: 1, y: 0 }, { x: 0, y: 1 }]
+    return (
+      <g>
+        <FittingArt joint={joint} C={{ x: 0, y: 0 }} legs={legs} A={LEG} ro={END_RO} sw={1.6} accent={accent} />
+        <CenterLine d={kind === 'elbow45' ? `M -14 0 L ${LEG} 0 M 10 -10 L ${-LEG * S45 - 10} ${LEG * S45 + 10}` : kind === 'tee_branch' ? `M 0 ${-LEG - 8} L 0 ${LEG + 8} M -14 0 L ${LEG} 0` : `M 0 -14 L 0 ${LEG + 20} M ${kind === 'tee' ? -LEG - 8 : -14} 0 L ${LEG} 0`} />
+      </g>
+    )
+  }
   switch (kind) {
     case 'elbow90_long':
     case 'elbow90_short':
@@ -139,6 +159,8 @@ export interface StraightDiagramProps {
   leftKind: QuickFittingKind
   rightKind: QuickFittingKind
   leftFace: boolean
+  /** 接続方式(継手の絵の描き分けに使う) */
+  joint?: Joint
   rightFace: boolean
   selected: 'left' | 'right'
   onSelect: (end: 'left' | 'right') => void
@@ -230,10 +252,10 @@ export function StraightDiagram(p: StraightDiagramProps) {
 
       {/* 継手 */}
       <g transform={`translate(${XL} ${CY})`}>
-        <EndFitting kind={p.leftKind} accent={p.selected === 'left'} />
+        <EndFitting kind={p.leftKind} accent={p.selected === 'left'} joint={p.joint} />
       </g>
       <g transform={`translate(${XR} ${CY}) scale(-1 1)`}>
-        <EndFitting kind={p.rightKind} accent={p.selected === 'right'} />
+        <EndFitting kind={p.rightKind} accent={p.selected === 'right'} joint={p.joint} />
       </g>
 
       {/* 選択中の端の目印 */}
@@ -269,6 +291,8 @@ export interface OffsetDiagramProps {
   cutState: 'ok' | 'none' | 'bad'
   /** 両端45°エルボのツラ〜ツラ(水平) */
   faceText: string
+  /** 接続方式(継手の絵の描き分けに使う) */
+  joint?: Joint
   given: 'offset' | 'travel' | 'cut'
   onGiven: (g: 'offset' | 'travel' | 'cut') => void
 }
@@ -335,8 +359,17 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       <Tube d={`M 14 ${P1.y} L ${a1.x} ${a1.y}`} />
       <Tube d={`M ${b1.x} ${b1.y} L ${a2.x} ${a2.y}`} />
       <Tube d={`M ${b2.x} ${b2.y} L 346 ${P2.y}`} />
-      <Tube d={`M ${a1.x} ${a1.y} A ${r} ${r} 0 0 0 ${b1.x} ${b1.y}`} accent />
-      <Tube d={`M ${a2.x} ${a2.y} A ${r} ${r} 0 0 1 ${b2.x} ${b2.y}`} accent />
+      {p.joint ? (
+        <>
+          <FittingArt joint={p.joint} C={P1} legs={[{ x: -1, y: 0 }, { x: S45, y: -S45 }]} A={leg} ro={END_RO} sw={1.6} accent />
+          <FittingArt joint={p.joint} C={P2} legs={[{ x: -S45, y: S45 }, { x: 1, y: 0 }]} A={leg} ro={END_RO} sw={1.6} accent />
+        </>
+      ) : (
+        <>
+          <Tube d={`M ${a1.x} ${a1.y} A ${r} ${r} 0 0 0 ${b1.x} ${b1.y}`} accent />
+          <Tube d={`M ${a2.x} ${a2.y} A ${r} ${r} 0 0 1 ${b2.x} ${b2.y}`} accent />
+        </>
+      )}
       <text x={P1.x + 22} y={P1.y + 4} className="qd-label-s" textAnchor="start" dominantBaseline="hanging">
         45° s1 {p.sText}
       </text>
@@ -405,6 +438,13 @@ export interface FittingFigureProps {
   shape: FittingShape
   /** 図に書き込む数値（形ごとに並びが決まっている。dimRowsの順） */
   values: string[]
+  /** 接続方式。エルボ・Tはこれでカタログ風の線画を描き分ける */
+  joint?: Joint
+}
+
+/** 引しろ表の図での管の外径の半分(px)。差込溶接は鍛造のかたまりらしく太めに */
+function figRo(joint: Joint): number {
+  return joint === 'socket' ? 22 : joint === 'buttweld' ? 16 : 18
 }
 
 function FigText({ x, y, children, anchor = 'middle' }: { x: number; y: number; children: ReactNode; anchor?: 'start' | 'middle' | 'end' }) {
@@ -415,7 +455,7 @@ function FigText({ x, y, children, anchor = 'middle' }: { x: number; y: number; 
   )
 }
 
-export function FittingFigure({ shape, values }: FittingFigureProps) {
+export function FittingFigure({ shape, values, joint }: FittingFigureProps) {
   const v = (i: number) => values[i] ?? '—'
   const T = 30 // 図の管の太さ
   const tube = (d: string, key?: string) => (
@@ -426,11 +466,15 @@ export function FittingFigure({ shape, values }: FittingFigureProps) {
   )
   switch (shape) {
     case 'elbow90': {
-      const O = { x: 130, y: 62 }
+      const O = { x: 130, y: joint ? 74 : 62 }
       const A = 110
       return (
         <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label="90°エルボ">
-          {tube(`M ${O.x} ${O.y + A} A ${A} ${A} 0 0 1 ${O.x + A} ${O.y}`)}
+          {joint ? (
+            <FittingArt joint={joint} C={O} legs={[{ x: 0, y: 1 }, { x: 1, y: 0 }]} A={A} ro={figRo(joint)} />
+          ) : (
+            tube(`M ${O.x} ${O.y + A} A ${A} ${A} 0 0 1 ${O.x + A} ${O.y}`)
+          )}
           <CenterLine d={`M ${O.x} ${O.y + A + 14} L ${O.x} ${O.y - 14} M ${O.x - 14} ${O.y} L ${O.x + A + 14} ${O.y}`} />
           <Ext x1={O.x} y1={O.y - 10} x2={O.x} y2={18} />
           <Ext x1={O.x + A} y1={O.y - 20} x2={O.x + A} y2={18} />
@@ -451,20 +495,24 @@ export function FittingFigure({ shape, values }: FittingFigureProps) {
       const E2 = { x: O.x + A * S45, y: O.y - A * S45 }
       return (
         <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label="45°エルボ">
-          {tube(`M ${E1.x} ${E1.y} A ${rr} ${rr} 0 0 0 ${E2.x} ${E2.y}`)}
+          {joint ? (
+            <FittingArt joint={joint} C={O} legs={[{ x: -1, y: 0 }, { x: S45, y: -S45 }]} A={A} ro={figRo(joint)} />
+          ) : (
+            tube(`M ${E1.x} ${E1.y} A ${rr} ${rr} 0 0 0 ${E2.x} ${E2.y}`)
+          )}
           <CenterLine d={`M ${E1.x - 14} ${O.y} L ${O.x + 30} ${O.y} M ${O.x - 20 * S45} ${O.y + 20 * S45} L ${E2.x + 14 * S45} ${E2.y - 14 * S45}`} />
-          <Ext x1={E1.x} y1={O.y + 20} x2={E1.x} y2={O.y + 44} />
-          <Ext x1={O.x} y1={O.y + 8} x2={O.x} y2={O.y + 44} />
-          <DimLine x1={E1.x} y1={O.y + 38} x2={O.x} y2={O.y + 38} className="qd-dim strong" />
-          <FigText x={(E1.x + O.x) / 2} y={O.y + 32}>{v(0)}</FigText>
+          <Ext x1={E1.x} y1={O.y + 20} x2={E1.x} y2={O.y + 54} />
+          <Ext x1={O.x} y1={O.y + 8} x2={O.x} y2={O.y + 54} />
+          <DimLine x1={E1.x} y1={O.y + 48} x2={O.x} y2={O.y + 48} className="qd-dim strong" />
+          <FigText x={(E1.x + O.x) / 2} y={O.y + 42}>{v(0)}</FigText>
           <DimLine
-            x1={O.x + 26 * S45}
-            y1={O.y + 26 * S45}
-            x2={E2.x + 26 * S45}
-            y2={E2.y + 26 * S45}
+            x1={O.x + 40 * S45}
+            y1={O.y + 40 * S45}
+            x2={E2.x + 40 * S45}
+            y2={E2.y + 40 * S45}
             className="qd-dim strong"
           />
-          <FigText x={(O.x + E2.x) / 2 + 46} y={(O.y + E2.y) / 2 + 30} anchor="start">{v(0)}</FigText>
+          <FigText x={(O.x + E2.x) / 2 + 56} y={(O.y + E2.y) / 2 + 40} anchor="start">{v(0)}</FigText>
           <text x={O.x + 40} y={O.y - 6} className="qd-label-s">45°</text>
         </svg>
       )
@@ -474,7 +522,17 @@ export function FittingFigure({ shape, values }: FittingFigureProps) {
       const A = 110
       return (
         <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label="チーズ">
-          {tube(`M ${O.x - A} ${O.y} L ${O.x + A} ${O.y} M ${O.x} ${O.y} L ${O.x} ${O.y + A}`)}
+          {joint ? (
+            <FittingArt
+              joint={joint}
+              C={O}
+              legs={[{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }]}
+              A={A}
+              ro={figRo(joint)}
+            />
+          ) : (
+            tube(`M ${O.x - A} ${O.y} L ${O.x + A} ${O.y} M ${O.x} ${O.y} L ${O.x} ${O.y + A}`)
+          )}
           <CenterLine d={`M ${O.x - A - 14} ${O.y} L ${O.x + A + 14} ${O.y} M ${O.x} ${O.y - 30} L ${O.x} ${O.y + A + 14}`} />
           <Ext x1={O.x} y1={O.y - 24} x2={O.x} y2={14} />
           <Ext x1={O.x + A} y1={O.y - 20} x2={O.x + A} y2={14} />

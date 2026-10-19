@@ -5276,3 +5276,25 @@ button.qc-history-row {
   text-overflow: ellipsis;
   padding: 0 6px;
 }
+
+/* --- 継手の線画（FittingArt） --- */
+.fa-line {
+  stroke: var(--text);
+}
+
+.fa-line.accent {
+  stroke: var(--accent);
+}
+
+.fa-fillline {
+  fill: var(--text);
+}
+
+.fa-fillline.accent {
+  fill: var(--accent);
+}
+
+.fa-fill {
+  fill: var(--bg);
+  stroke: none;
+}
