@@ -202,12 +202,15 @@ function FieldBox({
   cy,
   active,
   w = 164,
+  h = 28,
   rotate,
 }: {
   cx: number
   cy: number
   active: boolean
   w?: number
+  /** 高さ。28より大きいときは cy を中心に上下へ広げる(2段の文字用) */
+  h?: number
   /** 文字と同じ角度に傾ける(度) */
   rotate?: number
 }) {
@@ -215,9 +218,9 @@ function FieldBox({
     <rect
       transform={rotate ? `rotate(${rotate} ${cx} ${cy})` : undefined}
       x={cx - w / 2}
-      y={cy - 21}
+      y={h === 28 ? cy - 21 : cy - h / 2}
       width={w}
-      height={28}
+      height={h}
       rx={7}
       className={active ? 'qd-field active' : 'qd-field'}
     />
@@ -355,12 +358,12 @@ function RiserElbow({ C, u, leg, ro }: { C: { x: number; y: number }; u: { x: nu
   )
 }
 
-const xBLabel = 280 // 45°振りの図の b の枠の中心(x)
+const xBLabel = 290 // 45°振りの図の b の枠の中心(x)。「b」と数字の2段にして幅を細くしている
 
 export function OffsetDiagram(p: OffsetDiagramProps) {
-  // 配管は左に寄せ、右側の b の枠に寸法の補助線(縦線)がかからないようにする
-  const P1 = { x: 60, y: 214 }
-  const P2 = { x: 196, y: 78 }
+  // 右側の b の枠に寸法の補助線(縦線)がかからない範囲で、配管をなるべく右に置く
+  const P1 = { x: 80, y: 214 }
+  const P2 = { x: 216, y: 78 }
   const bx = xBLabel
   const legOf = (real?: { a: number; od: number }) => (p.joint ? artLeg(real, 30, 12, 34) : 30)
   const leg1 = legOf(p.real1)
@@ -457,14 +460,22 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       <Ext x1={P2.x + 4} y1={P2.y} x2={xB + 8} y2={P2.y} />
       <Ext x1={P1.x + 10} y1={P1.y} x2={xB + 8} y2={P1.y} />
       <DimLine x1={xB} y1={P2.y} x2={xB} y2={P1.y} className={p.given === 'offset' ? 'qd-dim strong' : 'qd-dim'} />
-      <FieldBox cx={bx} cy={(P1.y + P2.y) / 2} w={92} active={p.given === 'offset'} />
+      <FieldBox cx={bx} cy={(P1.y + P2.y) / 2} w={70} h={54} active={p.given === 'offset'} />
       <text
         x={bx}
-        y={(P1.y + P2.y) / 2}
+        y={(P1.y + P2.y) / 2 - 6}
         className={p.given === 'offset' ? 'qd-label-a' : 'qd-label-s big'}
         textAnchor="middle"
       >
-        b　{p.offsetText}
+        b
+      </text>
+      <text
+        x={bx}
+        y={(P1.y + P2.y) / 2 + 18}
+        className={p.given === 'offset' ? 'qd-label-a' : 'qd-label-s big'}
+        textAnchor="middle"
+      >
+        {p.offsetText}
       </text>
       <Ext x1={P1.x} y1={P1.y + 10} x2={P1.x} y2={yA + 8} />
       <Ext x1={P2.x} y1={P2.y + 10} x2={P2.x} y2={yA + 8} />
@@ -490,7 +501,7 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       )}
 
       {/* 寸法の数字をタップして、b / c / L のどれを入力するか選ぶ */}
-      <circle cx={bx} cy={(P1.y + P2.y) / 2 - 8} r={40} className="qd-hit" onPointerDown={() => p.onGiven('offset')} />
+      <circle cx={bx} cy={(P1.y + P2.y) / 2} r={38} className="qd-hit" onPointerDown={() => p.onGiven('offset')} />
       {/* c と L は斜めに近接して並ぶので、枠と同じ傾いた帯だけを当たり判定にする */}
       <rect
         transform={`rotate(-45 ${cm.x} ${cm.y})`}
