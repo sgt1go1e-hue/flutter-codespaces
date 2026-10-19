@@ -337,7 +337,6 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
   const pairFirst = tableKey?.split('_')[0]
   const pairSeconds = isPair ? tableKeys.filter((k) => k.split('_')[0] === pairFirst) : []
   const tableRows = tableFitting && tableKey ? dimRows(tableFitting, tableFitting.dims[tableKey]) : []
-  const groupInfo = FITTING_GROUPS.find((g) => g.kind === tableGroup)
   const tableInch = tableKey && !tableKey.includes('_') ? inchLabel(tableKey, tableGroup) : ''
   const jump = tableFitting && tableKey ? planJump(tableFitting.id, tableKey, tableGroup, pipeType) : undefined
 
@@ -772,7 +771,6 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                 </div>
                 <div className="qc-fig-sub">
                   <span>{fittingChipLabel(tableFitting)}</span>
-                  <span>{tableFitting.drawingNo ?? ''}</span>
                 </div>
                 <FittingFigure
                   shape={shapeOf(tableFitting)}
@@ -796,7 +794,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                   </button>
                 )}
                 <div className="qc-fig-note">
-                  {groupInfo?.maker}。芯（中心）から差込み底・端面までの寸法です。現物・カタログと照合してお使いください。
+                  芯（中心）から差込み底・端面までの参考寸法です。メーカーにより異なる場合があるため、現物・カタログと照合してお使いください。
                 </div>
               </div>
             )}

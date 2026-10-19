@@ -7,16 +7,16 @@ import type { ConnectionKind } from './takeout'
 export interface FittingGroup {
   kind: ConnectionKind
   label: string
-  /** 出典の表示名 */
-  maker: string
 }
 
+// 画面にはメーカー名・規格番号・図番を出さない(ユーザーの方針)。
+// 数値の出典(どのカタログから取ったか)は fittings.json の source / drawingNo / _comment に残す。
 export const FITTING_GROUPS: FittingGroup[] = [
-  { kind: 'buttweld', label: '突合せ溶接', maker: 'イノック SUS304 突合せ溶接' },
-  { kind: 'socket', label: '差込溶接', maker: '日本ジョイント 差込溶接 SCH80' },
-  { kind: 'thread', label: 'ねじ込み', maker: 'JIS B2301 ねじ込み式（桑名・リケン）' },
-  { kind: 'vp_dv', label: '塩ビDV', maker: '積水 エスロン DV継手' },
-  { kind: 'vp_ts', label: '塩ビTS', maker: 'クボタケミックス TS継手' },
+  { kind: 'buttweld', label: '突合せ溶接' },
+  { kind: 'socket', label: '差込溶接' },
+  { kind: 'thread', label: 'ねじ込み' },
+  { kind: 'vp_dv', label: '塩ビDV' },
+  { kind: 'vp_ts', label: '塩ビTS' },
 ]
 
 export function groupOfSource(source?: string | null): ConnectionKind | undefined {

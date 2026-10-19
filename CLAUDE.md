@@ -57,6 +57,8 @@ React + Vite + TypeScript のアプリ（`app/`）を、Capacitor で iOS / Andr
 - Tの呼び方は「メイン」と「枝」（「ラン」は使わない）。
 - 接続方法は「突合せ溶接・差込溶接・ねじ込み」の3つ。フランジはサブ的なもので、接続方法には入れない
   （フランジ自体はパーツ配置・クイック計算の端の継手として使える）。
+- 画面にメーカー名・規格番号(JIS等)・カタログの図番は出さない（載せないほうがリスクが少ないという方針）。
+  数値の出典は `app/src/data/fittings.json` の source / drawingNo / _comment にだけ残す。
 
 ## Android エミュレーターでの確認
 - `cd app && npm run sync:mobile` → `cd app/android && ./gradlew installDebug`
