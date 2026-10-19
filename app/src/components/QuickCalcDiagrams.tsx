@@ -355,9 +355,13 @@ function RiserElbow({ C, u, leg, ro }: { C: { x: number; y: number }; u: { x: nu
   )
 }
 
+const xBLabel = 280 // 45°振りの図の b の枠の中心(x)
+
 export function OffsetDiagram(p: OffsetDiagramProps) {
-  const P1 = { x: 96, y: 214 }
-  const P2 = { x: 256, y: 54 }
+  // 配管は左に寄せ、右側の b の枠に寸法の補助線(縦線)がかからないようにする
+  const P1 = { x: 60, y: 214 }
+  const P2 = { x: 196, y: 78 }
+  const bx = xBLabel
   const legOf = (real?: { a: number; od: number }) => (p.joint ? artLeg(real, 30, 12, 34) : 30)
   const leg1 = legOf(p.real1)
   const leg2 = legOf(p.real2)
@@ -375,8 +379,8 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
   const nx = -S45
   const ny = -S45
   const off = (pt: { x: number; y: number }, k: number) => ({ x: pt.x + nx * k, y: pt.y + ny * k })
-  const c1 = off(P1, 58)
-  const c2 = off(P2, 58)
+  const c1 = off(P1, 66)
+  const c2 = off(P2, 66)
   const l1 = off(b1, 30)
   const l2 = off(a2, 30)
   const mid = (u: { x: number; y: number }, v: { x: number; y: number }) => ({ x: (u.x + v.x) / 2, y: (u.y + v.y) / 2 })
@@ -453,9 +457,9 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       <Ext x1={P2.x + 4} y1={P2.y} x2={xB + 8} y2={P2.y} />
       <Ext x1={P1.x + 10} y1={P1.y} x2={xB + 8} y2={P1.y} />
       <DimLine x1={xB} y1={P2.y} x2={xB} y2={P1.y} className={p.given === 'offset' ? 'qd-dim strong' : 'qd-dim'} />
-      <FieldBox cx={xB - 56} cy={(P1.y + P2.y) / 2} w={104} active={p.given === 'offset'} />
+      <FieldBox cx={bx} cy={(P1.y + P2.y) / 2} w={92} active={p.given === 'offset'} />
       <text
-        x={xB - 56}
+        x={bx}
         y={(P1.y + P2.y) / 2}
         className={p.given === 'offset' ? 'qd-label-a' : 'qd-label-s big'}
         textAnchor="middle"
@@ -486,7 +490,7 @@ export function OffsetDiagram(p: OffsetDiagramProps) {
       )}
 
       {/* 寸法の数字をタップして、b / c / L のどれを入力するか選ぶ */}
-      <circle cx={xB - 56} cy={(P1.y + P2.y) / 2 - 8} r={44} className="qd-hit" onPointerDown={() => p.onGiven('offset')} />
+      <circle cx={bx} cy={(P1.y + P2.y) / 2 - 8} r={40} className="qd-hit" onPointerDown={() => p.onGiven('offset')} />
       {/* c と L は斜めに近接して並ぶので、枠と同じ傾いた帯だけを当たり判定にする */}
       <rect
         transform={`rotate(-45 ${cm.x} ${cm.y})`}
