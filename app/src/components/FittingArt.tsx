@@ -126,15 +126,32 @@ export interface FittingArtProps {
   branchRo?: number
   /** 脚ごとに引しろを変える(Y継手の上流・下流・枝など)。指定した脚はA/branchAより優先 */
   legA?: number[]
+  /** 受口の深さ(差込み底〜端面, px)を実寸で指定する(メイン/枝)。省略時は太さからの目安 */
+  depth?: number
+  branchDepth?: number
 }
 
-export function FittingArt({ joint, C, legs, A, ro, sw = 2, accent, branchA, branchRo, legA }: FittingArtProps) {
+export function FittingArt({
+  joint,
+  C,
+  legs,
+  A,
+  ro,
+  sw = 2,
+  accent,
+  branchA,
+  branchRo,
+  legA,
+  depth,
+  branchDepth,
+}: FittingArtProps) {
   const isTee = legs.length === 3
   const P = proportions(joint, A, ro)
   const Aof = (i: number) => legA?.[i] ?? (isTee && i === 2 && branchA != null ? branchA : A)
   const roOf = (i: number) => (isTee && i === 2 && branchRo != null ? branchRo : ro)
   const Pof = (i: number) => (isTee && i === 2 ? proportions(joint, Aof(i), roOf(i)) : P)
-  const Fof = (i: number) => Aof(i) + Pof(i).depth
+  const depthOf = (i: number) => (isTee && i === 2 ? branchDepth : depth) ?? Pof(i).depth
+  const Fof = (i: number) => Aof(i) + depthOf(i)
   const lineCls = accent ? 'fa-line accent' : 'fa-line'
 
   // ---- 外形の部品

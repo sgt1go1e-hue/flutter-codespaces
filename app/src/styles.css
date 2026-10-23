@@ -5313,3 +5313,9 @@ button.qc-history-row {
   font-size: 13px;
   font-weight: 800;
 }
+
+/* 引しろ表の「入り代」(図の入り代の寸法線と同じ色) */
+.qc-fig-value.ins,
+.qc-fig-value.ins b {
+  color: var(--label-zero);
+}

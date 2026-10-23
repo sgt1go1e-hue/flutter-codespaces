@@ -33,6 +33,7 @@ import {
 import type { ConnectionKind } from '../lib/takeout'
 import { useLocalStorage } from '../hooks/useLocalStorage'
 import { useSwipeDismiss } from '../hooks/useSwipeDismiss'
+import { socketDepth } from '../data/socketDepths'
 import { CalcKeypad } from './CalcKeypad'
 import { DrumWheel } from './DrumWheel'
 import { QuickCalcRecords, addRecord, type QcRecord, type QcFile } from './QuickCalcRecords'
@@ -338,6 +339,16 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
   const pairSeconds = isPair ? tableKeys.filter((k) => k.split('_')[0] === pairFirst) : []
   const tableRows = tableFitting && tableKey ? dimRows(tableFitting, tableFitting.dims[tableKey]) : []
   const tableInch = tableKey && !tableKey.includes('_') ? inchLabel(tableKey, tableGroup) : ''
+  // 管の入り代(ねじ込み・塩ビのエルボ・T)。径違いTの枝は枝の呼び径で引く
+  const tableIns = (() => {
+    if (!tableFitting || !tableKey) return undefined
+    const shape = shapeOf(tableFitting)
+    if (shape !== 'elbow90' && shape !== 'elbow45' && shape !== 'tee') return undefined
+    const [n1, n2] = tableKey.split('_')
+    const main = socketDepth(tableGroup, n1)
+    if (main == null) return undefined
+    return { main, branch: shape === 'tee' ? socketDepth(tableGroup, n2 ?? n1) : undefined }
+  })()
   const jump = tableFitting && tableKey ? planJump(tableFitting.id, tableKey, tableGroup, pipeType) : undefined
 
   // 引しろ表で見ている継手・サイズを、芯引きの左端にそのまま入れて計算を始める
@@ -778,6 +789,7 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                   joint={tableGroup}
                   mm={figureMm(tableFitting.dims[tableKey], tableKey, tableGroup)}
                   fittingId={tableFitting.id}
+                  ins={tableIns}
                 />
                 <div className="qc-fig-values">
                   {tableRows.map((r) => (
@@ -787,6 +799,17 @@ export function QuickCalc({ onClose, onRequirePaid }: Props) {
                       <span>mm</span>
                     </div>
                   ))}
+                  {tableIns && (
+                    <div className="qc-fig-value ins">
+                      <span>入り代</span>
+                      <b>
+                        {tableIns.branch != null && tableIns.branch !== tableIns.main
+                          ? `${tableIns.main}/${tableIns.branch}`
+                          : tableIns.main}
+                      </b>
+                      <span>mm</span>
+                    </div>
+                  )}
                 </div>
                 {jump && (
                   <button type="button" className="qc-jump" onClick={jumpToStraight}>

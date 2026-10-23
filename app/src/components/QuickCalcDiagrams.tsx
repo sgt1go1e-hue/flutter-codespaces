@@ -543,6 +543,8 @@ export interface FittingFigureProps {
   mm?: { a: number; b?: number; c?: number; od: number; bod?: number }
   /** 継手のid(偏心レジューサー・ブッシングなど形の描き分けに使う) */
   fittingId?: string
+  /** 管の入り代(mm)。ねじ込み・塩ビのエルボ・Tで、受口の深さを実寸で描き寸法を入れる */
+  ins?: { main?: number; branch?: number }
 }
 
 function ReducerFigure({
@@ -706,108 +708,6 @@ function WyeFigure({
  * エルボ・Tを、実物の「太さ:引しろ」の比のまま図の枠に収めて描く。
  * 寸法線は継手の外形のすぐ外に置く。
  */
-function ArtFigure({
-  shape,
-  joint,
-  mm,
-  v,
-}: {
-  shape: 'elbow90' | 'elbow45' | 'tee'
-  joint: Joint
-  mm: { a: number; b?: number; od: number; bod?: number }
-  v: (i: number) => string
-}) {
-  const ro = mm.od / 2
-  const ext = artExtent(joint, mm.a, ro)
-  const label = shape === 'tee' ? 'チーズ' : shape === 'elbow45' ? '45°エルボ' : '90°エルボ'
-  if (shape === 'elbow90') {
-    // 脚は下と右。左に縦の寸法、上に横の寸法の余白をとる
-    const box = { x: 78, y: 48, w: 250, h: 172 }
-    const span = ext.face + ext.hub
-    const k = Math.min(box.w / span, box.h / span)
-    const O = { x: box.x + ext.hub * k + (box.w - span * k) / 2, y: box.y + ext.hub * k }
-    const A = mm.a * k
-    const top = O.y - ext.hub * k - 12
-    const left = O.x - ext.hub * k - 12
-    return (
-      <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
-        <FittingArt joint={joint} C={O} legs={[{ x: 0, y: 1 }, { x: 1, y: 0 }]} A={A} ro={ro * k} />
-        <CenterLine d={`M ${O.x} ${O.y - ext.hub * k - 4} L ${O.x} ${O.y + ext.face * k + 8} M ${O.x - ext.hub * k - 4} ${O.y} L ${O.x + ext.face * k + 8} ${O.y}`} />
-        <Ext x1={O.x} y1={O.y} x2={O.x} y2={top - 6} />
-        <Ext x1={O.x + A} y1={O.y} x2={O.x + A} y2={top - 6} />
-        <DimLine x1={O.x} y1={top} x2={O.x + A} y2={top} className="qd-dim strong" />
-        <FigText x={O.x + A / 2} y={top - 7}>{v(0)}</FigText>
-        <Ext x1={O.x} y1={O.y} x2={left - 6} y2={O.y} />
-        <Ext x1={O.x} y1={O.y + A} x2={left - 6} y2={O.y + A} />
-        <DimLine x1={left} y1={O.y} x2={left} y2={O.y + A} className="qd-dim strong" />
-        <FigText x={left - 6} y={O.y + A / 2 + 8} anchor="end">{v(0)}</FigText>
-      </svg>
-    )
-  }
-  if (shape === 'elbow45') {
-    // 脚は左と右上(45°)。下に横の寸法、右下に斜めの寸法の余白をとる
-    const w = ext.face + ext.face * S45 + ext.hub * S45
-    const h = ext.face * S45 + ext.hub * S45 + ext.hub
-    const box = { x: 30, y: 24, w: 260, h: 150 }
-    const k = Math.min(box.w / w, box.h / h)
-    const O = { x: box.x + ext.face * k + (box.w - w * k) / 2, y: box.y + (ext.face * S45 + ext.hub * S45) * k }
-    const A = mm.a * k
-    const E1 = { x: O.x - A, y: O.y }
-    const E2 = { x: O.x + A * S45, y: O.y - A * S45 }
-    const below = O.y + ext.hub * k + 16
-    const off = ext.hub * k + 16
-    return (
-      <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
-        <FittingArt joint={joint} C={O} legs={[{ x: -1, y: 0 }, { x: S45, y: -S45 }]} A={A} ro={ro * k} />
-        <CenterLine d={`M ${O.x - ext.face * k - 8} ${O.y} L ${O.x + 20} ${O.y} M ${O.x - 16 * S45} ${O.y + 16 * S45} L ${O.x + (ext.face * k + 8) * S45} ${O.y - (ext.face * k + 8) * S45}`} />
-        <Ext x1={E1.x} y1={O.y} x2={E1.x} y2={below + 6} />
-        <Ext x1={O.x} y1={O.y} x2={O.x} y2={below + 6} />
-        <DimLine x1={E1.x} y1={below} x2={O.x} y2={below} className="qd-dim strong" />
-        <FigText x={(E1.x + O.x) / 2} y={below + 24}>{v(0)}</FigText>
-        <Ext x1={O.x} y1={O.y} x2={O.x + (off + 6) * S45} y2={O.y + (off + 6) * S45} />
-        <Ext x1={E2.x} y1={E2.y} x2={E2.x + (off + 6) * S45} y2={E2.y + (off + 6) * S45} />
-        <DimLine x1={O.x + off * S45} y1={O.y + off * S45} x2={E2.x + off * S45} y2={E2.y + off * S45} className="qd-dim strong" />
-        <FigText x={(O.x + E2.x) / 2 + (off + 12) * S45} y={(O.y + E2.y) / 2 + (off + 12) * S45 + 8} anchor="start">
-          {v(0)}
-        </FigText>
-      </svg>
-    )
-  }
-  // T: メインは左右、枝は下。上にメインの寸法、右に枝の寸法の余白をとる
-  const bro = (mm.bod ?? mm.od) / 2
-  const bext = artExtent(joint, mm.b ?? mm.a, bro)
-  const w = ext.face * 2
-  const h = ext.hub + bext.face
-  const box = { x: 20, y: 46, w: 320, h: 172 }
-  const k = Math.min(box.w / w, box.h / h)
-  const O = { x: 180, y: box.y + ext.hub * k }
-  const A = mm.a * k
-  const B = (mm.b ?? mm.a) * k
-  const top = O.y - ext.hub * k - 12
-  const right = O.x + bext.hub * k + 14
-  return (
-    <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
-      <FittingArt
-        joint={joint}
-        C={O}
-        legs={[{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: 1 }]}
-        A={A}
-        ro={ro * k}
-        branchA={B}
-        branchRo={bro * k}
-      />
-      <CenterLine d={`M ${O.x - ext.face * k - 8} ${O.y} L ${O.x + ext.face * k + 8} ${O.y} M ${O.x} ${O.y - ext.hub * k - 4} L ${O.x} ${O.y + bext.face * k + 8}`} />
-      <Ext x1={O.x} y1={O.y} x2={O.x} y2={top - 6} />
-      <Ext x1={O.x + A} y1={O.y} x2={O.x + A} y2={top - 6} />
-      <DimLine x1={O.x} y1={top} x2={O.x + A} y2={top} className="qd-dim strong" />
-      <FigText x={O.x + A / 2} y={top - 7}>メイン {v(0)}</FigText>
-      <Ext x1={O.x} y1={O.y + B} x2={right + 6} y2={O.y + B} />
-      <DimLine x1={right} y1={O.y} x2={right} y2={O.y + B} className="qd-dim strong" />
-      <FigText x={right + 6} y={O.y + B / 2 + 8} anchor="start">枝 {v(1)}</FigText>
-    </svg>
-  )
-}
-
 /** 引しろ表の図での管の外径の半分(px)。差込溶接は鍛造のかたまりらしく太めに */
 function figRo(joint: Joint): number {
   return joint === 'socket' ? 22 : joint === 'buttweld' ? 16 : 18
@@ -821,11 +721,143 @@ function FigText({ x, y, children, anchor = 'middle' }: { x: number; y: number; 
   )
 }
 
-export function FittingFigure({ shape, values, joint, mm, fittingId }: FittingFigureProps) {
+function ArtFigure({
+  shape,
+  joint,
+  mm,
+  v,
+  ins,
+}: {
+  shape: 'elbow90' | 'elbow45' | 'tee'
+  joint: Joint
+  mm: { a: number; b?: number; od: number; bod?: number }
+  v: (i: number) => string
+  /** 管の入り代(mm)。メイン/枝。あれば受口の深さをこの実寸で描き、寸法も入れる */
+  ins?: { main?: number; branch?: number }
+}) {
+  const ro = mm.od / 2
+  const base = artExtent(joint, mm.a, ro)
+  // 入り代が分かっていれば、受口の深さ(端面の位置)を実寸にする
+  const ext = ins?.main != null ? { face: mm.a + ins.main, hub: base.hub } : base
+  const label = shape === 'tee' ? 'チーズ' : shape === 'elbow45' ? '45°エルボ' : '90°エルボ'
+  /** 入り代の寸法線(差込み底〜端面)。引しろと区別できるよう色を変える */
+  const insDim = (x1: number, y1: number, x2: number, y2: number, tx: number, ty: number, anchor: 'start' | 'middle' | 'end' = 'middle') =>
+    ins?.main != null ? (
+      <g>
+        <DimLine x1={x1} y1={y1} x2={x2} y2={y2} className="qd-dim face" />
+        <text x={tx} y={ty} className="qd-label-face" textAnchor={anchor}>
+          入り代 {ins.main}
+        </text>
+      </g>
+    ) : null
+  if (shape === 'elbow90') {
+    // 脚は下と右。左に縦の寸法、上に横の寸法の余白をとる
+    // 上に「引しろ」と「入り代」の2段の文字が入るよう、上の余白を広めにとる
+    const box = { x: 78, y: ins?.main != null ? 64 : 52, w: 250, h: ins?.main != null ? 158 : 168 }
+    const span = ext.face + ext.hub
+    const k = Math.min(box.w / span, box.h / span)
+    const O = { x: box.x + ext.hub * k + (box.w - span * k) / 2, y: box.y + ext.hub * k }
+    const A = mm.a * k
+    const F = ext.face * k
+    const top = O.y - ext.hub * k - 12
+    const left = O.x - ext.hub * k - 12
+    return (
+      <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
+        <FittingArt joint={joint} C={O} legs={[{ x: 0, y: 1 }, { x: 1, y: 0 }]} A={A} ro={ro * k} depth={ins?.main != null ? ins.main * k : undefined} />
+        <CenterLine d={`M ${O.x} ${O.y - ext.hub * k - 4} L ${O.x} ${O.y + F + 8} M ${O.x - ext.hub * k - 4} ${O.y} L ${O.x + F + 8} ${O.y}`} />
+        <Ext x1={O.x} y1={O.y} x2={O.x} y2={top - 6} />
+        <Ext x1={O.x + A} y1={O.y} x2={O.x + A} y2={top - 6} />
+        <DimLine x1={O.x} y1={top} x2={O.x + A} y2={top} className="qd-dim strong" />
+        <FigText x={O.x + A / 2} y={top - 7}>{v(0)}</FigText>
+        {ins?.main != null && <Ext x1={O.x + F} y1={O.y - ext.hub * k} x2={O.x + F} y2={top - 6} />}
+        {insDim(O.x + A, top, O.x + F, top, Math.min(O.x + F, 352), top - 32, 'end')}
+        <Ext x1={O.x} y1={O.y} x2={left - 6} y2={O.y} />
+        <Ext x1={O.x} y1={O.y + A} x2={left - 6} y2={O.y + A} />
+        <DimLine x1={left} y1={O.y} x2={left} y2={O.y + A} className="qd-dim strong" />
+        <FigText x={left - 6} y={O.y + A / 2 + 8} anchor="end">{v(0)}</FigText>
+      </svg>
+    )
+  }
+  if (shape === 'elbow45') {
+    // 脚は左と右上(45°)。下に横の寸法、右下に斜めの寸法の余白をとる
+    const w = ext.face + ext.face * S45 + ext.hub * S45
+    const h = ext.face * S45 + ext.hub * S45 + ext.hub
+    // 下に「引しろ」と「入り代」の2段の文字が入るよう、下の余白を広めにとる
+    const box = { x: 30, y: 24, w: 260, h: ins?.main != null ? 124 : 146 }
+    const k = Math.min(box.w / w, box.h / h)
+    const O = { x: box.x + ext.face * k + (box.w - w * k) / 2, y: box.y + (ext.face * S45 + ext.hub * S45) * k }
+    const A = mm.a * k
+    const F = ext.face * k
+    const E1 = { x: O.x - A, y: O.y }
+    const E2 = { x: O.x + A * S45, y: O.y - A * S45 }
+    const below = O.y + ext.hub * k + 16
+    const off = ext.hub * k + 16
+    return (
+      <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
+        <FittingArt joint={joint} C={O} legs={[{ x: -1, y: 0 }, { x: S45, y: -S45 }]} A={A} ro={ro * k} depth={ins?.main != null ? ins.main * k : undefined} />
+        <CenterLine d={`M ${O.x - F - 8} ${O.y} L ${O.x + 20} ${O.y} M ${O.x - 16 * S45} ${O.y + 16 * S45} L ${O.x + (F + 8) * S45} ${O.y - (F + 8) * S45}`} />
+        <Ext x1={E1.x} y1={O.y} x2={E1.x} y2={below + 6} />
+        <Ext x1={O.x} y1={O.y} x2={O.x} y2={below + 6} />
+        <DimLine x1={E1.x} y1={below} x2={O.x} y2={below} className="qd-dim strong" />
+        <FigText x={(E1.x + O.x) / 2} y={below + 24}>{v(0)}</FigText>
+        {ins?.main != null && <Ext x1={O.x - F} y1={O.y + ext.hub * k} x2={O.x - F} y2={below + 6} />}
+        {insDim(O.x - F, below, E1.x, below, O.x - F, below + 44, 'start')}
+        <Ext x1={O.x} y1={O.y} x2={O.x + (off + 6) * S45} y2={O.y + (off + 6) * S45} />
+        <Ext x1={E2.x} y1={E2.y} x2={E2.x + (off + 6) * S45} y2={E2.y + (off + 6) * S45} />
+        <DimLine x1={O.x + off * S45} y1={O.y + off * S45} x2={E2.x + off * S45} y2={E2.y + off * S45} className="qd-dim strong" />
+        <FigText x={(O.x + E2.x) / 2 + (off + 12) * S45} y={(O.y + E2.y) / 2 + (off + 12) * S45 + 8} anchor="start">
+          {v(0)}
+        </FigText>
+      </svg>
+    )
+  }
+  // T: メインは左右、枝は上。下にメインの寸法、右に枝の寸法の余白をとる
+  const bro = (mm.bod ?? mm.od) / 2
+  const bbase = artExtent(joint, mm.b ?? mm.a, bro)
+  const bext = ins?.branch != null ? { face: (mm.b ?? mm.a) + ins.branch, hub: bbase.hub } : bbase
+  const w = ext.face * 2
+  const h = ext.hub + bext.face
+  const box = { x: 20, y: 14, w: 320, h: 158 }
+  const k = Math.min(box.w / w, box.h / h)
+  const O = { x: 180, y: box.y + bext.face * k }
+  const A = mm.a * k
+  const B = (mm.b ?? mm.a) * k
+  const F = ext.face * k
+  const below = O.y + ext.hub * k + 14
+  const right = O.x + bext.hub * k + 14
+  return (
+    <svg className="qd-svg qd-fig" viewBox="0 0 360 230" role="img" aria-label={label}>
+      <FittingArt
+        joint={joint}
+        C={O}
+        legs={[{ x: -1, y: 0 }, { x: 1, y: 0 }, { x: 0, y: -1 }]}
+        A={A}
+        ro={ro * k}
+        branchA={B}
+        branchRo={bro * k}
+        depth={ins?.main != null ? ins.main * k : undefined}
+        branchDepth={ins?.branch != null ? ins.branch * k : undefined}
+      />
+      <CenterLine d={`M ${O.x - F - 8} ${O.y} L ${O.x + F + 8} ${O.y} M ${O.x} ${O.y + ext.hub * k + 4} L ${O.x} ${O.y - bext.face * k - 8}`} />
+      <Ext x1={O.x} y1={O.y} x2={O.x} y2={below + 6} />
+      <Ext x1={O.x + A} y1={O.y} x2={O.x + A} y2={below + 6} />
+      <DimLine x1={O.x} y1={below} x2={O.x + A} y2={below} className="qd-dim strong" />
+      <FigText x={O.x + A / 2} y={below + 24}>メイン {v(0)}</FigText>
+      {ins?.main != null && <Ext x1={O.x + F} y1={O.y + ext.hub * k} x2={O.x + F} y2={below + 6} />}
+      {insDim(O.x + A, below, O.x + F, below, Math.min(O.x + F, 352), below + 44, 'end')}
+      <Ext x1={O.x} y1={O.y - B} x2={right + 6} y2={O.y - B} />
+      <DimLine x1={right} y1={O.y} x2={right} y2={O.y - B} className="qd-dim strong" />
+      <FigText x={right + 6} y={O.y - B / 2 + 8} anchor="start">枝 {v(1)}</FigText>
+    </svg>
+  )
+}
+
+
+export function FittingFigure({ shape, values, joint, mm, fittingId, ins }: FittingFigureProps) {
   const v = (i: number) => values[i] ?? '—'
   if (joint && mm && mm.a > 0 && mm.od > 0) {
     if (shape === 'elbow90' || shape === 'elbow45' || shape === 'tee') {
-      return <ArtFigure shape={shape} joint={joint} mm={mm} v={v} />
+      return <ArtFigure shape={shape} joint={joint} mm={mm} v={v} ins={ins} />
     }
     if (shape === 'reducer') return <ReducerFigure joint={joint} mm={mm} v={v} fittingId={fittingId} />
     if (shape === 'cap') return <CapFigure mm={mm} v={v} />
