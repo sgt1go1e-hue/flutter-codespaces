@@ -1311,7 +1311,8 @@ export function DrawingCanvas({
   }
 
   // レジューサーのシンボル。
-  // 同心=二等辺三角形（大径=底辺→小径=頂点）、偏心=直角三角形（斜辺の向きが Top/Bottom 連動）。
+  // 同心=二等辺三角形（大径=底辺→小径=頂点）、偏心=直角三角形（揃う面を配管の線上に置き、
+  // 下面合わせは線の上側・上面合わせは線の下側に本体を出す）。
   // 常に「上流(大径)側=底辺・下流(小径)側=頂点」。ルート向きが変わっても維持。
   function reducerSymbol(
     s: Segment,
@@ -1340,13 +1341,28 @@ export function DrawingCanvas({
     const largeCy = junction.y
     const c1 = { x: largeCx + nx * W, y: largeCy + ny * W }
     const c2 = { x: largeCx - nx * W, y: largeCy - ny * W }
-    let apex = { x: junction.x + ux * reach, y: junction.y + uy * reach } // 小径側の中心（同心の頂点）
+    const apex = { x: junction.x + ux * reach, y: junction.y + uy * reach } // 小径側の中心（同心の頂点）
     if (kind === 'eccentric' && align) {
-      // 画面上下で「面が揃う側」を決め、その角から頂点を配管方向へ伸ばす（斜辺=反対側）
-      const cTop = c1.y <= c2.y ? c1 : c2
-      const cBot = c1.y <= c2.y ? c2 : c1
-      const flush = align === 'bottom' ? cBot : cTop
-      apex = { x: flush.x + ux * reach, y: flush.y + uy * reach }
+      // 偏心は「面が揃う側」を配管の線上に置く（線の中央を通さない）。
+      // 線上の辺 = 揃う面（大径の端〜小径の端）、もう1つの角を大径の端から
+      // 図の上下（アイソメの鉛直＝画面の縦）へ大径分だけ出す。
+      // 下面合わせ=本体が線の上側、上面合わせ=本体が線の下側。
+      // 配管自体が画面でほぼ縦のときは上下が取れないので、配管に直角な右側へ出す。
+      const side = align === 'bottom' ? -1 : 1 // 画面のy: -1=上, +1=下
+      let ox = 0
+      let oy = side
+      if (Math.abs(ux) < 0.3) {
+        ox = nx >= 0 ? nx : -nx
+        oy = nx >= 0 ? ny : -ny
+      }
+      const small = { x: junction.x + ux * reach, y: junction.y + uy * reach }
+      const body = { x: junction.x + ox * 2 * W, y: junction.y + oy * 2 * W }
+      return (
+        <polygon
+          className="reducer-mark"
+          points={`${junction.x},${junction.y} ${body.x},${body.y} ${small.x},${small.y}`}
+        />
+      )
     }
     return (
       <polygon

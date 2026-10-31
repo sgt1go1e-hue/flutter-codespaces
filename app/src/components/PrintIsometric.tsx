@@ -491,12 +491,24 @@ export function PrintIsometric({
     const largeCy = junction.y
     const c1 = { x: largeCx + nx * W, y: largeCy + ny * W }
     const c2 = { x: largeCx - nx * W, y: largeCy - ny * W }
-    let apex = { x: junction.x + ux * reach, y: junction.y + uy * reach }
+    const apex = { x: junction.x + ux * reach, y: junction.y + uy * reach }
     if (kind === 'eccentric' && align) {
-      const cTop = c1.y <= c2.y ? c1 : c2
-      const cBot = c1.y <= c2.y ? c2 : c1
-      const flush = align === 'bottom' ? cBot : cTop
-      apex = { x: flush.x + ux * reach, y: flush.y + uy * reach }
+      // 揃う面を配管の線上に置く。理由はDrawingCanvas.tsxの同関数のコメント参照。
+      const side = align === 'bottom' ? -1 : 1 // 画面のy: -1=上, +1=下
+      let ox = 0
+      let oy = side
+      if (Math.abs(ux) < 0.3) {
+        ox = nx >= 0 ? nx : -nx
+        oy = nx >= 0 ? ny : -ny
+      }
+      const small = { x: junction.x + ux * reach, y: junction.y + uy * reach }
+      const body = { x: junction.x + ox * 2 * W, y: junction.y + oy * 2 * W }
+      return (
+        <polygon
+          className="reducer-mark"
+          points={`${junction.x},${junction.y} ${body.x},${body.y} ${small.x},${small.y}`}
+        />
+      )
     }
     return (
       <polygon
